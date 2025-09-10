@@ -1,0 +1,141 @@
+# BarberPro Local Development Environment
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: barberpro-postgres
+    environment:
+      POSTGRES_DB: barberpro_dev
+      POSTGRES_USER: barberpro
+      POSTGRES_PASSWORD: barberpro_dev_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - barberpro-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U barberpro -d barberpro_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: barberpro-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - barberpro-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Backend API (Fastify)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: barberpro-backend
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://barberpro:barberpro_dev_password@postgres:5432/barberpro_dev
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-jwt-secret-key-not-for-production
+      LOG_LEVEL: debug
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - barberpro-network
+    restart: unless-stopped
+    command: npm run dev:backend
+
+  # Frontend (SvelteKit)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: barberpro-frontend
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://localhost:3000/api
+      VITE_APP_URL: http://localhost:5173
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - barberpro-network
+    restart: unless-stopped
+    command: npm run dev:frontend
+
+  # Database Administration (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4:7
+    container_name: barberpro-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@barberpro.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - barberpro-network
+    restart: unless-stopped
+
+  # Redis Admin Interface
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: barberpro-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin123
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - barberpro-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  barberpro-network:
+    driver: bridge

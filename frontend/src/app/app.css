@@ -1,0 +1,36 @@
+@import '@fontsource/fira-mono';
+
+:root {
+	--font-mono: 'Fira Mono', monospace;
+	--color-primary: #1976D2;
+	--color-secondary: #FFB300;
+	--color-bg: #ffffff;
+	--color-text: #333333;
+	--color-border: #e5e7eb;
+}
+
+html {
+	/* firefox */
+	scrollbar-color: var(--color-primary) var(--color-bg);
+}
+
+body {
+	margin: 0;
+	font-family: system-ui, -apple-system, sans-serif;
+	background-color: var(--color-bg);
+	color: var(--color-text);
+	line-height: 1.5;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+a {
+	color: var(--color-primary);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}

@@ -1,0 +1,276 @@
+# BarberPro Performance Testing Configuration
+# Optimized for Argentina network conditions and expected user load
+
+config:
+  target: 'http://localhost:3000'
+  phases:
+    # Warm-up phase
+    - duration: 30
+      arrivalRate: 5
+      name: "Warm-up"
+    
+    # Normal load - simulate typical usage
+    - duration: 300  # 5 minutes
+      arrivalRate: 50  # 50 users per second
+      name: "Normal load"
+    
+    # Peak load - simulate busy periods (weekends, evenings)
+    - duration: 120  # 2 minutes
+      arrivalRate: 100  # 100 users per second
+      name: "Peak load"
+    
+    # Stress test - beyond normal capacity
+    - duration: 60   # 1 minute
+      arrivalRate: 200  # 200 users per second
+      name: "Stress test"
+  
+  # Performance thresholds for Argentina market
+  ensure:
+    # API response times (Argentina network conditions)
+    - http.response_time.p95: 500  # 95% of requests under 500ms
+    - http.response_time.p99: 1000 # 99% of requests under 1s
+    
+    # Success rates
+    - http.codes.200: 95          # 95% success rate minimum
+    - http.codes.500: 0           # No server errors
+    
+    # Booking-specific thresholds
+    - vusers.failed: 0            # No failed virtual users
+    - http.request_rate: 100      # At least 100 requests/second
+
+  # Simulate Argentina network conditions
+  http:
+    timeout: 10
+    connectionTimeout: 5
+    
+  # Variables for test data
+  variables:
+    cities:
+      - "Buenos Aires"
+      - "Córdoba" 
+      - "Mendoza"
+      - "Rosario"
+    
+    services:
+      - "corte"
+      - "barba"
+      - "combo"
+      - "afeitado"
+
+scenarios:
+  # Scenario 1: Provider Search (Most common action)
+  - name: "Provider Search Flow"
+    weight: 40
+    flow:
+      - get:
+          url: "/api/search/providers"
+          qs:
+            city: "{{ cities[$randomNumber(0,3)] }}"
+            service: "{{ services[$randomNumber(0,3)] }}"
+            limit: 20
+          headers:
+            Accept-Language: "es-AR"
+          capture:
+            - json: "$.providers[0].id"
+              as: "providerId"
+      
+      - think: 2  # User browses results for 2 seconds
+      
+      - get:
+          url: "/api/providers/{{ providerId }}"
+          headers:
+            Accept-Language: "es-AR"
+
+  # Scenario 2: Booking Creation (Critical business flow)
+  - name: "Booking Creation Flow"
+    weight: 25
+    flow:
+      # Search for providers
+      - get:
+          url: "/api/search/providers"
+          qs:
+            city: "Buenos Aires"
+            service: "corte"
+          capture:
+            - json: "$.providers[0].id"
+              as: "providerId"
+            - json: "$.providers[0].services[0].id"
+              as: "serviceId"
+      
+      # Get available time slots
+      - get:
+          url: "/api/providers/{{ providerId }}/availability"
+          qs:
+            date: "{{ $randomDate('2025-09-11', '2025-09-18') }}"
+          capture:
+            - json: "$.slots[0].time"
+              as: "timeSlot"
+      
+      # Create booking
+      - post:
+          url: "/api/bookings"
+          headers:
+            Content-Type: "application/json"
+            Accept-Language: "es-AR"
+          json:
+            providerId: "{{ providerId }}"
+            serviceId: "{{ serviceId }}"
+            startTime: "{{ timeSlot }}"
+            clientInfo:
+              name: "Test User {{ $randomString() }}"
+              email: "test{{ $randomNumber(1000,9999) }}@test.com"
+              phone: "+549111234{{ $randomNumber(1000,9999) }}"
+          capture:
+            - json: "$.bookingId"
+              as: "bookingId"
+      
+      # Simulate payment processing time
+      - think: 5
+      
+      # Complete payment (mock)
+      - post:
+          url: "/api/bookings/{{ bookingId }}/payment"
+          headers:
+            Content-Type: "application/json"
+          json:
+            paymentMethod: "mercadopago"
+            amount: 800
+
+  # Scenario 3: Provider Dashboard (Provider users)
+  - name: "Provider Dashboard"
+    weight: 20
+    flow:
+      # Provider login
+      - post:
+          url: "/api/auth/login"
+          headers:
+            Content-Type: "application/json"
+          json:
+            email: "provider{{ $randomNumber(1,10) }}@test.com"
+            password: "TestPassword123"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+      
+      # Get dashboard data
+      - get:
+          url: "/api/provider/dashboard"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+            Accept-Language: "es-AR"
+      
+      # Get today's bookings
+      - get:
+          url: "/api/provider/bookings"
+          qs:
+            date: "{{ $today }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      
+      # Update availability
+      - put:
+          url: "/api/provider/availability"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+            Content-Type: "application/json"
+          json:
+            date: "{{ $tomorrow }}"
+            slots:
+              - "09:00"
+              - "10:00"
+              - "11:00"
+
+  # Scenario 4: Real-time updates (WebSocket simulation)
+  - name: "Real-time Updates"
+    weight: 10
+    flow:
+      # Simulate checking for real-time updates
+      - get:
+          url: "/api/bookings/updates"
+          headers:
+            Accept-Language: "es-AR"
+      
+      - think: 10  # Wait 10 seconds
+      
+      # Check again (simulates WebSocket polling fallback)
+      - get:
+          url: "/api/bookings/updates"
+          headers:
+            Accept-Language: "es-AR"
+
+  # Scenario 5: Mobile API usage (High frequency, lower complexity)
+  - name: "Mobile Quick Actions"
+    weight: 5
+    flow:
+      # Quick provider search (mobile app)
+      - get:
+          url: "/api/search/quick"
+          qs:
+            lat: "-34.6118"  # Buenos Aires coordinates
+            lng: "-58.3960"
+            radius: "5"
+          headers:
+            User-Agent: "BarberPro-Mobile/1.0"
+            Accept-Language: "es-AR"
+      
+      # Get user's recent bookings
+      - get:
+          url: "/api/user/bookings/recent"
+          headers:
+            User-Agent: "BarberPro-Mobile/1.0"
+
+# Performance monitoring plugins
+plugins:
+  # Memory and CPU monitoring
+  metrics-by-endpoint:
+    useOnlyRequestNames: true
+  
+  # Custom metrics for business KPIs
+  publish-metrics:
+    - type: "cloudwatch"
+      namespace: "BarberPro/Performance"
+    
+  # Argentina-specific network simulation
+  network-conditions:
+    profiles:
+      argentina-3g:
+        latency: 150      # 150ms latency for 3G
+        download: 1600    # 1.6 Mbps download
+        upload: 750       # 750 Kbps upload
+      
+      argentina-4g:
+        latency: 50       # 50ms latency for 4G
+        download: 9000    # 9 Mbps download  
+        upload: 2000      # 2 Mbps upload
+      
+      argentina-wifi:
+        latency: 20       # 20ms latency for WiFi
+        download: 25000   # 25 Mbps download
+        upload: 5000      # 5 Mbps upload
+
+# Custom functions for test data
+functions:
+  $randomDate: |
+    function(startDate, endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const randomTime = start.getTime() + Math.random() * (end.getTime() - start.getTime());
+      return new Date(randomTime).toISOString().split('T')[0];
+    }
+  
+  $randomString: |
+    function() {
+      return Math.random().toString(36).substring(7);
+    }
+  
+  $today: |
+    function() {
+      return new Date().toISOString().split('T')[0];
+    }
+  
+  $tomorrow: |
+    function() {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return tomorrow.toISOString().split('T')[0];
+    }

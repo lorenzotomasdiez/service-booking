@@ -1,13 +1,49 @@
 import { PrismaClient } from '@prisma/client';
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
+class DatabaseService {
+  private static instance: DatabaseService;
+  public prisma: PrismaClient;
 
-export const db = globalForPrisma.prisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-});
+  private constructor() {
+    this.prisma = new PrismaClient({
+      log: process.env.NODE_ENV === 'development' 
+        ? ['query', 'info', 'warn', 'error'] 
+        : ['warn', 'error'],
+    });
+  }
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
+  public static getInstance(): DatabaseService {
+    if (!DatabaseService.instance) {
+      DatabaseService.instance = new DatabaseService();
+    }
+    return DatabaseService.instance;
+  }
 
-export default db;
+  public async connect(): Promise<void> {
+    try {
+      await this.prisma.$connect();
+      console.log('✅ Database connected successfully');
+    } catch (error) {
+      console.error('❌ Database connection failed:', error);
+      throw error;
+    }
+  }
+
+  public async disconnect(): Promise<void> {
+    await this.prisma.$disconnect();
+    console.log('👋 Database disconnected');
+  }
+
+  public async healthCheck(): Promise<boolean> {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return true;
+    } catch (error) {
+      console.error('Database health check failed:', error);
+      return false;
+    }
+  }
+}
+
+export const database = DatabaseService.getInstance();
+export const prisma = database.prisma;

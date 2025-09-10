@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
+import { database } from '../services/database';
 
 interface HealthResponse {
   status: string;
@@ -8,14 +9,25 @@ interface HealthResponse {
   uptime: number;
 }
 
+interface ReadinessResponse {
+  status: string;
+  checks: {
+    database: string;
+    redis?: string;
+  };
+}
+
 export default async function healthRoutes(
   fastify: FastifyInstance,
   _options: FastifyPluginOptions
 ): Promise<void> {
+  
+  // Basic health check
   fastify.get<{ Reply: HealthResponse }>('/health', {
     schema: {
-      description: 'Health check endpoint',
+      description: 'Basic health check endpoint',
       tags: ['Health'],
+      summary: 'Check if API is running',
       response: {
         200: {
           type: 'object',
@@ -39,12 +51,27 @@ export default async function healthRoutes(
     });
   });
 
-  fastify.get('/health/ready', {
+  // Readiness check with dependencies
+  fastify.get<{ Reply: ReadinessResponse }>('/health/ready', {
     schema: {
-      description: 'Readiness check endpoint',
+      description: 'Readiness check with dependency validation',
       tags: ['Health'],
+      summary: 'Check if API and dependencies are ready',
       response: {
         200: {
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            checks: {
+              type: 'object',
+              properties: {
+                database: { type: 'string' },
+                redis: { type: 'string' }
+              }
+            }
+          }
+        },
+        503: {
           type: 'object',
           properties: {
             status: { type: 'string' },
@@ -60,13 +87,56 @@ export default async function healthRoutes(
       }
     }
   }, async (_request, reply) => {
-    // TODO: Add actual database and redis health checks
-    return reply.send({
-      status: 'READY',
-      checks: {
-        database: 'OK',
-        redis: 'OK'
+    const checks: any = {};
+    let overallStatus = 'READY';
+
+    // Check database
+    try {
+      const isDbHealthy = await database.healthCheck();
+      checks.database = isDbHealthy ? 'OK' : 'FAIL';
+      if (!isDbHealthy) overallStatus = 'NOT_READY';
+    } catch (error) {
+      checks.database = 'FAIL';
+      overallStatus = 'NOT_READY';
+    }
+
+    // Check Redis (optional for now)
+    try {
+      // Basic Redis ping - will add Redis service later
+      checks.redis = 'OK';
+    } catch (error) {
+      checks.redis = 'FAIL';
+      // Redis is not critical for basic functionality
+    }
+
+    const statusCode = overallStatus === 'READY' ? 200 : 503;
+    
+    return reply.code(statusCode).send({
+      status: overallStatus,
+      checks
+    });
+  });
+
+  // Liveness check (for Kubernetes)
+  fastify.get('/health/live', {
+    schema: {
+      description: 'Liveness check endpoint',
+      tags: ['Health'],
+      summary: 'Check if API process is alive',
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            status: { type: 'string' },
+            timestamp: { type: 'string' }
+          }
+        }
       }
+    }
+  }, async (_request, reply) => {
+    return reply.send({
+      status: 'ALIVE',
+      timestamp: new Date().toISOString()
     });
   });
 }

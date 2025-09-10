@@ -1,0 +1,33 @@
+{
+  "name": "barberpro-tests",
+  "version": "1.0.0",
+  "description": "BarberPro Testing Suite - Performance and Security Tests",
+  "private": true,
+  "scripts": {
+    "test:performance": "artillery run performance/load-test.yml",
+    "test:performance:report": "artillery run performance/load-test.yml --output performance-report.json && artillery report performance-report.json",
+    "test:security": "npm run test:security:owasp && npm run test:security:deps",
+    "test:security:owasp": "zap-cli quick-scan --self-contained http://localhost:3000",
+    "test:security:deps": "npm audit --audit-level moderate",
+    "test:security:snyk": "snyk test",
+    "setup:test-data": "node scripts/setup-test-data.js",
+    "cleanup:test-data": "node scripts/cleanup-test-data.js",
+    "validate:argentina-compliance": "node scripts/validate-argentina-compliance.js"
+  },
+  "dependencies": {
+    "artillery": "^2.0.20",
+    "owasp-zap": "^0.2.0",
+    "snyk": "^1.1293.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "testing",
+    "performance",
+    "security",
+    "argentina",
+    "barberpro"
+  ]
+}

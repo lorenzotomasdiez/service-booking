@@ -1,0 +1,181 @@
+name: Bug Report
+description: Report a bug in BarberPro platform
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## BarberPro Bug Report
+        Thank you for reporting a bug! Please provide detailed information to help us resolve the issue quickly.
+        
+        **For Argentina-specific issues, please include location and device information.**
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Bug Severity
+      description: How critical is this bug?
+      options:
+        - P0 - Critical (System down, payment failures, security issues)
+        - P1 - High (Major feature broken, performance issues)
+        - P2 - Medium (Minor feature issues, UI problems)
+        - P3 - Low (Cosmetic issues, enhancements)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the system is affected?
+      options:
+        - Authentication (Login/Register)
+        - Provider Onboarding
+        - Client Booking Flow
+        - Payment Processing (MercadoPago)
+        - Provider Dashboard
+        - Client Dashboard
+        - Search & Discovery
+        - Notifications
+        - Mobile App (PWA)
+        - Backend API
+        - Database
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Where did you encounter this bug?
+      options:
+        - Production
+        - Staging
+        - Local Development
+        - Testing Environment
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser & Version
+      description: "Example: Chrome 118.0.5993.70, Safari 17.0, Firefox 119.0"
+      placeholder: Chrome 118.0.5993.70
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device Information
+      description: "Example: iPhone 14 iOS 17.0, Samsung Galaxy S22 Android 13, Desktop Windows 11"
+      placeholder: iPhone 14 iOS 17.0
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Argentina Location (if relevant)
+      description: "Example: Buenos Aires, Córdoba, Mendoza - helps with network/payment testing"
+      placeholder: Buenos Aires, Argentina
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Clear description of what went wrong
+      placeholder: "Describe the bug clearly and concisely..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the bug
+      placeholder: |
+        1. Go to...
+        2. Click on...
+        3. Enter...
+        4. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: "Describe what you expected to happen..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: "Describe what actually happened..."
+    validations:
+      required: true
+
+  - type: input
+    id: user_account
+    attributes:
+      label: Test User Account (if applicable)
+      description: "Test account used (do not include passwords)"
+      placeholder: "test.provider@barberpro.com"
+
+  - type: textarea
+    id: console_errors
+    attributes:
+      label: Console Errors
+      description: Any browser console errors (F12 → Console)
+      placeholder: "Paste console errors here..."
+
+  - type: textarea
+    id: network_info
+    attributes:
+      label: Network Information
+      description: "Connection type, speed, any network issues"
+      placeholder: "4G, WiFi, 3G slow connection..."
+
+  - type: checkboxes
+    id: argentina_specific
+    attributes:
+      label: Argentina-Specific Issues
+      description: Check any that apply
+      options:
+        - label: MercadoPago payment issue
+        - label: Argentina phone number format issue
+        - label: Argentina address format issue
+        - label: Spanish language/localization issue
+        - label: Argentina timezone issue
+        - label: Network performance issue
+        - label: Mobile performance on Argentina networks
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Information
+      description: Any other relevant information, screenshots, videos
+      placeholder: "Add any additional context, attach screenshots..."
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Bug Report Checklist
+      description: Please confirm you have done the following
+      options:
+        - label: I have searched existing issues to avoid duplicates
+          required: true
+        - label: I have provided clear steps to reproduce
+          required: true
+        - label: I have included browser and device information
+          required: true
+        - label: I have selected the appropriate severity level
+          required: true

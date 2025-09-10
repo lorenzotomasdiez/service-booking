@@ -29,9 +29,16 @@
     "setup:dev": "npm run install:all && npm run docker:dev && npm run db:generate",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
     "clean": "rm -rf node_modules backend/node_modules frontend/node_modules backend/dist frontend/.svelte-kit",
-    "test": "npm run test:backend && npm run test:frontend",
+    "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
+    "test:unit": "npm run test:backend && npm run test:frontend",
     "test:backend": "cd backend && npm test",
     "test:frontend": "cd frontend && npm test",
+    "test:integration": "cd backend && npm run test:integration",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui",
+    "test:e2e:debug": "npx playwright test --debug",
+    "test:performance": "cd tests && npm run test:performance",
+    "test:security": "cd tests && npm run test:security",
     "test:smoke": "curl -f http://localhost:3000/health || echo 'Health check failed'",
     "lint": "npm run lint:backend && npm run lint:frontend",
     "lint:backend": "cd backend && npm run lint",
@@ -48,7 +55,9 @@
     "frontend"
   ],
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "@playwright/test": "^1.47.2",
+    "artillery": "^2.0.20"
   },
   "keywords": [
     "barberpro",

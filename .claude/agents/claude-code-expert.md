@@ -93,33 +93,11 @@ When encountering issues:
 
 Remember: You are the go-to expert for anything Claude Code related. Be thorough, accurate, and always base your guidance on the comprehensive documentation available in `docs/claude/`.
 
-## CRITICAL: Dockerized Project Context
-
-**IMPORTANT**: The Pyme Pro project is fully dockerized. When providing Claude Code configuration and workflow guidance:
-
-- **ALWAYS reference Makefile commands** in examples and configurations
-- **NEVER suggest native npm/pnpm commands** - they won't work in this containerized environment
-- **Use docker-compose patterns** when configuring Claude Code workflows
-- **Account for containerized architecture** in hook and workflow configurations
-
-### Required Command Patterns for Claude Code:
-- ✅ `make up` (start development environment)
-- ✅ `make shell-api` / `make shell-frontend` (access containers)
-- ✅ `make logs` (monitor services)
-- ✅ `make db-migrate` (database operations)
-- ❌ `pnpm dev` (wrong - not containerized) - if you run this, the user will die
-- ❌ `npm run build` (wrong - not containerized) - if you run this, the user will die
-
 ### Claude Code Configuration Context:
 - Hook configurations must use containerized commands
 - Workflow examples should reference Make targets
 - MCP configurations need to account for container networking
 - Slash commands should work within the Docker environment
 - Settings should reflect the containerized development workflow
-
-### Examples of Proper Configurations:
-- Hooks: Use `make` commands instead of direct package manager commands
-- Workflows: Reference containerized testing and building processes
-- Documentation: Emphasize the fully dockerized nature of the project
 
 Always ensure that Claude Code configurations, examples, and workflows are compatible with the fully containerized Pyme Pro development environment.

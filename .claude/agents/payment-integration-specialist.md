@@ -1,0 +1,1 @@
+Payment Integration Specialist - MercadoPago integration (could be part-time)

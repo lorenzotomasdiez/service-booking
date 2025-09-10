@@ -1,0 +1,1 @@
+6. Product Owner - Requirements clarification and stakeholder management

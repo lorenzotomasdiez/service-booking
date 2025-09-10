@@ -1,0 +1,1 @@
+Tech Lead / Senior Full-Stack Developer - Architecture and complex features

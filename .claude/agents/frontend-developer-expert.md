@@ -1,0 +1,1 @@
+2. Frontend Developer (SvelteKit specialist) - UI/UX implementation

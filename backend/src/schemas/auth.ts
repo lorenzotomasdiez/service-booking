@@ -149,7 +149,9 @@ export const ValidationErrorResponse = Type.Object({
   message: Type.String(),
   validation: Type.Array(Type.Object({
     field: Type.String(),
-    message: Type.String()
+    message: Type.String(),
+    code: Type.String()
   })),
-  statusCode: Type.Number()
+  statusCode: Type.Number(),
+  timestamp: Type.String()
 });

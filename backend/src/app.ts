@@ -42,7 +42,9 @@ export function buildServer(): FastifyInstance {
           ignore: 'pid,hostname'
         }
       } : undefined
-    }
+    },
+    // Allow error handler override to prevent warnings
+    allowErrorHandlerOverride: true
   });
 
   // Add database to Fastify instance
@@ -50,76 +52,6 @@ export function buildServer(): FastifyInstance {
 
   // Add metrics middleware
   server.addHook('onRequest', createMetricsMiddleware());
-
-  // Global error handler
-  server.setErrorHandler(async (error, request, reply) => {
-    const { log } = request;
-    
-    // Log the error
-    log.error(error);
-
-    // Handle Prisma errors
-    if (error.code && error.code.startsWith('P')) {
-      if (error.code === 'P2002') {
-        reply.code(409).send({
-          error: 'Conflict',
-          message: 'Recurso ya existe',
-          statusCode: 409
-        });
-        return;
-      }
-      
-      if (error.code === 'P2025') {
-        reply.code(404).send({
-          error: 'Not Found',
-          message: 'Recurso no encontrado',
-          statusCode: 404
-        });
-        return;
-      }
-    }
-
-    // Handle JWT errors
-    if (error.message.includes('jwt')) {
-      reply.code(401).send({
-        error: 'Unauthorized',
-        message: 'Token inválido',
-        statusCode: 401
-      });
-      return;
-    }
-
-    // Handle validation errors
-    if (error.validation) {
-      reply.code(400).send({
-        error: 'Validation Error',
-        message: 'Datos de entrada inválidos',
-        validation: error.validation,
-        statusCode: 400
-      });
-      return;
-    }
-
-    // Rate limit errors
-    if (error.statusCode === 429) {
-      reply.code(429).send({
-        error: 'Too Many Requests',
-        message: 'Demasiadas solicitudes. Intente nuevamente en unos minutos.',
-        statusCode: 429
-      });
-      return;
-    }
-
-    // Generic server error
-    const statusCode = error.statusCode || 500;
-    reply.code(statusCode).send({
-      error: statusCode >= 400 && statusCode < 500 ? 'Client Error' : 'Internal Server Error',
-      message: process.env.NODE_ENV === 'production' 
-        ? 'Error interno del servidor' 
-        : error.message,
-      statusCode: statusCode
-    });
-  });
 
   // Not found handler
   server.setNotFoundHandler((request, reply) => {

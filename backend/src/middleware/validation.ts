@@ -153,14 +153,14 @@ export function validateSchema<T = any>(schema: ZodSchema<T>, target: 'body' | '
           code: err.code
         }));
         
-        reply.code(400).send({
+        // Send validation error response and terminate request processing
+        return reply.code(400).send({
           error: 'Validation Error',
           message: 'Los datos enviados no son válidos',
           statusCode: 400,
           validation: errors,
           timestamp: new Date().toISOString()
         });
-        return;
       }
       
       // Re-throw non-validation errors
@@ -245,6 +245,12 @@ export function errorNormalizationMiddleware(server: FastifyInstance): void {
   server.setErrorHandler(async (error, request, reply) => {
     const { log } = request;
     
+    // Check if response was already sent to prevent duplicate responses
+    if (reply.sent) {
+      log.warn('Attempted to send error response after reply was already sent');
+      return;
+    }
+    
     // Log the error with context
     log.error({
       error: error.message,
@@ -259,69 +265,63 @@ export function errorNormalizationMiddleware(server: FastifyInstance): void {
     if (error.code && error.code.startsWith('P')) {
       switch (error.code) {
         case 'P2002':
-          reply.code(409).send({
+          return reply.code(409).send({
             error: 'Conflict',
             message: 'El recurso ya existe. Verifique los datos únicos.',
             statusCode: 409,
             timestamp: new Date().toISOString()
           });
-          return;
         case 'P2025':
-          reply.code(404).send({
+          return reply.code(404).send({
             error: 'Not Found',
             message: 'El recurso solicitado no fue encontrado.',
             statusCode: 404,
             timestamp: new Date().toISOString()
           });
-          return;
         case 'P2003':
-          reply.code(400).send({
+          return reply.code(400).send({
             error: 'Foreign Key Constraint',
             message: 'Error de relación entre datos. Verifique las referencias.',
             statusCode: 400,
             timestamp: new Date().toISOString()
           });
-          return;
       }
     }
 
     // Handle JWT errors
     if (error.message.includes('jwt') || error.message.includes('token')) {
-      reply.code(401).send({
+      return reply.code(401).send({
         error: 'Unauthorized',
         message: 'Token de acceso inválido o expirado.',
         statusCode: 401,
         timestamp: new Date().toISOString()
       });
-      return;
     }
 
-    // Handle validation errors (already handled above, but just in case)
+    // Handle validation errors (already handled in preHandler, but just in case)
     if (error.validation) {
-      reply.code(400).send({
+      return reply.code(400).send({
         error: 'Validation Error',
         message: 'Los datos enviados no son válidos.',
         validation: error.validation,
         statusCode: 400,
         timestamp: new Date().toISOString()
       });
-      return;
     }
 
     // Rate limit errors
     if (error.statusCode === 429) {
-      reply.code(429).send({
+      return reply.code(429).send({
         error: 'Too Many Requests',
         message: 'Demasiadas solicitudes. Intente nuevamente en unos minutos.',
         statusCode: 429,
         timestamp: new Date().toISOString()
       });
-      return;
     }
 
     // Generic server error
     const statusCode = error.statusCode || 500;
-    reply.code(statusCode).send({
+    return reply.code(statusCode).send({
       error: statusCode >= 400 && statusCode < 500 ? 'Client Error' : 'Internal Server Error',
       message: process.env.NODE_ENV === 'production' 
         ? 'Error interno del servidor. Contacte soporte si el problema persiste.' 

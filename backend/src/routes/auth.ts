@@ -1,6 +1,8 @@
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { Type } from '@sinclair/typebox';
+import { z } from 'zod';
 import { AuthService } from '../services/auth';
+import { validateSchema, argentinaValidation } from '../middleware/validation';
 import {
   RegisterSchema,
   LoginSchema,
@@ -14,27 +16,44 @@ import {
   ValidationErrorResponse
 } from '../schemas/auth';
 
+// Zod validation schemas for auth endpoints
+const registerValidationSchema = z.object({
+  name: z.string().min(2, 'Nombre debe tener al menos 2 caracteres').max(100, 'Nombre demasiado largo'),
+  email: z.string().email('Email inválido'),
+  password: z.string().min(8, 'Contraseña debe tener al menos 8 caracteres').max(100, 'Contraseña demasiado larga'),
+  phone: argentinaValidation.phone.optional(),
+  role: z.enum(['CLIENT', 'PROVIDER', 'ADMIN']).default('CLIENT'),
+  dni: argentinaValidation.dni.optional(),
+  cuit: argentinaValidation.cuit.optional(),
+  birthDate: z.string().datetime('Fecha de nacimiento inválida').optional()
+});
+
+const loginValidationSchema = z.object({
+  email: z.string().email('Email inválido'),
+  password: z.string().min(1, 'Contraseña requerida'),
+  rememberMe: z.boolean().default(false).optional()
+});
+
+const refreshTokenValidationSchema = z.object({
+  refreshToken: z.string().min(1, 'Token de actualización requerido')
+});
+
 const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
   const authService = new AuthService(fastify);
 
   // Register endpoint
   fastify.post('/register', {
+    preHandler: [validateSchema(registerValidationSchema, 'body')],
     schema: {
       tags: ['Auth'],
       summary: 'Register a new user',
-      description: 'Create a new user account with Argentina-specific validations',
-      body: RegisterSchema,
-      response: {
-        201: AuthResponse,
-        400: ValidationErrorResponse,
-        409: AuthErrorResponse
-      }
+      description: 'Create a new user account with Argentina-specific validations'
     }
   }, async (request: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
     try {
       const result = await authService.register(request.body);
       
-      reply.code(201).send({
+      return reply.code(201).send({
         user: result.user,
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
@@ -43,29 +62,23 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
     } catch (error: any) {
       const message = error.message;
       
-      if (message.includes('Errores de validación')) {
-        reply.code(400).send({
-          error: 'Validation Error',
-          message,
-          statusCode: 400
-        });
-      } else {
-        reply.code(409).send({
-          error: 'Registration Failed',
-          message: message || 'Error al registrar usuario',
-          statusCode: 409
-        });
-      }
+      // All validation errors are now handled by preHandler middleware
+      // This catch block only handles business logic errors
+      return reply.code(409).send({
+        error: 'Registration Failed',
+        message: message || 'Error al registrar usuario',
+        statusCode: 409
+      });
     }
   });
 
   // Login endpoint
   fastify.post('/login', {
+    preHandler: [validateSchema(loginValidationSchema, 'body')],
     schema: {
       tags: ['Auth'],
       summary: 'User login',
       description: 'Authenticate user and return access tokens',
-      body: LoginSchema,
       response: {
         200: AuthResponse,
         401: AuthErrorResponse,
@@ -103,11 +116,11 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
 
   // Refresh token endpoint
   fastify.post('/refresh', {
+    preHandler: [validateSchema(refreshTokenValidationSchema, 'body')],
     schema: {
       tags: ['Auth'],
       summary: 'Refresh access token',
       description: 'Get new access token using refresh token',
-      body: RefreshTokenSchema,
       response: {
         200: TokenResponse,
         401: AuthErrorResponse
@@ -133,11 +146,11 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
 
   // Logout endpoint
   fastify.post('/logout', {
+    preHandler: [validateSchema(refreshTokenValidationSchema, 'body')],
     schema: {
       tags: ['Auth'],
       summary: 'User logout',
       description: 'Revoke refresh token and logout user',
-      body: RefreshTokenSchema,
       response: {
         200: Type.Object({
           message: Type.String()

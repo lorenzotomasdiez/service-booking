@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
+	import { authStore, isAuthenticated, user } from '$lib/stores/auth';
 	
 	// Mobile navigation state
 	let mobileMenuOpen = false;
@@ -10,6 +11,8 @@
 
 	onMount(() => {
 		mounted = true;
+		// Initialize authentication state
+		authStore.initializeAuth();
 	});
 
 	// Close mobile menu when route changes
@@ -62,20 +65,49 @@
 					{/each}
 				</nav>
 
-				<!-- Desktop Auth Buttons -->
+				<!-- Desktop Auth/User Menu -->
 				<div class="hidden md:flex items-center space-x-4">
-					<a
-						href="/login"
-						class="text-neutral-600 hover:text-brand transition-colors duration-200 font-medium"
-					>
-						Iniciar Sesión
-					</a>
-					<a
-						href="/register"
-						class="btn btn-primary"
-					>
-						Registrarse
-					</a>
+					{#if $isAuthenticated && $user}
+						<!-- User Menu -->
+						<div class="relative">
+							<button
+								type="button"
+								class="flex items-center space-x-2 text-neutral-600 hover:text-brand transition-colors duration-200 font-medium"
+							>
+								{#if $user.avatar}
+									<img src={$user.avatar} alt="Avatar" class="w-8 h-8 rounded-full object-cover" />
+								{:else}
+									<div class="w-8 h-8 bg-brand rounded-full flex items-center justify-center text-white text-sm font-medium">
+										{$user.firstName[0]}{$user.lastName[0]}
+									</div>
+								{/if}
+								<span>{$user.firstName}</span>
+								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+								</svg>
+							</button>
+						</div>
+						<a
+							href="/dashboard"
+							class="btn btn-primary"
+						>
+							Dashboard
+						</a>
+					{:else}
+						<!-- Auth Buttons -->
+						<a
+							href="/login"
+							class="text-neutral-600 hover:text-brand transition-colors duration-200 font-medium"
+						>
+							Iniciar Sesión
+						</a>
+						<a
+							href="/register"
+							class="btn btn-primary"
+						>
+							Registrarse
+						</a>
+					{/if}
 				</div>
 
 				<!-- Mobile menu button -->

@@ -1,0 +1,258 @@
+# BarberPro Production Environment
+# This is for self-hosted production deployments
+version: '3.8'
+
+services:
+  # PostgreSQL Database with Production Configuration
+  postgres:
+    image: postgres:15-alpine
+    container_name: barberpro-postgres-prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-barberpro_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-barberpro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      # Performance tuning for Argentina workload
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=es_AR.UTF-8 --lc-ctype=es_AR.UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ./config/postgres-prod.conf:/etc/postgresql/postgresql.conf:ro
+      - ./scripts/init-prod-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - barberpro-prod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-barberpro} -d ${POSTGRES_DB:-barberpro_prod}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    command: |
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=1GB
+      -c effective_cache_size=3GB
+      -c maintenance_work_mem=256MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+
+  # Redis with Persistence and Production Config
+  redis:
+    image: redis:7-alpine
+    container_name: barberpro-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_prod_data:/data
+      - ./config/redis-prod.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - barberpro-prod-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # Backend API (Production Build)
+  backend:
+    image: barberpro-backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: barberpro-backend-prod
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-barberpro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-barberpro_prod}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      LOG_LEVEL: warn
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://barberpro.com.ar}
+      RATE_LIMIT_MAX_REQUESTS: 200
+      RATE_LIMIT_WINDOW_MS: 900000
+      SENTRY_DSN: ${SENTRY_DSN}
+      NEWRELIC_LICENSE_KEY: ${NEWRELIC_LICENSE_KEY}
+      DATADOG_API_KEY: ${DATADOG_API_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - barberpro-prod-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+      replicas: 2
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Load Balancer (nginx)
+  nginx:
+    image: nginx:alpine
+    container_name: barberpro-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - backend
+    networks:
+      - barberpro-prod-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Monitoring: Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: barberpro-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - barberpro-prod-network
+    restart: unless-stopped
+
+  # Monitoring: Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: barberpro-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: false
+      GF_SERVER_DOMAIN: barberpro.com.ar
+      GF_SMTP_ENABLED: true
+      GF_SMTP_HOST: ${SMTP_HOST}:${SMTP_PORT}
+      GF_SMTP_USER: ${SMTP_USER}
+      GF_SMTP_PASSWORD: ${SMTP_PASS}
+      GF_SMTP_FROM_ADDRESS: monitoring@barberpro.com.ar
+    depends_on:
+      - prometheus
+    networks:
+      - barberpro-prod-network
+    restart: unless-stopped
+
+  # Log Management: Loki
+  loki:
+    image: grafana/loki:latest
+    container_name: barberpro-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - barberpro-prod-network
+    restart: unless-stopped
+
+  # Backup Service
+  backup:
+    image: postgres:15-alpine
+    container_name: barberpro-backup
+    volumes:
+      - ./scripts/backup.sh:/backup.sh:ro
+      - backup_data:/backup
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-barberpro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-barberpro_prod}
+      S3_BUCKET: ${BACKUP_S3_BUCKET}
+      AWS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_KEY}
+    depends_on:
+      - postgres
+    networks:
+      - barberpro-prod-network
+    restart: unless-stopped
+    command: |
+      sh -c "
+        echo '0 2 * * * /backup.sh' | crontab -
+        crond -f
+      "
+
+volumes:
+  postgres_prod_data:
+    driver: local
+  redis_prod_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+  backup_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  barberpro-prod-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

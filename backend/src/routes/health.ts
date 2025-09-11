@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import { database } from '../services/database';
+import { createMonitoringService } from '../services/monitoring';
 
 interface HealthResponse {
   status: string;
@@ -138,5 +139,47 @@ export default async function healthRoutes(
       status: 'ALIVE',
       timestamp: new Date().toISOString()
     });
+  });
+
+  // Metrics endpoint for Prometheus
+  fastify.get('/metrics', {
+    schema: {
+      description: 'Prometheus metrics endpoint',
+      tags: ['Health'],
+      summary: 'Application metrics for monitoring',
+      response: {
+        200: {
+          type: 'string',
+          description: 'Prometheus formatted metrics'
+        }
+      }
+    }
+  }, async (_request, reply) => {
+    const monitoring = createMonitoringService();
+    const metrics = await monitoring.getMetrics();
+    
+    reply.header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    return reply.send(metrics);
+  });
+
+  // Business metrics endpoint
+  fastify.get('/business-metrics', {
+    schema: {
+      description: 'Business metrics endpoint',
+      tags: ['Health'],
+      summary: 'Business-specific metrics for Argentina operations',
+      response: {
+        200: {
+          type: 'string',
+          description: 'Business metrics in Prometheus format'
+        }
+      }
+    }
+  }, async (_request, reply) => {
+    const monitoring = createMonitoringService();
+    const businessMetrics = await monitoring.getBusinessMetrics();
+    
+    reply.header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    return reply.send(businessMetrics);
   });
 }

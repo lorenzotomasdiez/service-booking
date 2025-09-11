@@ -9,10 +9,20 @@ import swaggerUi from '@fastify/swagger-ui';
 // Database connection
 import { database, prisma } from './services/database';
 
+// Monitoring service
+import { createMetricsMiddleware } from './services/monitoring';
+
+// Security middleware
+import { setupAllSecurityMiddleware, securityConfig } from './middleware/security';
+
 // Route imports
 import healthRoutes from './routes/health';
 import authRoutes from './routes/auth';
 import usersRoutes from './routes/users';
+import servicesRoutes from './routes/services';
+import bookingsRoutes from './routes/bookings';
+import searchRoutes from './routes/search';
+import paymentsRoutes from './routes/payments';
 
 export function buildServer(): FastifyInstance {
   const server = Fastify({
@@ -30,6 +40,9 @@ export function buildServer(): FastifyInstance {
 
   // Add database to Fastify instance
   server.decorate('prisma', prisma);
+
+  // Add metrics middleware
+  server.addHook('onRequest', createMetricsMiddleware());
 
   // Global error handler
   server.setErrorHandler(async (error, request, reply) => {
@@ -91,12 +104,13 @@ export function buildServer(): FastifyInstance {
     }
 
     // Generic server error
-    reply.code(error.statusCode || 500).send({
-      error: error.statusCode >= 400 && error.statusCode < 500 ? 'Client Error' : 'Internal Server Error',
+    const statusCode = error.statusCode || 500;
+    reply.code(statusCode).send({
+      error: statusCode >= 400 && statusCode < 500 ? 'Client Error' : 'Internal Server Error',
       message: process.env.NODE_ENV === 'production' 
         ? 'Error interno del servidor' 
         : error.message,
-      statusCode: error.statusCode || 500
+      statusCode: statusCode
     });
   });
 
@@ -109,27 +123,14 @@ export function buildServer(): FastifyInstance {
     });
   });
 
-  // Register plugins
-  server.register(cors, {
-    origin: process.env.NODE_ENV === 'production' 
-      ? process.env.CORS_ORIGIN?.split(',') || ['https://barberpro.com.ar'] 
-      : true,
-    credentials: true
-  });
+  // Setup comprehensive security middleware
+  setupAllSecurityMiddleware(server);
 
-  // Rate limiting for Argentina market
-  server.register(rateLimit, {
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
-    timeWindow: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-    errorResponseBuilder: (request, context) => {
-      return {
-        error: 'Too Many Requests',
-        message: `Demasiadas solicitudes. Límite: ${context.max} por ${Math.floor(context.timeWindow / 1000 / 60)} minutos.`,
-        statusCode: 429,
-        retryAfter: Math.round(context.ttl / 1000)
-      };
-    }
-  });
+  // Register plugins
+  server.register(cors, securityConfig.cors as any);
+
+  // Enhanced rate limiting for Argentina market
+  server.register(rateLimit, securityConfig.rateLimits.global as any);
 
   server.register(jwt, {
     secret: process.env.JWT_SECRET || 'supersecret-change-in-production'
@@ -230,6 +231,10 @@ export function buildServer(): FastifyInstance {
   server.register(healthRoutes, { prefix: '/api' });
   server.register(authRoutes, { prefix: '/api/auth' });
   server.register(usersRoutes, { prefix: '/api/users' });
+  server.register(servicesRoutes, { prefix: '/api/services' });
+  server.register(bookingsRoutes, { prefix: '/api/bookings' });
+  server.register(searchRoutes, { prefix: '/api/search' });
+  server.register(paymentsRoutes, { prefix: '/api' });
 
   return server;
 }

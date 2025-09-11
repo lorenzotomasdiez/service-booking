@@ -28,7 +28,7 @@
 	}
 
 	body {
-		@apply text-argentina;
+		@apply text-spanish;
 		background-color: theme('colors.neutral.50');
 		color: theme('colors.neutral.800');
 		-webkit-font-smoothing: antialiased;
@@ -108,6 +108,110 @@
 		max-width: 100%;
 	}
 
+	/* Button styles */
+	.btn {
+		@apply inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+	}
+
+	.btn-primary {
+		@apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 shadow-sm hover:shadow-md;
+	}
+
+	.btn-secondary {
+		@apply bg-white text-primary-600 border-primary-600 hover:bg-primary-50 focus:ring-primary-500;
+	}
+
+	.btn-ghost {
+		@apply bg-transparent text-primary-600 hover:bg-primary-50 focus:ring-primary-500;
+	}
+
+	.btn-success {
+		@apply bg-success-600 text-white hover:bg-success-700 focus:ring-success-500;
+	}
+
+	.btn-danger {
+		@apply bg-error-600 text-white hover:bg-error-700 focus:ring-error-500;
+	}
+
+	.btn-sm {
+		@apply px-3 py-1.5 text-xs;
+	}
+
+	.btn-md {
+		@apply px-4 py-2 text-sm;
+	}
+
+	.btn-lg {
+		@apply px-6 py-3 text-base;
+	}
+
+	/* Form styles */
+	.form-input {
+		@apply block w-full px-3 py-2 border border-neutral-300 rounded-lg shadow-sm placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition-colors;
+	}
+
+	.form-input-error {
+		@apply border-error-500 focus:ring-error-500 focus:border-error-500;
+	}
+
+	.form-label {
+		@apply block text-sm font-medium text-neutral-700 mb-2;
+	}
+
+	.form-error {
+		@apply mt-1 text-sm text-error-600;
+	}
+
+	/* Card styles */
+	.card {
+		@apply bg-white rounded-xl shadow-soft border border-neutral-200 overflow-hidden;
+	}
+
+	.card-elevated {
+		@apply shadow-medium;
+	}
+
+	.card-outlined {
+		@apply border-2 border-neutral-300 shadow-none;
+	}
+
+	.card-interactive {
+		@apply cursor-pointer hover:shadow-medium transition-shadow duration-200;
+	}
+
+	.card-body {
+		@apply p-6;
+	}
+
+	.card-header {
+		@apply px-6 py-4 border-b border-neutral-200;
+	}
+
+	.card-footer {
+		@apply px-6 py-4 border-t border-neutral-200 bg-neutral-50;
+	}
+
+	/* Loading styles */
+	.skeleton {
+		@apply animate-pulse bg-neutral-200 rounded;
+	}
+
+	.skeleton-text {
+		@apply h-4 skeleton;
+	}
+
+	.skeleton-text-sm {
+		@apply h-3 skeleton;
+	}
+
+	.skeleton-avatar {
+		@apply w-10 h-10 skeleton rounded-full;
+	}
+
+	.skeleton-button {
+		@apply h-10 w-24 skeleton;
+	}
+
 	/* Argentina-specific component styles */
 	.phone-input {
 		@apply form-input;
@@ -132,7 +236,8 @@
 
 	/* Touch-friendly mobile components */
 	.mobile-nav {
-		@apply touch-manipulation tap-highlight-none;
+		@apply touch-manipulation;
+		-webkit-tap-highlight-color: transparent;
 	}
 
 	/* Argentina brand colors shortcuts */
@@ -179,6 +284,10 @@
 		padding-right: max(1rem, env(safe-area-inset-right));
 	}
 
+	.safe-area-bottom {
+		padding-bottom: env(safe-area-inset-bottom);
+	}
+
 	/* Component-specific utilities */
 	.scale-98 {
 		transform: scale(0.98);
@@ -211,6 +320,14 @@
 		animation: scaleIn 0.2s ease-out;
 	}
 
+	.animate-slide-down {
+		animation: slideDown 0.3s ease-out;
+	}
+
+	.animate-fade-in {
+		animation: fadeIn 0.2s ease-out;
+	}
+
 	@keyframes scaleIn {
 		from {
 			opacity: 0;
@@ -219,6 +336,26 @@
 		to {
 			opacity: 1;
 			transform: scale(1);
+		}
+	}
+
+	@keyframes slideDown {
+		from {
+			opacity: 0;
+			transform: translateY(-10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
 		}
 	}
 }

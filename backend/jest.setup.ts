@@ -4,6 +4,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import '@jest/globals';
 
 // Global test timeout
 jest.setTimeout(30000);
@@ -140,7 +141,7 @@ export const testUtils = {
   /**
    * Generate test JWT token
    */
-  generateTestJWT(userId: string, role: string = 'CLIENT') {
+  generateTestJWT(userId: string, role: string = 'CLIENT', expiresIn: string = '24h') {
     const jwt = require('jsonwebtoken');
     return jwt.sign(
       { 
@@ -149,7 +150,7 @@ export const testUtils = {
         iat: Math.floor(Date.now() / 1000)
       },
       process.env.JWT_SECRET!,
-      { expiresIn: '24h' }
+      { expiresIn }
     );
   },
 

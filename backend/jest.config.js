@@ -10,9 +10,9 @@ module.exports = {
   ],
   
   // Module resolution
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@tests/(.*)$': '<rootDir>/__tests__/$1'
+    '^@tests/(.*)$': '<rootDir>/tests/$1'
   },
   
   // Setup files

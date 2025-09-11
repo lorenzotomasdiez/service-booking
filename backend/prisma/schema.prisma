@@ -39,6 +39,11 @@ model User {
   refreshTokens    RefreshToken[]
   notifications    Notification[]
 
+  @@index([email])              // Login queries
+  @@index([phone])              // Phone lookup
+  @@index([dni])                // Argentina DNI lookup
+  @@index([role, isActive])     // Role-based queries
+  @@index([isVerified])         // Verification status
   @@map("users")
 }
 
@@ -84,7 +89,28 @@ model Provider {
   services Service[]
   bookings Booking[]
 
+  @@index([isActive, isVerified])  // Active verified providers lookup
+  @@index([city, province])        // Location-based search
+  @@index([latitude, longitude])   // Geo-location queries
+  @@index([businessType])          // Service type filtering
   @@map("providers")
+}
+
+model ServiceCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  icon        String?   // Icon name or URL
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  services    Service[]
+
+  @@map("service_categories")
 }
 
 model Service {
@@ -94,21 +120,42 @@ model Service {
   duration    Int     // minutes
   price       Decimal @db.Decimal(10, 2) // ARS pricing
   isActive    Boolean @default(true)
-  category    String? // Haircut, Beard, Styling, etc.
+  
+  // Category relationship
+  categoryId  String?
   
   // Provider relation
   providerId  String
   
+  // Pricing options
+  depositRequired Boolean @default(false)
+  depositAmount   Decimal? @db.Decimal(10, 2)
+  
+  // Service options
+  bufferTimeBefore Int @default(5)  // minutes before service
+  bufferTimeAfter  Int @default(10) // minutes after service
+  maxAdvanceBookingDays Int @default(30)
+  allowSameDayBooking Boolean @default(true)
+  requiresConsultation Boolean @default(false)
+  
   // Media
   images      String[] // Array of image URLs
+  
+  // Metadata
+  tags        String[] // searchable tags
+  sortOrder   Int      @default(0)
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  provider Provider  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  provider Provider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  category ServiceCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   bookings Booking[]
 
+  @@index([providerId, isActive])
+  @@index([categoryId])
+  @@index([price])
   @@map("services")
 }
 
@@ -127,6 +174,7 @@ model Booking {
   // Additional information
   notes       String?
   clientNotes String?
+  internalNotes String? // Private provider notes
   
   // Payment information
   paymentStatus PaymentStatus @default(PENDING)
@@ -138,6 +186,18 @@ model Booking {
   cancelReason  String?
   cancelledAt   DateTime?
   
+  // Confirmation and completion
+  confirmedAt   DateTime?
+  completedAt   DateTime?
+  
+  // Rating and feedback
+  clientRating  Int?     // 1-5 stars
+  clientFeedback String?
+  providerFeedback String?
+  
+  // Reminder notifications
+  remindersSent Json?    // Track sent reminders
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -147,6 +207,13 @@ model Booking {
   service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   payment  Payment?
 
+  // Performance indexes for Argentina booking platform
+  @@index([providerId, startTime]) // Provider's daily schedule lookup
+  @@index([clientId, startTime])   // Client's booking history
+  @@index([status, startTime])     // Status-based queries
+  @@index([startTime, endTime])    // Time range conflicts
+  @@index([providerId, status, startTime]) // Provider dashboard queries
+  @@index([paymentStatus])         // Payment processing
   @@map("bookings")
 }
 
@@ -196,6 +263,9 @@ model RefreshToken {
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([token])           // Token lookup
+  @@index([userId])          // User's tokens
+  @@index([expiresAt])       // Cleanup expired tokens
   @@map("refresh_tokens")
 }
 
@@ -220,6 +290,9 @@ model Notification {
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, status])     // User's unread notifications
+  @@index([type, createdAt])    // Notification type queries
+  @@index([sentAt])             // Sent notifications tracking
   @@map("notifications")
 }
 

@@ -1,0 +1,56 @@
+# Grafana Datasources Configuration for BarberPro
+apiVersion: 1
+
+deleteDatasources:
+  - name: Prometheus
+  - name: Loki
+
+datasources:
+  # Prometheus for metrics
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: "POST"
+    secureJsonData: {}
+
+  # Loki for logs
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    jsonData:
+      maxLines: 1000
+      timeout: "60s"
+    secureJsonData: {}
+
+  # PostgreSQL for business intelligence
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: barberpro_prod
+    user: barberpro
+    editable: true
+    jsonData:
+      sslmode: "require"
+      postgresVersion: 1500
+      timescaledb: false
+    secureJsonData:
+      password: "${POSTGRES_PASSWORD}"
+
+  # Redis for cache metrics (via Redis Exporter)
+  - name: Redis
+    type: prometheus
+    access: proxy
+    url: http://redis-exporter:9121
+    editable: true
+    jsonData:
+      timeInterval: "30s"
+    secureJsonData: {}

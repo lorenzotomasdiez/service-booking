@@ -1,0 +1,227 @@
+# Prometheus Alert Rules for BarberPro
+# Argentina-optimized alerting for service booking platform
+
+groups:
+  # High Priority Alerts
+  - name: barberpro.critical
+    rules:
+      # Application Down
+      - alert: BarberProApplicationDown
+        expr: up{job="barberpro-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: devops
+          service: barberpro
+        annotations:
+          summary: "BarberPro application is down"
+          description: "BarberPro backend service has been down for more than 1 minute. Immediate attention required."
+          runbook_url: "https://docs.barberpro.com.ar/runbooks/app-down"
+
+      # Database Connection Issues
+      - alert: DatabaseConnectionFailure
+        expr: pg_up{job="postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: devops
+          service: database
+        annotations:
+          summary: "PostgreSQL database is unreachable"
+          description: "Database connection has been failing for {{ $value }} minutes. Service disruption imminent."
+
+      # Redis Down
+      - alert: RedisServiceDown
+        expr: redis_up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: devops
+          service: redis
+        annotations:
+          summary: "Redis service is down"
+          description: "Redis service unavailable. Session management and caching affected."
+
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          team: devops
+          service: barberpro
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+  # Performance Alerts
+  - name: barberpro.performance
+    rules:
+      # High Response Time (Argentina SLA: <200ms)
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+          service: barberpro
+          sla: argentina
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value | humanizeDuration }}, exceeding Argentina SLA of 200ms."
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+          service: infrastructure
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 85% ({{ $value | humanizePercentage }})"
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: devops
+          service: infrastructure
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is above 80% ({{ $value | humanizePercentage }})"
+
+      # Database Slow Queries
+      - alert: DatabaseSlowQueries
+        expr: pg_stat_activity_max_tx_duration{datname="barberpro_prod"} > 30
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+          service: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Long-running queries detected in production database ({{ $value }}s)"
+
+  # Business Logic Alerts
+  - name: barberpro.business
+    rules:
+      # High Booking Failure Rate
+      - alert: HighBookingFailureRate
+        expr: rate(booking_failures_total[5m]) / rate(booking_attempts_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          team: product
+          service: booking
+          impact: revenue
+        annotations:
+          summary: "High booking failure rate"
+          description: "Booking failure rate is {{ $value | humanizePercentage }}, potentially impacting revenue."
+
+      # Payment Processing Issues
+      - alert: PaymentProcessingFailure
+        expr: rate(payment_failures_total{provider="mercadopago"}[5m]) > 0.02
+        for: 2m
+        labels:
+          severity: critical
+          team: finance
+          service: payments
+          impact: revenue
+        annotations:
+          summary: "MercadoPago payment failures"
+          description: "High payment failure rate with MercadoPago: {{ $value | humanizePercentage }}"
+
+      # Low Booking Volume (Argentina business hours)
+      - alert: LowBookingVolume
+        expr: rate(booking_completed_total[1h]) < 0.1
+        for: 30m
+        labels:
+          severity: warning
+          team: product
+          service: booking
+          timezone: argentina
+        annotations:
+          summary: "Unusually low booking volume"
+          description: "Booking rate ({{ $value }}/hour) is below expected levels during business hours."
+
+  # Infrastructure Alerts
+  - name: barberpro.infrastructure
+    rules:
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+          service: infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is below 10% ({{ $value | humanizePercentage }} remaining)"
+
+      # Database Connection Pool Exhausted
+      - alert: DatabaseConnectionPoolExhausted
+        expr: pg_stat_activity_count / pg_settings_max_connections > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+          service: database
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "Database connections at {{ $value | humanizePercentage }} of maximum"
+
+      # Redis Memory Usage High
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+          service: redis
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis memory usage at {{ $value | humanizePercentage }}"
+
+      # SSL Certificate Expiring
+      - alert: SSLCertificateExpiring
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+        for: 1h
+        labels:
+          severity: warning
+          team: devops
+          service: ssl
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate expires in {{ $value | humanizeDuration }}"
+
+  # Security Alerts
+  - name: barberpro.security
+    rules:
+      # Too Many Failed Login Attempts
+      - alert: HighFailedLoginAttempts
+        expr: rate(auth_failed_attempts_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+          service: authentication
+        annotations:
+          summary: "High failed login attempt rate"
+          description: "Failed login rate: {{ $value }}/second. Possible brute force attack."
+
+      # Unusual API Request Pattern
+      - alert: UnusualAPIRequestPattern
+        expr: rate(http_requests_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          service: api
+        annotations:
+          summary: "Unusual API request volume"
+          description: "API request rate ({{ $value }}/second) is unusually high. Possible DDoS attack."

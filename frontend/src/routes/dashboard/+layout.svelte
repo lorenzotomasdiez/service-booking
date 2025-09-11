@@ -2,8 +2,10 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { authStore, isAuthenticated, user, isProvider, isClient } from '$lib/stores/auth';
+	import { socketService } from '$lib/services/socket';
 	import { OnboardingFlow } from '$lib/components';
-	import { onMount } from 'svelte';
+	import NotificationCenter from '$lib/components/notifications/NotificationCenter.svelte';
+	import { onMount, onDestroy } from 'svelte';
 	
 	let sidebarOpen = false;
 	let showOnboarding = false;
@@ -15,6 +17,15 @@
 			return;
 		}
 
+		// Initialize Socket.io connection
+		if ($user) {
+			// Update socket auth token
+			const token = localStorage.getItem('auth_token');
+			if (token) {
+				socketService.updateAuthToken(token);
+			}
+		}
+
 		// Check if onboarding should be shown
 		const onboardingCompleted = localStorage.getItem('onboarding_completed');
 		if (!onboardingCompleted && $user && !$user.isProfileComplete) {
@@ -23,6 +34,11 @@
 				showOnboarding = true;
 			}, 1000);
 		}
+	});
+
+	onDestroy(() => {
+		// Cleanup socket connection
+		socketService.disconnect();
 	});
 
 	function handleOnboardingComplete() {
@@ -148,22 +164,26 @@
 						
 						<!-- User info -->
 						<div class="mt-6 px-4">
-							<div class="flex items-center">
-								{#if $user.avatar}
-									<img class="h-10 w-10 rounded-full object-cover" src={$user.avatar} alt="Avatar" />
-								{:else}
-									<div class="h-10 w-10 rounded-full bg-brand flex items-center justify-center text-white font-medium">
-										{$user.firstName[0]}{$user.lastName[0]}
+							<div class="flex items-center justify-between">
+								<div class="flex items-center">
+									{#if $user.avatar}
+										<img class="h-10 w-10 rounded-full object-cover" src={$user.avatar} alt="Avatar" />
+									{:else}
+										<div class="h-10 w-10 rounded-full bg-brand flex items-center justify-center text-white font-medium">
+											{$user.firstName[0]}{$user.lastName[0]}
+										</div>
+									{/if}
+									<div class="ml-3">
+										<p class="text-sm font-medium text-neutral-700">
+											{$user.firstName} {$user.lastName}
+										</p>
+										<p class="text-xs text-neutral-500">
+											{$isProvider ? 'Profesional' : 'Cliente'}
+										</p>
 									</div>
-								{/if}
-								<div class="ml-3">
-									<p class="text-sm font-medium text-neutral-700">
-										{$user.firstName} {$user.lastName}
-									</p>
-									<p class="text-xs text-neutral-500">
-										{$isProvider ? 'Profesional' : 'Cliente'}
-									</p>
 								</div>
+								<!-- Desktop Notifications -->
+								<NotificationCenter />
 							</div>
 						</div>
 
@@ -347,7 +367,10 @@
 						</div>
 						<span class="text-xl font-bold text-neutral-800">BarberPro</span>
 					</div>
-					<div class="w-12"></div>
+					<!-- Mobile Notifications -->
+					<div class="flex items-center">
+						<NotificationCenter />
+					</div>
 				</div>
 			</div>
 

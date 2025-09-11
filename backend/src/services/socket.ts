@@ -117,6 +117,12 @@ export class SocketService {
       // Handle presence events
       this.setupPresenceEvents(socket);
 
+      // Handle reconnection sync
+      this.setupReconnectionHandling(socket);
+
+      // Handle real-time availability subscriptions
+      this.setupAvailabilityEvents(socket);
+
       // Handle disconnection
       socket.on('disconnect', (reason: string) => {
         console.log(`User ${socket.userId} disconnected: ${reason}`);
@@ -193,9 +199,122 @@ export class SocketService {
           timestamp: new Date()
         });
 
+        // Broadcast availability update for the affected date
+        await this.broadcastAvailabilityUpdate(booking.providerId, booking.startTime);
+
       } catch (error) {
         console.error('Error updating booking status:', error);
         socket.emit('error', { message: 'Error al actualizar reserva' });
+      }
+    });
+
+    // Real-time booking attempt (check availability before creating)
+    socket.on('booking:check-availability', async (data: { 
+      providerId: string; 
+      serviceId: string; 
+      startTime: string; 
+    }) => {
+      try {
+        const { bookingService } = require('./booking');
+        const startTime = new Date(data.startTime);
+        
+        const service = await prisma.service.findUnique({
+          where: { id: data.serviceId }
+        });
+
+        if (!service) {
+          socket.emit('booking:availability-result', {
+            available: false,
+            error: 'Servicio no encontrado'
+          });
+          return;
+        }
+
+        const endTime = new Date(startTime.getTime() + (service.duration * 60000));
+        const validation = await bookingService.validateBookingSlot(
+          data.providerId,
+          data.serviceId,
+          startTime,
+          endTime
+        );
+
+        socket.emit('booking:availability-result', {
+          available: validation.isValid,
+          conflicts: validation.conflicts,
+          timeSlot: { start: startTime, end: endTime }
+        });
+
+      } catch (error) {
+        console.error('Error checking booking availability:', error);
+        socket.emit('booking:availability-result', {
+          available: false,
+          error: 'Error al verificar disponibilidad'
+        });
+      }
+    });
+
+    // Live booking creation with real-time conflict detection
+    socket.on('booking:create-live', async (data: {
+      providerId: string;
+      serviceId: string;
+      startTime: string;
+      notes?: string;
+    }) => {
+      try {
+        const { bookingService } = require('./booking');
+        const startTime = new Date(data.startTime);
+
+        const result = await bookingService.createBookingWithLock({
+          clientId: socket.userId,
+          providerId: data.providerId,
+          serviceId: data.serviceId,
+          startTime,
+          notes: data.notes
+        });
+
+        if (result.success && result.booking) {
+          // Emit success to the client
+          socket.emit('booking:create-success', {
+            booking: result.booking,
+            message: 'Reserva creada exitosamente'
+          });
+
+          // Broadcast to all relevant parties
+          await this.broadcastBookingUpdate({
+            bookingId: result.booking.id,
+            action: 'created',
+            booking: result.booking,
+            timestamp: new Date()
+          });
+
+          // Update availability for the affected date
+          await this.broadcastAvailabilityUpdate(data.providerId, startTime);
+
+        } else {
+          // Handle conflicts
+          socket.emit('booking:create-conflict', {
+            errors: result.errors,
+            message: 'El horario ya no está disponible'
+          });
+
+          // Suggest alternative slots
+          const suggestions = await bookingService.getSuggestedSlots(
+            data.providerId,
+            data.serviceId,
+            startTime
+          );
+
+          socket.emit('booking:suggested-slots', {
+            suggestions,
+            originalRequest: data
+          });
+        }
+
+      } catch (error) {
+        console.error('Error creating live booking:', error);
+        socket.emit('booking:create-error', {
+          message: 'Error al crear la reserva'
+        });
       }
     });
   }
@@ -261,6 +380,194 @@ export class SocketService {
         userId: socket.userId,
         typing: false
       });
+    });
+  }
+
+  /**
+   * Setup real-time availability events
+   */
+  private setupAvailabilityEvents(socket: any): void {
+    // Subscribe to provider availability updates
+    socket.on('availability:subscribe', (providerId: string) => {
+      socket.join(`availability:${providerId}`);
+      console.log(`User ${socket.userId} subscribed to availability updates for provider ${providerId}`);
+    });
+
+    // Unsubscribe from provider availability updates
+    socket.on('availability:unsubscribe', (providerId: string) => {
+      socket.leave(`availability:${providerId}`);
+      console.log(`User ${socket.userId} unsubscribed from availability updates for provider ${providerId}`);
+    });
+
+    // Provider calendar subscription (for provider dashboard)
+    socket.on('calendar:subscribe', () => {
+      if (socket.providerId) {
+        socket.join(`provider-calendar:${socket.providerId}`);
+        console.log(`Provider ${socket.providerId} subscribed to calendar updates`);
+      }
+    });
+
+    // Request immediate availability update
+    socket.on('availability:request-update', async (data: { providerId: string; date: string }) => {
+      try {
+        const requestDate = new Date(data.date);
+        await this.broadcastAvailabilityUpdate(data.providerId, requestDate);
+      } catch (error) {
+        console.error('Error handling availability update request:', error);
+        socket.emit('error', { message: 'Error al actualizar disponibilidad' });
+      }
+    });
+  }
+
+  /**
+   * Real-time availability synchronization
+   */
+  public async broadcastAvailabilityUpdate(providerId: string, date: Date): Promise<void> {
+    try {
+      // Import here to avoid circular dependency
+      const { bookingService } = require('./booking');
+      
+      // Get provider services for availability calculation
+      const provider = await prisma.provider.findUnique({
+        where: { id: providerId },
+        include: { services: true }
+      });
+
+      if (!provider) return;
+
+      const availabilityUpdates = await Promise.all(
+        provider.services.map(async (service) => ({
+          serviceId: service.id,
+          slots: await bookingService.calculateAvailableSlots(providerId, service.id, date)
+        }))
+      );
+
+      // Emit to provider's calendar subscribers
+      this.io.to(`provider-calendar:${providerId}`).emit('availability:updated', {
+        providerId,
+        date: date.toISOString(),
+        availability: availabilityUpdates,
+        timestamp: new Date()
+      });
+
+      // Emit to global availability watchers for this provider
+      this.io.to(`availability:${providerId}`).emit('availability:updated', {
+        providerId,
+        date: date.toISOString(),
+        availability: availabilityUpdates,
+        timestamp: new Date()
+      });
+
+      console.log(`Broadcasted availability update for provider ${providerId} on ${date.toDateString()}`);
+    } catch (error) {
+      console.error('Error broadcasting availability update:', error);
+    }
+  }
+
+  /**
+   * Real-time booking conflict detection
+   */
+  public async notifyBookingConflict(data: {
+    userId: string;
+    providerId: string;
+    conflictDetails: any;
+    suggestedSlots: any[];
+  }): Promise<void> {
+    try {
+      const notification = {
+        type: 'booking_conflict',
+        title: 'Conflicto de Reserva',
+        message: 'El horario solicitado ya no está disponible',
+        data: {
+          conflictDetails: data.conflictDetails,
+          suggestedSlots: data.suggestedSlots
+        },
+        timestamp: new Date()
+      };
+
+      // Send to the specific user
+      this.io.to(`user:${data.userId}`).emit('booking:conflict', notification);
+
+      console.log(`Notified user ${data.userId} of booking conflict`);
+    } catch (error) {
+      console.error('Error notifying booking conflict:', error);
+    }
+  }
+
+  /**
+   * Multi-user conflict resolution for simultaneous bookings
+   */
+  public async handleSimultaneousBooking(data: {
+    providerId: string;
+    serviceId: string;
+    timeSlot: { start: Date; end: Date };
+    competingUsers: string[];
+  }): Promise<void> {
+    try {
+      // Notify all competing users about the conflict
+      const notification = {
+        type: 'booking_race_condition',
+        title: 'Reserva Simultánea',
+        message: 'Múltiples usuarios intentaron reservar el mismo horario',
+        data: {
+          providerId: data.providerId,
+          serviceId: data.serviceId,
+          timeSlot: data.timeSlot
+        },
+        timestamp: new Date()
+      };
+
+      // Send to all competing users
+      data.competingUsers.forEach(userId => {
+        this.io.to(`user:${userId}`).emit('booking:race-condition', notification);
+      });
+
+      // Broadcast updated availability immediately
+      await this.broadcastAvailabilityUpdate(data.providerId, data.timeSlot.start);
+
+      console.log(`Handled simultaneous booking for ${data.competingUsers.length} users`);
+    } catch (error) {
+      console.error('Error handling simultaneous booking:', error);
+    }
+  }
+
+  /**
+   * Reconnection handling for unstable connections
+   */
+  private setupReconnectionHandling(socket: any): void {
+    socket.on('reconnect:request-sync', async () => {
+      try {
+        // Send missed updates to the user
+        const offlineUpdates = await this.getOfflineUpdates(socket.userId);
+        const offlineNotifications = await this.getOfflineNotifications(socket.userId);
+
+        socket.emit('reconnect:sync-data', {
+          updates: offlineUpdates,
+          notifications: offlineNotifications,
+          timestamp: new Date()
+        });
+
+        // If user is a provider, send current calendar state
+        if (socket.providerId) {
+          const today = new Date();
+          const nextWeek = new Date();
+          nextWeek.setDate(today.getDate() + 7);
+
+          // Send current availability for next 7 days
+          for (let i = 0; i < 7; i++) {
+            const checkDate = new Date(today);
+            checkDate.setDate(today.getDate() + i);
+            await this.broadcastAvailabilityUpdate(socket.providerId, checkDate);
+          }
+        }
+
+        console.log(`Synced reconnection data for user ${socket.userId}`);
+      } catch (error) {
+        console.error('Error handling reconnection sync:', error);
+        socket.emit('reconnect:sync-error', { 
+          message: 'Error al sincronizar datos de reconexión' 
+        });
+      }
     });
   }
 
@@ -358,6 +665,60 @@ export class SocketService {
   }
 
   /**
+   * Send notification to specific provider
+   */
+  public async notifyProvider(providerId: string, notification: any): Promise<void> {
+    try {
+      // Get provider's user ID
+      const provider = await prisma.provider.findUnique({
+        where: { id: providerId },
+        include: { user: true }
+      });
+
+      if (!provider) {
+        throw new Error('Provider not found');
+      }
+
+      // Send real-time notification
+      this.io.to(`user:${provider.userId}`).emit('notification', {
+        ...notification,
+        timestamp: new Date()
+      });
+
+      // Store notification for offline delivery
+      await this.storeOfflineNotification(provider.userId, {
+        ...notification,
+        timestamp: new Date()
+      });
+      
+    } catch (error) {
+      console.error('Error notifying provider:', error);
+    }
+  }
+
+  /**
+   * Send notification to specific client
+   */
+  public async notifyClient(clientId: string, notification: any): Promise<void> {
+    try {
+      // Send real-time notification
+      this.io.to(`user:${clientId}`).emit('notification', {
+        ...notification,
+        timestamp: new Date()
+      });
+
+      // Store notification for offline delivery
+      await this.storeOfflineNotification(clientId, {
+        ...notification,
+        timestamp: new Date()
+      });
+      
+    } catch (error) {
+      console.error('Error notifying client:', error);
+    }
+  }
+
+  /**
    * Get online users count
    */
   public getOnlineUsersCount(): number {
@@ -404,17 +765,17 @@ export class SocketService {
     try {
       const key = `presence:${userId}`;
       if (status === 'online') {
-        await redis.setex(key, 300, JSON.stringify({ // 5 minutes TTL
+        await redis.set(key, JSON.stringify({ // 5 minutes TTL
           status,
           lastSeen: new Date(),
           socketCount: this.connectedUsers.get(userId)?.length || 0
-        }));
+        }), 300);
       } else {
-        await redis.setex(key, 3600, JSON.stringify({ // 1 hour TTL for offline
+        await redis.set(key, JSON.stringify({ // 1 hour TTL for offline
           status,
           lastSeen: new Date(),
           socketCount: 0
-        }));
+        }), 3600);
       }
     } catch (error) {
       console.error('Error updating user presence:', error);
@@ -427,14 +788,14 @@ export class SocketService {
   private async storeOfflineUpdate(userId: string, data: any): Promise<void> {
     try {
       const key = `offline_updates:${userId}`;
-      await redis.lpush(key, JSON.stringify({
+      await redis.getClient().lPush(key, JSON.stringify({
         ...data,
         timestamp: new Date()
       }));
       // Keep only last 50 updates
-      await redis.ltrim(key, 0, 49);
+      await redis.getClient().lTrim(key, 0, 49);
       // Set expiry to 7 days
-      await redis.expire(key, 604800);
+      await redis.getClient().expire(key, 604800);
     } catch (error) {
       console.error('Error storing offline update:', error);
     }
@@ -446,11 +807,11 @@ export class SocketService {
   private async storeOfflineNotification(userId: string, notification: any): Promise<void> {
     try {
       const key = `offline_notifications:${userId}`;
-      await redis.lpush(key, JSON.stringify(notification));
+      await redis.getClient().lPush(key, JSON.stringify(notification));
       // Keep only last 100 notifications
-      await redis.ltrim(key, 0, 99);
+      await redis.getClient().lTrim(key, 0, 99);
       // Set expiry to 30 days
-      await redis.expire(key, 2592000);
+      await redis.getClient().expire(key, 2592000);
     } catch (error) {
       console.error('Error storing offline notification:', error);
     }
@@ -462,7 +823,7 @@ export class SocketService {
   public async getOfflineUpdates(userId: string): Promise<any[]> {
     try {
       const key = `offline_updates:${userId}`;
-      const updates = await redis.lrange(key, 0, -1);
+      const updates = await redis.getClient().lRange(key, 0, -1);
       await redis.del(key); // Clear after retrieving
       return updates.map((update: string) => JSON.parse(update));
     } catch (error) {
@@ -477,7 +838,7 @@ export class SocketService {
   public async getOfflineNotifications(userId: string): Promise<any[]> {
     try {
       const key = `offline_notifications:${userId}`;
-      const notifications = await redis.lrange(key, 0, -1);
+      const notifications = await redis.getClient().lRange(key, 0, -1);
       await redis.del(key); // Clear after retrieving
       return notifications.map((notification: string) => JSON.parse(notification));
     } catch (error) {

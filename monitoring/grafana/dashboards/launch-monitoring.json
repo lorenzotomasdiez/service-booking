@@ -1,0 +1,564 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "BarberPro Launch Monitoring Dashboard",
+    "tags": ["barberpro", "launch", "business", "argentina"],
+    "timezone": "America/Argentina/Buenos_Aires",
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1,
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚀 Launch Status Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"barberpro-backend\"}",
+            "legendFormat": "Application Status"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            },
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "DOWN"
+                  },
+                  "1": {
+                    "text": "LIVE"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "💰 Real-time Revenue (ARS)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(payment_amount_total[5m])) * 300",
+            "legendFormat": "Revenue/5min"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "currencyARS",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 1000
+                },
+                {
+                  "color": "green",
+                  "value": 5000
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "📅 Active Bookings",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(booking_completed_total[1m])) * 60",
+            "legendFormat": "Bookings/hour"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 10
+                },
+                {
+                  "color": "green",
+                  "value": 50
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 4,
+        "title": "🇦🇷 Argentina Response Time",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{country=\"AR\"}[5m]))",
+            "legendFormat": "P95 Response Time"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.2
+                },
+                {
+                  "color": "red",
+                  "value": 0.5
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        }
+      },
+      {
+        "id": 5,
+        "title": "🎯 Business KPIs - Last Hour",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum(rate(booking_completed_total[1h])) * 3600",
+            "legendFormat": "Successful Bookings",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(payment_successful_total[1h])) * 3600",
+            "legendFormat": "Successful Payments",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(user_registration_total[1h])) * 3600",
+            "legendFormat": "New Users",
+            "refId": "C"
+          },
+          {
+            "expr": "sum(rate(provider_registration_total[1h])) * 3600",
+            "legendFormat": "New Providers",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 6,
+        "title": "⚠️ Critical Alerts Status",
+        "type": "alertlist",
+        "targets": [],
+        "options": {
+          "showOptions": "current",
+          "maxItems": 10,
+          "sortOrder": 1,
+          "dashboardAlerts": false,
+          "alertName": "",
+          "dashboardTitle": "",
+          "folderId": null,
+          "tags": ["critical", "barberpro"]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 7,
+        "title": "📊 Booking Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(booking_completed_total[5m]) / (rate(booking_completed_total[5m]) + rate(booking_failed_total[5m]))",
+            "legendFormat": "Success Rate"
+          }
+        ],
+        "yAxes": [
+          {
+            "min": 0,
+            "max": 1,
+            "unit": "percentunit"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 0.9,
+            "colorMode": "critical",
+            "op": "lt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 8,
+        "title": "💳 MercadoPago Payment Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(payment_successful_total{provider=\"mercadopago\"}[5m]) / (rate(payment_successful_total{provider=\"mercadopago\"}[5m]) + rate(payment_failed_total{provider=\"mercadopago\"}[5m]))",
+            "legendFormat": "MercadoPago Success Rate"
+          }
+        ],
+        "yAxes": [
+          {
+            "min": 0.9,
+            "max": 1,
+            "unit": "percentunit"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 0.95,
+            "colorMode": "critical",
+            "op": "lt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      },
+      {
+        "id": 9,
+        "title": "🏆 System Health Score",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "(\n  # Database health (25% weight)\n  (up{job=\"postgres\"} * 25) +\n  # API health (30% weight)\n  (up{job=\"barberpro-backend\"} * 30) +\n  # Redis health (15% weight)\n  (up{job=\"redis\"} * 15) +\n  # Response time health (20% weight)\n  ((histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) < 0.2) * 20) +\n  # Business metrics health (10% weight)\n  ((rate(booking_completed_total[5m]) > 0.01) * 10)\n) / 100",
+            "legendFormat": "Health Score"
+          }
+        ],
+        "valueMaps": [
+          {
+            "op": "=",
+            "text": "CRITICAL",
+            "value": "0"
+          }
+        ],
+        "colorBackground": true,
+        "thresholds": "0.7,0.9",
+        "colors": [
+          "rgba(245, 54, 54, 0.9)",
+          "rgba(237, 129, 40, 0.89)",
+          "rgba(50, 172, 45, 0.97)"
+        ],
+        "format": "percentunit",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 24
+        }
+      },
+      {
+        "id": 10,
+        "title": "🔄 Active User Sessions",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "active_user_sessions",
+            "legendFormat": "Active Sessions"
+          }
+        ],
+        "yAxes": [
+          {
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 24
+        }
+      },
+      {
+        "id": 11,
+        "title": "📱 Platform Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (platform) (rate(http_requests_total[1h]))",
+            "legendFormat": "{{platform}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 24
+        }
+      },
+      {
+        "id": 12,
+        "title": "🇦🇷 Geographic Distribution (Argentina)",
+        "type": "worldmap",
+        "targets": [
+          {
+            "expr": "sum by (region) (rate(http_requests_total{country=\"AR\"}[1h]))",
+            "legendFormat": "{{region}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 32
+        }
+      },
+      {
+        "id": 13,
+        "title": "🔥 Error Rate Heatmap",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 40
+        }
+      },
+      {
+        "id": 14,
+        "title": "⚡ Infrastructure Resource Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU Usage %"
+          },
+          {
+            "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+            "legendFormat": "Memory Usage %"
+          }
+        ],
+        "yAxes": [
+          {
+            "min": 0,
+            "max": 100,
+            "unit": "percent"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 80,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 40
+        }
+      },
+      {
+        "id": 15,
+        "title": "📧 Notification Channels Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum(rate(notification_sent_total[1h])) by (channel)",
+            "legendFormat": "{{channel}}"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 0,
+          "y": 48
+        }
+      },
+      {
+        "id": 16,
+        "title": "🎨 Frontend Performance Metrics",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(frontend_page_load_duration_seconds_bucket[5m]))",
+            "legendFormat": "Page Load P95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(frontend_first_contentful_paint_seconds_bucket[5m]))",
+            "legendFormat": "First Contentful Paint P95"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "s"
+          }
+        ],
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 12,
+          "y": 48
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        },
+        {
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "iconColor": "red",
+          "name": "Critical Alerts",
+          "titleFormat": "Alert: {{alertname}}",
+          "textFormat": "{{description}}"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "allValue": null,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "datasource": "Prometheus",
+          "definition": "label_values(up, instance)",
+          "hide": 0,
+          "includeAll": true,
+          "label": "Instance",
+          "multi": true,
+          "name": "instance",
+          "options": [],
+          "query": "label_values(up, instance)",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        }
+      ]
+    },
+    "links": [
+      {
+        "icon": "external link",
+        "includeVars": false,
+        "tags": [],
+        "title": "BarberPro Production",
+        "type": "link",
+        "url": "https://barberpro.com.ar"
+      },
+      {
+        "icon": "external link",
+        "includeVars": false,
+        "tags": [],
+        "title": "Runbook",
+        "type": "link",
+        "url": "https://docs.barberpro.com.ar/runbooks/"
+      }
+    ]
+  }
+}

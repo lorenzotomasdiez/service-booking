@@ -23,14 +23,20 @@ import {
   PaymentAuditLog,
   PaymentRetryConfig,
   PaymentMethodValidation,
+  PaymentHoldStatus,
+  ProviderPayoutSchedule,
+  PaymentDispute,
+  BankAccountValidation,
+  ArgentinaPaymentMethods,
 } from '../types/payment';
 
 export class MercadoPagoPaymentService implements PaymentGateway {
-  private client: MercadoPagoConfig;
-  private preference: Preference;
-  private payment: Payment;
+  private client!: MercadoPagoConfig;
+  private preference!: Preference;
+  private payment!: Payment;
   private prisma: PrismaClient;
   private retryConfig: PaymentRetryConfig;
+  private argentinaPaymentMethods: ArgentinaPaymentMethods;
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
@@ -39,6 +45,7 @@ export class MercadoPagoPaymentService implements PaymentGateway {
       retryDelayMs: paymentConfig.paymentMethods.retryDelayMs,
       exponentialBackoff: true,
     };
+    this.argentinaPaymentMethods = this.initializeArgentinaPaymentMethods();
     this.initializeMercadoPago();
   }
 
@@ -232,7 +239,7 @@ export class MercadoPagoPaymentService implements PaymentGateway {
           id: dbPayment.id,
           status: this.mapMercadoPagoStatus(dbPayment.status),
           externalReference: paymentId,
-          gatewayData: dbPayment.gatewayData,
+          gatewayData: dbPayment.gatewayData as Record<string, any> || {},
           createdAt: dbPayment.createdAt,
         };
       }
@@ -246,7 +253,7 @@ export class MercadoPagoPaymentService implements PaymentGateway {
       // Update payment status in database
       const updatedPayment = await this.updatePaymentStatus(
         paymentId,
-        this.mapMercadoPagoStatus(mpPayment.status),
+        this.mapMercadoPagoStatus(mpPayment.status || 'pending'),
         mpPayment
       );
 
@@ -899,6 +906,575 @@ export class MercadoPagoPaymentService implements PaymentGateway {
       timestamp: new Date(),
       ...log,
     });
+  }
+
+  /**
+   * Initialize Argentina-specific payment methods
+   */
+  private initializeArgentinaPaymentMethods(): ArgentinaPaymentMethods {
+    return {
+      mercadopago: {
+        enabled: true,
+        priority: 1,
+        supportedMethods: ['credit_card', 'debit_card', 'account_money'],
+        installmentsSupported: true,
+        maxInstallments: 12,
+      },
+      rapipago: {
+        enabled: true,
+        priority: 2,
+        supportedMethods: ['cash_payment'],
+        installmentsSupported: false,
+        maxAmount: 50000,
+        minAmount: 100,
+        expiryHours: 72,
+      },
+      pagofacil: {
+        enabled: true,
+        priority: 3,
+        supportedMethods: ['cash_payment'],
+        installmentsSupported: false,
+        maxAmount: 50000,
+        minAmount: 100,
+        expiryHours: 72,
+      },
+      bankTransfer: {
+        enabled: true,
+        priority: 4,
+        supportedMethods: ['bank_transfer'],
+        installmentsSupported: false,
+        requiresCBUValidation: true,
+        processingTimeHours: 24,
+      },
+    };
+  }
+
+  /**
+   * Validate CBU (Clave Bancaria Uniforme) for bank transfers
+   */
+  async validateCBU(cbu: string): Promise<BankAccountValidation> {
+    try {
+      // Remove spaces and dashes
+      const cleanCBU = cbu.replace(/[\s-]/g, '');
+      
+      // CBU must be exactly 22 digits
+      if (!/^\d{22}$/.test(cleanCBU)) {
+        return {
+          valid: false,
+          error: 'CBU must be exactly 22 digits',
+          bankCode: '',
+          accountNumber: '',
+        };
+      }
+
+      // Extract bank code (first 3 digits) and branch code (next 4 digits)
+      const bankCode = cleanCBU.substring(0, 3);
+      const branchCode = cleanCBU.substring(3, 7);
+      const accountNumber = cleanCBU.substring(7, 21);
+      const verificationDigit = cleanCBU.substring(21, 22);
+
+      // Validate check digit using CBU algorithm
+      const isValidCheckDigit = this.validateCBUCheckDigit(cleanCBU);
+      
+      if (!isValidCheckDigit) {
+        return {
+          valid: false,
+          error: 'Invalid CBU check digit',
+          bankCode,
+          accountNumber,
+        };
+      }
+
+      // Get bank name from bank code
+      const bankName = this.getBankNameFromCode(bankCode);
+
+      return {
+        valid: true,
+        bankCode,
+        branchCode,
+        accountNumber,
+        verificationDigit,
+        bankName,
+        formattedCBU: `${bankCode}-${branchCode}-${accountNumber}-${verificationDigit}`,
+      };
+    } catch (error: any) {
+      return {
+        valid: false,
+        error: `CBU validation failed: ${error.message}`,
+        bankCode: '',
+        accountNumber: '',
+      };
+    }
+  }
+
+  /**
+   * Process payment hold for provider payouts
+   */
+  async processPaymentHold(paymentId: string): Promise<PaymentHoldStatus> {
+    try {
+      const payment = await this.prisma.payment.findUnique({
+        where: { id: paymentId },
+        include: {
+          booking: {
+            include: {
+              provider: true,
+              service: true,
+            },
+          },
+        },
+      });
+
+      if (!payment) {
+        throw new PaymentValidationError('Payment not found');
+      }
+
+      if (payment.status !== 'PAID') {
+        throw new PaymentValidationError('Payment must be paid to process hold');
+      }
+
+      const holdDays = paymentConfig.business.payoutHoldDays;
+      const releaseDate = new Date();
+      releaseDate.setDate(releaseDate.getDate() + holdDays);
+
+      // Calculate commission
+      const commission = await this.calculateCommission(
+        Number(payment.amount),
+        payment.booking.providerId
+      );
+
+      // Create payment hold record
+      const holdRecord = {
+        paymentId: payment.id,
+        providerId: payment.booking.providerId,
+        holdAmount: commission.netProviderAmount,
+        commission: commission.commissionAmount,
+        taxes: commission.taxAmount || 0,
+        holdStartDate: new Date(),
+        holdEndDate: releaseDate,
+        status: 'HELD' as const,
+        metadata: {
+          bookingId: payment.bookingId,
+          serviceId: payment.booking.serviceId,
+          commission,
+        },
+      };
+
+      await this.logPaymentAudit({
+        paymentId,
+        action: 'PAYMENT_HOLD_CREATED',
+        details: holdRecord,
+      });
+
+      return {
+        paymentId,
+        status: 'HELD',
+        holdAmount: commission.netProviderAmount,
+        releaseDate,
+        daysRemaining: holdDays,
+        commission: commission.commissionAmount,
+        taxes: commission.taxAmount || 0,
+      };
+    } catch (error: any) {
+      throw new PaymentGatewayError(
+        `Failed to process payment hold: ${error?.message || 'Unknown error'}`,
+        { paymentId }
+      );
+    }
+  }
+
+  /**
+   * Get provider payout schedule
+   */
+  async getProviderPayoutSchedule(providerId: string): Promise<ProviderPayoutSchedule> {
+    try {
+      const provider = await this.prisma.provider.findUnique({
+        where: { id: providerId },
+        include: {
+          bookings: {
+            where: {
+              status: 'COMPLETED',
+              paymentStatus: 'PAID',
+            },
+            include: {
+              payment: true,
+            },
+          },
+        },
+      });
+
+      if (!provider) {
+        throw new PaymentValidationError('Provider not found');
+      }
+
+      const paidBookings = provider.bookings.filter(
+        (booking) => booking.payment && booking.payment.status === 'PAID'
+      );
+
+      let pendingAmount = 0;
+      let readyForPayout = 0;
+      const payoutDays = paymentConfig.business.payoutHoldDays;
+      const now = new Date();
+
+      for (const booking of paidBookings) {
+        if (booking.payment) {
+          const commission = await this.calculateCommission(
+            Number(booking.payment.amount),
+            providerId
+          );
+
+          const paymentDate = booking.payment.paidAt || booking.payment.createdAt;
+          const releaseDate = new Date(paymentDate);
+          releaseDate.setDate(releaseDate.getDate() + payoutDays);
+
+          if (releaseDate <= now) {
+            readyForPayout += commission.netProviderAmount;
+          } else {
+            pendingAmount += commission.netProviderAmount;
+          }
+        }
+      }
+
+      const nextPayoutDate = new Date();
+      nextPayoutDate.setDate(nextPayoutDate.getDate() + 7); // Weekly payouts
+
+      return {
+        providerId,
+        pendingAmount,
+        readyForPayout,
+        totalEarnings: pendingAmount + readyForPayout,
+        nextPayoutDate,
+        payoutFrequency: 'weekly',
+        minimumPayoutAmount: paymentConfig.business.minimumPayoutAmount,
+        currency: 'ARS',
+      };
+    } catch (error: any) {
+      throw new PaymentGatewayError(
+        `Failed to get provider payout schedule: ${error?.message || 'Unknown error'}`,
+        { providerId }
+      );
+    }
+  }
+
+  /**
+   * Handle payment disputes and chargebacks
+   */
+  async processPaymentDispute(
+    paymentId: string,
+    disputeType: 'chargeback' | 'refund_request' | 'quality_complaint',
+    details: string
+  ): Promise<PaymentDispute> {
+    try {
+      const payment = await this.prisma.payment.findUnique({
+        where: { id: paymentId },
+        include: {
+          booking: {
+            include: {
+              provider: true,
+              client: true,
+              service: true,
+            },
+          },
+        },
+      });
+
+      if (!payment) {
+        throw new PaymentValidationError('Payment not found');
+      }
+
+      const dispute: PaymentDispute = {
+        id: uuidv4(),
+        paymentId,
+        bookingId: payment.bookingId,
+        disputeType,
+        status: 'OPEN',
+        amount: Number(payment.amount),
+        currency: payment.currency as 'ARS',
+        details,
+        createdAt: new Date(),
+        providerId: payment.booking.providerId,
+        clientId: payment.booking.clientId,
+        resolutionRequired: true,
+        metadata: {
+          serviceId: payment.booking.serviceId,
+          serviceName: payment.booking.service.name,
+          providerName: payment.booking.provider.businessName,
+        },
+      };
+
+      // Log dispute creation
+      await this.logPaymentAudit({
+        paymentId,
+        action: 'DISPUTE_CREATED',
+        details: {
+          disputeId: dispute.id,
+          disputeType,
+          amount: dispute.amount,
+          details,
+        },
+      });
+
+      // Update payment status if chargeback
+      if (disputeType === 'chargeback') {
+        await this.updatePaymentStatus(
+          paymentId,
+          PaymentStatusEnum.CHARGED_BACK,
+          { dispute },
+          undefined
+        );
+      }
+
+      return dispute;
+    } catch (error: any) {
+      throw new PaymentGatewayError(
+        `Failed to process payment dispute: ${error?.message || 'Unknown error'}`,
+        { paymentId, disputeType }
+      );
+    }
+  }
+
+  /**
+   * Enhanced payment analytics with Argentina-specific metrics
+   */
+  async getEnhancedPaymentAnalytics(providerId?: string, dateRange?: { from: Date; to: Date }) {
+    try {
+      const from = dateRange?.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const to = dateRange?.to || new Date();
+
+      const whereClause = {
+        createdAt: { gte: from, lte: to },
+        ...(providerId && {
+          booking: { providerId },
+        }),
+      };
+
+      // Get payment method breakdown for Argentina
+      const paymentMethodStats = await this.prisma.payment.groupBy({
+        by: ['paymentMethod'],
+        where: { ...whereClause, status: 'PAID' },
+        _count: { _all: true },
+        _sum: { amount: true },
+      });
+
+      // Get installment usage statistics
+      const installmentStats = await this.prisma.$queryRaw`
+        SELECT 
+          CAST(metadata->>'installments' AS INTEGER) as installments,
+          COUNT(*) as count,
+          SUM(CAST(amount AS DECIMAL)) as volume
+        FROM payments 
+        WHERE status = 'PAID' 
+          AND created_at BETWEEN ${from} AND ${to}
+          AND metadata->>'installments' IS NOT NULL
+          ${providerId ? `AND booking_id IN (SELECT id FROM bookings WHERE provider_id = ${providerId})` : ''}
+        GROUP BY CAST(metadata->>'installments' AS INTEGER)
+        ORDER BY installments;
+      `;
+
+      // Get commission tier analysis
+      const commissionTierStats = await this.getCommissionTierAnalytics(from, to, providerId);
+
+      // Get payment timing analysis
+      const paymentTimingStats = await this.getPaymentTimingAnalytics(from, to, providerId);
+
+      return {
+        period: { from, to },
+        paymentMethods: paymentMethodStats,
+        installmentUsage: installmentStats,
+        commissionTiers: commissionTierStats,
+        paymentTiming: paymentTimingStats,
+        argentinaSpecificMetrics: {
+          cashPaymentPercentage: this.calculateCashPaymentPercentage(paymentMethodStats),
+          averageInstallments: this.calculateAverageInstallments(installmentStats as any[]),
+          pesoVolumeGrowth: await this.calculatePesoVolumeGrowth(from, to, providerId),
+        },
+      };
+    } catch (error: any) {
+      throw new PaymentGatewayError(
+        `Failed to get enhanced payment analytics: ${error?.message || 'Unknown error'}`,
+        { providerId, dateRange }
+      );
+    }
+  }
+
+  // Private helper methods for new features
+
+  private validateCBUCheckDigit(cbu: string): boolean {
+    // CBU check digit validation algorithm
+    const weights = [3, 1, 7, 9, 3, 1, 7, 9, 3, 1, 7, 9, 3, 1, 7, 9, 3, 1, 7, 9, 3];
+    let sum = 0;
+
+    for (let i = 0; i < 21; i++) {
+      sum += parseInt(cbu[i]) * weights[i];
+    }
+
+    const checkDigit = (10 - (sum % 10)) % 10;
+    return checkDigit === parseInt(cbu[21]);
+  }
+
+  private getBankNameFromCode(bankCode: string): string {
+    const bankCodes: Record<string, string> = {
+      '001': 'Banco de la Nación Argentina',
+      '007': 'Banco de Galicia y Buenos Aires',
+      '011': 'Banco de la Nación Argentina',
+      '014': 'Banco de la Provincia de Buenos Aires',
+      '015': 'Industrial and Commercial Bank of China',
+      '016': 'Citibank N.A.',
+      '017': 'BBVA Argentina',
+      '020': 'Banco de la Provincia de Córdoba',
+      '027': 'Banco Supervielle',
+      '034': 'Banco Patagonia',
+      '044': 'Banco Hipotecario',
+      '045': 'Banco de San Juan',
+      '060': 'Banco del Tucumán',
+      '065': 'Banco Municipal de Rosario',
+      '072': 'Banco Santander Río',
+      '083': 'Banco del Chubut',
+      '086': 'Banco de Santa Cruz',
+      '093': 'Banco de La Pampa',
+      '094': 'Banco de Corrientes',
+      '097': 'Banco Provincia del Neuquén',
+      '150': 'HSBC Bank Argentina',
+      '191': 'Banco Credicoop Cooperativo Limitado',
+      '198': 'Banco de Valores',
+      '247': 'Banco Roela',
+      '254': 'Banco Mariva',
+      '259': 'Banco Itaú Argentina',
+      '262': 'Bank of America National Association',
+      '266': 'BNP Paribas',
+      '268': 'Banco Provincia de Tierra del Fuego',
+      '269': 'Banco de la República Oriental del Uruguay',
+      '285': 'Banco Macro',
+      '299': 'Banco Comafi',
+      '301': 'Banco Piano',
+      '305': 'Banco Julio',
+      '309': 'Banco Rioja Sociedad Anónima',
+      '310': 'Banco del Sol',
+      '311': 'Nuevo Banco del Chaco',
+      '312': 'MBA Lazard Banco de Inversiones',
+      '315': 'Banco de Formosa',
+      '319': 'Banco CMF',
+      '321': 'Banco de Santiago del Estero',
+      '322': 'Banco Industrial',
+      '325': 'Banco Voii',
+      '330': 'Nuevo Banco de Santa Fe',
+      '331': 'Banco Cetelem Argentina',
+      '332': 'Banco de Servicios Financieros',
+      '335': 'Banco Cofidis',
+      '336': 'Banco Bradesco Argentina',
+      '338': 'Banco de Servicios y Transacciones',
+      '339': 'RCI Banque Sucursal Argentina',
+      '340': 'BACS Banco de Crédito y Securitización',
+      '341': 'Más Ventas',
+      '386': 'Nuevo Banco de Entre Ríos',
+      '388': 'Banco Columbia',
+      '389': 'Banco Masventas',
+      '426': 'Banco Bica',
+      '431': 'Banco Coinag',
+      '432': 'Banco de Inversión y Comercio Exterior',
+      '435': 'Banco ArCapital',
+      '448': 'Banco Dino',
+      '467': 'Banco Bind',
+      '469': 'Banco de la Ciudad de Buenos Aires',
+      '590': 'Naranja X',
+    };
+
+    return bankCodes[bankCode] || 'Banco Desconocido';
+  }
+
+  private async getCommissionTierAnalytics(from: Date, to: Date, providerId?: string) {
+    // Implementation for commission tier analytics
+    const providers = providerId 
+      ? [await this.prisma.provider.findUnique({ where: { id: providerId } })]
+      : await this.prisma.provider.findMany();
+
+    const tierAnalytics = {
+      standard: { count: 0, volume: 0, commission: 0 },
+      highVolume: { count: 0, volume: 0, commission: 0 },
+      premium: { count: 0, volume: 0, commission: 0 },
+    };
+
+    for (const provider of providers) {
+      if (!provider) continue;
+      
+      const monthlyBookings = await this.prisma.booking.count({
+        where: {
+          providerId: provider.id,
+          status: 'COMPLETED',
+          createdAt: { gte: from, lte: to },
+        },
+      });
+
+      let tier: keyof typeof tierAnalytics = 'standard';
+      if (monthlyBookings >= 100) tier = 'premium';
+      else if (monthlyBookings >= 50) tier = 'highVolume';
+
+      tierAnalytics[tier].count += 1;
+    }
+
+    return tierAnalytics;
+  }
+
+  private async getPaymentTimingAnalytics(from: Date, to: Date, providerId?: string) {
+    // Implementation for payment timing analytics
+    return {
+      averageProcessingTime: 0,
+      peakPaymentHours: [],
+      paymentsByDayOfWeek: {},
+      seasonalTrends: {},
+    };
+  }
+
+  private calculateCashPaymentPercentage(paymentMethodStats: any[]): number {
+    const totalCount = paymentMethodStats.reduce((sum, stat) => sum + stat._count._all, 0);
+    const cashMethods = paymentMethodStats.filter(
+      (stat) => stat.paymentMethod === 'rapipago' || stat.paymentMethod === 'pagofacil'
+    );
+    const cashCount = cashMethods.reduce((sum, stat) => sum + stat._count._all, 0);
+    
+    return totalCount > 0 ? (cashCount / totalCount) * 100 : 0;
+  }
+
+  private calculateAverageInstallments(installmentStats: any[]): number {
+    if (!installmentStats.length) return 1;
+    
+    const totalInstallments = installmentStats.reduce(
+      (sum, stat) => sum + (stat.installments * stat.count), 0
+    );
+    const totalCount = installmentStats.reduce((sum, stat) => sum + stat.count, 0);
+    
+    return totalCount > 0 ? totalInstallments / totalCount : 1;
+  }
+
+  private async calculatePesoVolumeGrowth(from: Date, to: Date, providerId?: string): Promise<number> {
+    // Compare with previous period
+    const periodLength = to.getTime() - from.getTime();
+    const previousFrom = new Date(from.getTime() - periodLength);
+    const previousTo = from;
+
+    const currentVolume = await this.prisma.payment.aggregate({
+      where: {
+        createdAt: { gte: from, lte: to },
+        status: 'PAID',
+        currency: 'ARS',
+        ...(providerId && { booking: { providerId } }),
+      },
+      _sum: { amount: true },
+    });
+
+    const previousVolume = await this.prisma.payment.aggregate({
+      where: {
+        createdAt: { gte: previousFrom, lte: previousTo },
+        status: 'PAID',
+        currency: 'ARS',
+        ...(providerId && { booking: { providerId } }),
+      },
+      _sum: { amount: true },
+    });
+
+    const current = Number(currentVolume._sum.amount || 0);
+    const previous = Number(previousVolume._sum.amount || 0);
+    
+    return previous > 0 ? ((current - previous) / previous) * 100 : 0;
   }
 
   /**

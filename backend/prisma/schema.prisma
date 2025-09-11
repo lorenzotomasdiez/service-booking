@@ -38,6 +38,11 @@ model User {
   provider         Provider?
   refreshTokens    RefreshToken[]
   notifications    Notification[]
+  referralsGiven   Referral[] @relation("ReferralsGiven")
+  referralsReceived Referral[] @relation("ReferralsReceived")
+  promotionUsages  PromotionUsage[]
+  loyaltyPoints    LoyaltyPoints[]
+  clientNotes      ClientNote[] @relation("ClientNotes")
 
   @@index([email])              // Login queries
   @@index([phone])              // Phone lookup
@@ -88,6 +93,11 @@ model Provider {
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   services Service[]
   bookings Booking[]
+  referralCodes ReferralCode[]
+  promotions Promotion[]
+  loyaltyPoints LoyaltyPoints[]
+  analytics ProviderAnalytics[]
+  clientNotes ClientNote[]
 
   @@index([isActive, isVerified])  // Active verified providers lookup
   @@index([city, province])        // Location-based search
@@ -206,6 +216,9 @@ model Booking {
   provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
   payment  Payment?
+  referrals Referral[]
+  promotionUsages PromotionUsage[]
+  loyaltyTransactions LoyaltyTransaction[]
 
   // Performance indexes for Argentina booking platform
   @@index([providerId, startTime]) // Provider's daily schedule lookup
@@ -332,4 +345,261 @@ enum NotificationStatus {
   UNREAD
   READ
   ARCHIVED
+}
+
+// Referral System Models
+model ReferralCode {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  providerId  String
+  isActive    Boolean  @default(true)
+  maxUses     Int?     // null means unlimited
+  usedCount   Int      @default(0)
+  
+  // Reward settings
+  referrerReward    Decimal @db.Decimal(10, 2) // Amount for referrer
+  refereeDiscount   Decimal @db.Decimal(10, 2) // Discount for new client
+  rewardType        RewardType @default(FIXED_AMOUNT)
+  
+  // Validity
+  expiresAt   DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  provider    Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  referrals   Referral[]
+  
+  @@index([providerId, isActive])
+  @@index([code])
+  @@map("referral_codes")
+}
+
+model Referral {
+  id              String        @id @default(cuid())
+  codeId          String
+  referrerId      String        // The user who made the referral
+  refereeId       String        // The new user who was referred
+  bookingId       String?       // Booking that triggered the reward
+  status          ReferralStatus @default(PENDING)
+  
+  // Reward tracking
+  rewardAmount    Decimal?      @db.Decimal(10, 2)
+  discountAmount  Decimal?      @db.Decimal(10, 2)
+  rewardPaidAt    DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  code     ReferralCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  referrer User         @relation("ReferralsGiven", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee  User         @relation("ReferralsReceived", fields: [refereeId], references: [id], onDelete: Cascade)
+  booking  Booking?     @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  
+  @@index([codeId])
+  @@index([referrerId])
+  @@index([refereeId])
+  @@index([status])
+  @@map("referrals")
+}
+
+// Promotion System Models
+model Promotion {
+  id               String         @id @default(cuid())
+  providerId       String
+  name             String
+  description      String?
+  code             String?        @unique // Optional promo code
+  
+  // Discount settings
+  discountType     DiscountType
+  discountValue    Decimal        @db.Decimal(10, 2)
+  minimumAmount    Decimal?       @db.Decimal(10, 2)
+  maxDiscountAmount Decimal?      @db.Decimal(10, 2)
+  
+  // Validity and limits
+  isActive         Boolean        @default(true)
+  maxUses          Int?           // null means unlimited
+  usedCount        Int            @default(0)
+  maxUsesPerUser   Int            @default(1)
+  
+  // Target services
+  applicableToAllServices Boolean @default(true)
+  serviceIds       String[]       // Specific services if not all
+  
+  // Time constraints
+  validFrom        DateTime
+  validUntil       DateTime
+  
+  // Special conditions
+  isNewClientOnly  Boolean        @default(false)
+  isBirthdayPromo  Boolean        @default(false)
+  isGroupBooking   Boolean        @default(false)
+  minGroupSize     Int?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  provider         Provider       @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  usages           PromotionUsage[]
+  
+  @@index([providerId, isActive])
+  @@index([code])
+  @@index([validFrom, validUntil])
+  @@index([isActive, validFrom, validUntil])
+  @@map("promotions")
+}
+
+model PromotionUsage {
+  id           String    @id @default(cuid())
+  promotionId  String
+  userId       String
+  bookingId    String?
+  discountAmount Decimal @db.Decimal(10, 2)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  promotion    Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking      Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  
+  @@index([promotionId])
+  @@index([userId])
+  @@index([bookingId])
+  @@map("promotion_usages")
+}
+
+// Loyalty Points System
+model LoyaltyPoints {
+  id          String   @id @default(cuid())
+  userId      String
+  providerId  String
+  points      Int      @default(0)
+  totalEarned Int      @default(0)
+  totalSpent  Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  transactions LoyaltyTransaction[]
+  
+  @@unique([userId, providerId])
+  @@index([userId])
+  @@index([providerId])
+  @@map("loyalty_points")
+}
+
+model LoyaltyTransaction {
+  id              String      @id @default(cuid())
+  loyaltyPointsId String
+  bookingId       String?
+  type            LoyaltyTransactionType
+  points          Int
+  description     String?
+  
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  loyaltyPoints   LoyaltyPoints @relation(fields: [loyaltyPointsId], references: [id], onDelete: Cascade)
+  booking         Booking?      @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  
+  @@index([loyaltyPointsId])
+  @@index([bookingId])
+  @@index([type, createdAt])
+  @@map("loyalty_transactions")
+}
+
+// Provider Analytics Models
+model ProviderAnalytics {
+  id              String   @id @default(cuid())
+  providerId      String
+  date            DateTime @db.Date
+  
+  // Daily metrics
+  totalBookings   Int      @default(0)
+  completedBookings Int    @default(0)
+  cancelledBookings Int    @default(0)
+  noShowBookings  Int      @default(0)
+  
+  // Revenue metrics
+  totalRevenue    Decimal  @db.Decimal(10, 2) @default(0)
+  platformFee     Decimal  @db.Decimal(10, 2) @default(0)
+  netRevenue      Decimal  @db.Decimal(10, 2) @default(0)
+  
+  // Client metrics
+  newClients      Int      @default(0)
+  returningClients Int     @default(0)
+  
+  // Service metrics (JSON for flexibility)
+  serviceMetrics  Json?    // { serviceId: { bookings, revenue } }
+  
+  // Time metrics
+  averageServiceTime Int?  // minutes
+  utilizationRate    Decimal? @db.Decimal(5, 2) // percentage
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  provider        Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  
+  @@unique([providerId, date])
+  @@index([providerId, date])
+  @@index([date])
+  @@map("provider_analytics")
+}
+
+// Client Relationship Management
+model ClientNote {
+  id         String   @id @default(cuid())
+  providerId String
+  clientId   String
+  content    String
+  isPrivate  Boolean  @default(true)
+  tags       String[] // searchable tags
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // Relations
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  client     User     @relation("ClientNotes", fields: [clientId], references: [id], onDelete: Cascade)
+  
+  @@index([providerId, clientId])
+  @@index([providerId, tags])
+  @@map("client_notes")
+}
+
+// New Enums
+enum RewardType {
+  FIXED_AMOUNT
+  PERCENTAGE
+}
+
+enum ReferralStatus {
+  PENDING
+  COMPLETED
+  PAID
+  EXPIRED
+}
+
+enum DiscountType {
+  FIXED_AMOUNT
+  PERCENTAGE
+  BUY_ONE_GET_ONE
+}
+
+enum LoyaltyTransactionType {
+  EARNED
+  SPENT
+  EXPIRED
+  BONUS
 }

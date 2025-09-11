@@ -330,6 +330,188 @@ export interface PaymentAuditLog {
   userAgent?: string;
 }
 
+// Argentina-specific payment types
+export interface ArgentinaPaymentMethods {
+  mercadopago: {
+    enabled: boolean;
+    priority: number;
+    supportedMethods: string[];
+    installmentsSupported: boolean;
+    maxInstallments: number;
+  };
+  rapipago: {
+    enabled: boolean;
+    priority: number;
+    supportedMethods: string[];
+    installmentsSupported: boolean;
+    maxAmount: number;
+    minAmount: number;
+    expiryHours: number;
+  };
+  pagofacil: {
+    enabled: boolean;
+    priority: number;
+    supportedMethods: string[];
+    installmentsSupported: boolean;
+    maxAmount: number;
+    minAmount: number;
+    expiryHours: number;
+  };
+  bankTransfer: {
+    enabled: boolean;
+    priority: number;
+    supportedMethods: string[];
+    installmentsSupported: boolean;
+    requiresCBUValidation: boolean;
+    processingTimeHours: number;
+  };
+}
+
+export interface BankAccountValidation {
+  valid: boolean;
+  error?: string;
+  bankCode: string;
+  branchCode?: string;
+  accountNumber: string;
+  verificationDigit?: string;
+  bankName?: string;
+  formattedCBU?: string;
+}
+
+export interface PaymentHoldStatus {
+  paymentId: string;
+  status: 'HELD' | 'RELEASED' | 'DISPUTED';
+  holdAmount: number;
+  releaseDate: Date;
+  daysRemaining: number;
+  commission: number;
+  taxes: number;
+}
+
+export interface ProviderPayoutSchedule {
+  providerId: string;
+  pendingAmount: number;
+  readyForPayout: number;
+  totalEarnings: number;
+  nextPayoutDate: Date;
+  payoutFrequency: 'daily' | 'weekly' | 'biweekly' | 'monthly';
+  minimumPayoutAmount: number;
+  currency: 'ARS';
+}
+
+export interface PaymentDispute {
+  id: string;
+  paymentId: string;
+  bookingId: string;
+  disputeType: 'chargeback' | 'refund_request' | 'quality_complaint';
+  status: 'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'CLOSED';
+  amount: number;
+  currency: 'ARS';
+  details: string;
+  createdAt: Date;
+  resolvedAt?: Date;
+  resolution?: string;
+  providerId: string;
+  clientId: string;
+  resolutionRequired: boolean;
+  metadata?: Record<string, any>;
+}
+
+export interface EnhancedPaymentAnalytics {
+  period: { from: Date; to: Date };
+  paymentMethods: PaymentMethodBreakdown[];
+  installmentUsage: InstallmentStatistics[];
+  commissionTiers: CommissionTierAnalytics;
+  paymentTiming: PaymentTimingAnalytics;
+  argentinaSpecificMetrics: ArgentinaPaymentMetrics;
+}
+
+export interface PaymentMethodBreakdown {
+  method: string;
+  count: number;
+  volume: number;
+  percentage: number;
+  averageAmount: number;
+  successRate: number;
+}
+
+export interface InstallmentStatistics {
+  installments: number;
+  count: number;
+  volume: number;
+  averageAmount: number;
+  popularityRank: number;
+}
+
+export interface CommissionTierAnalytics {
+  standard: { count: number; volume: number; commission: number };
+  highVolume: { count: number; volume: number; commission: number };
+  premium: { count: number; volume: number; commission: number };
+}
+
+export interface PaymentTimingAnalytics {
+  averageProcessingTime: number;
+  peakPaymentHours: number[];
+  paymentsByDayOfWeek: Record<string, number>;
+  seasonalTrends: Record<string, number>;
+}
+
+export interface ArgentinaPaymentMetrics {
+  cashPaymentPercentage: number;
+  averageInstallments: number;
+  pesoVolumeGrowth: number;
+  bankTransferUsage?: number;
+  rapipagoPagofacilUsage?: number;
+  mercadopagoWalletUsage?: number;
+}
+
+// Enhanced payment method validation for Argentina
+export interface ArgentinaPaymentMethodValidation extends PaymentMethodValidation {
+  rapipago: PaymentMethodRules & {
+    networkFee: number;
+    expiryHours: number;
+    supportedProvinces: string[];
+  };
+  pagofacil: PaymentMethodRules & {
+    networkFee: number;
+    expiryHours: number;
+    supportedProvinces: string[];
+  };
+  cbu_transfer: PaymentMethodRules & {
+    requiresCBUValidation: boolean;
+    processingTimeHours: number;
+    dailyLimit: number;
+  };
+}
+
+// Payment processing queue types
+export interface PaymentQueueJob {
+  id: string;
+  type: 'PAYMENT_PROCESSING' | 'WEBHOOK_PROCESSING' | 'PAYOUT_PROCESSING';
+  payload: Record<string, any>;
+  priority: number;
+  attempts: number;
+  maxAttempts: number;
+  createdAt: Date;
+  scheduledFor?: Date;
+  metadata?: Record<string, any>;
+}
+
+// Advanced webhook types
+export interface EnhancedWebhookPayload extends MercadoPagoWebhook {
+  signature: string;
+  timestamp: string;
+  idempotencyKey?: string;
+  retryAttempt?: number;
+}
+
+export interface WebhookProcessingResult extends PaymentProcessingResult {
+  webhookId: string;
+  processingTimeMs: number;
+  retryAttempt: number;
+  validSignature: boolean;
+}
+
 export default {
   PaymentStatusEnum,
   PaymentMethodEnum,

@@ -51,10 +51,30 @@ const CancellationRequestSchema = Type.Object({
   applyPenalty: Type.Optional(Type.Boolean()),
 });
 
+const CBUValidationSchema = Type.Object({
+  cbu: Type.String({ minLength: 22, maxLength: 22 }),
+});
+
+const DisputeRequestSchema = Type.Object({
+  paymentId: Type.String(),
+  disputeType: Type.Union([Type.Literal('chargeback'), Type.Literal('refund_request'), Type.Literal('quality_complaint')]),
+  details: Type.String({ minLength: 10, maxLength: 1000 }),
+});
+
+const EnhancedAnalyticsSchema = Type.Object({
+  providerId: Type.Optional(Type.String()),
+  from: Type.Optional(Type.String({ format: 'date' })),
+  to: Type.Optional(Type.String({ format: 'date' })),
+  includeArgentinaMetrics: Type.Optional(Type.Boolean()),
+});
+
 type CreatePaymentRequest = Static<typeof CreatePaymentSchema>;
 type PaymentParams = Static<typeof PaymentParamsSchema>;
 type RefundRequest = Static<typeof RefundRequestSchema>;
 type CancellationRequest = Static<typeof CancellationRequestSchema>;
+type CBUValidationRequest = Static<typeof CBUValidationSchema>;
+type DisputeRequest = Static<typeof DisputeRequestSchema>;
+type EnhancedAnalyticsRequest = Static<typeof EnhancedAnalyticsSchema>;
 
 export default async function paymentRoutes(fastify: FastifyInstance) {
   const paymentService = new MercadoPagoPaymentService(prisma);
@@ -503,7 +523,31 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
           'rapipago',
           'pagofacil',
           'account_money',
+          'cbu_transfer',
         ],
+        argentinaSpecificMethods: {
+          rapipago: {
+            enabled: true,
+            maxAmount: 50000,
+            minAmount: 100,
+            expiryHours: 72,
+            networkFee: 0.015,
+          },
+          pagofacil: {
+            enabled: true,
+            maxAmount: 50000,
+            minAmount: 100,
+            expiryHours: 72,
+            networkFee: 0.015,
+          },
+          cbu_transfer: {
+            enabled: true,
+            requiresCBUValidation: true,
+            processingTimeHours: 24,
+            maxAmount: 1000000,
+            minAmount: 500,
+          },
+        },
       },
     });
   });
@@ -964,5 +1008,373 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
         },
       });
     }
+  });
+
+  /**
+   * Validate CBU (Argentina Bank Account)
+   * POST /api/payments/validate-cbu
+   */
+  fastify.post<{
+    Body: CBUValidationRequest;
+  }>('/payments/validate-cbu', {
+    schema: {
+      description: 'Validate CBU (Clave Bancaria Uniforme) for Argentina bank transfers',
+      tags: ['payments', 'argentina'],
+      body: CBUValidationSchema,
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Object({
+            valid: Type.Boolean(),
+            bankName: Type.Optional(Type.String()),
+            bankCode: Type.String(),
+            accountNumber: Type.String(),
+            formattedCBU: Type.Optional(Type.String()),
+          }),
+        }),
+        400: Type.Object({
+          success: Type.Boolean(),
+          error: Type.Object({
+            code: Type.String(),
+            message: Type.String(),
+          }),
+        }),
+      },
+    },
+  }, async (request: FastifyRequest<{ Body: CBUValidationRequest }>, reply: FastifyReply) => {
+    try {
+      const validation = await paymentService.validateCBU(request.body.cbu);
+
+      return reply.send({
+        success: true,
+        data: {
+          valid: validation.valid,
+          bankName: validation.bankName,
+          bankCode: validation.bankCode,
+          accountNumber: validation.accountNumber,
+          formattedCBU: validation.formattedCBU,
+          ...(validation.error && { error: validation.error }),
+        },
+      });
+    } catch (error) {
+      fastify.log.error('CBU validation error:', error);
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'CBU_VALIDATION_ERROR',
+          message: 'Failed to validate CBU',
+        },
+      });
+    }
+  });
+
+  /**
+   * Process Payment Hold
+   * POST /api/payments/:paymentId/hold
+   */
+  fastify.post<{
+    Params: PaymentParams;
+  }>('/payments/:paymentId/hold', {
+    schema: {
+      description: 'Process payment hold for provider payout',
+      tags: ['payments', 'payout'],
+      params: PaymentParamsSchema,
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Object({
+            paymentId: Type.String(),
+            status: Type.String(),
+            holdAmount: Type.Number(),
+            releaseDate: Type.String(),
+            daysRemaining: Type.Number(),
+            commission: Type.Number(),
+            taxes: Type.Number(),
+          }),
+        }),
+      },
+    },
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest<{ Params: PaymentParams }>, reply: FastifyReply) => {
+    try {
+      const holdStatus = await paymentService.processPaymentHold(request.params.paymentId);
+
+      return reply.send({
+        success: true,
+        data: {
+          paymentId: holdStatus.paymentId,
+          status: holdStatus.status,
+          holdAmount: holdStatus.holdAmount,
+          releaseDate: holdStatus.releaseDate.toISOString(),
+          daysRemaining: holdStatus.daysRemaining,
+          commission: holdStatus.commission,
+          taxes: holdStatus.taxes,
+        },
+      });
+    } catch (error) {
+      fastify.log.error('Payment hold processing error:', error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'HOLD_PROCESSING_ERROR',
+          message: 'Failed to process payment hold',
+        },
+      });
+    }
+  });
+
+  /**
+   * Get Provider Payout Schedule
+   * GET /api/payments/provider/:providerId/payout-schedule
+   */
+  fastify.get<{
+    Params: { providerId: string };
+  }>('/payments/provider/:providerId/payout-schedule', {
+    schema: {
+      description: 'Get provider payout schedule and pending amounts',
+      tags: ['payments', 'payout'],
+      params: Type.Object({
+        providerId: Type.String(),
+      }),
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Object({
+            providerId: Type.String(),
+            pendingAmount: Type.Number(),
+            readyForPayout: Type.Number(),
+            totalEarnings: Type.Number(),
+            nextPayoutDate: Type.String(),
+            payoutFrequency: Type.String(),
+            minimumPayoutAmount: Type.Number(),
+            currency: Type.String(),
+          }),
+        }),
+      },
+    },
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest<{ Params: { providerId: string } }>, reply: FastifyReply) => {
+    try {
+      const userId = (request as any).user.userId;
+      const { providerId } = request.params;
+
+      // Verify provider ownership
+      const provider = await prisma.provider.findUnique({
+        where: { id: providerId },
+      });
+
+      if (!provider || provider.userId !== userId) {
+        return reply.status(403).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'You are not authorized to view this payout schedule',
+          },
+        });
+      }
+
+      const schedule = await paymentService.getProviderPayoutSchedule(providerId);
+
+      return reply.send({
+        success: true,
+        data: {
+          providerId: schedule.providerId,
+          pendingAmount: schedule.pendingAmount,
+          readyForPayout: schedule.readyForPayout,
+          totalEarnings: schedule.totalEarnings,
+          nextPayoutDate: schedule.nextPayoutDate.toISOString(),
+          payoutFrequency: schedule.payoutFrequency,
+          minimumPayoutAmount: schedule.minimumPayoutAmount,
+          currency: schedule.currency,
+        },
+      });
+    } catch (error) {
+      fastify.log.error('Provider payout schedule error:', error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'PAYOUT_SCHEDULE_ERROR',
+          message: 'Failed to get provider payout schedule',
+        },
+      });
+    }
+  });
+
+  /**
+   * Process Payment Dispute
+   * POST /api/payments/dispute
+   */
+  fastify.post<{
+    Body: DisputeRequest;
+  }>('/payments/dispute', {
+    schema: {
+      description: 'Create a payment dispute or chargeback claim',
+      tags: ['payments', 'dispute'],
+      body: DisputeRequestSchema,
+      response: {
+        201: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Object({
+            disputeId: Type.String(),
+            paymentId: Type.String(),
+            status: Type.String(),
+            disputeType: Type.String(),
+            amount: Type.Number(),
+            createdAt: Type.String(),
+          }),
+        }),
+      },
+    },
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest<{ Body: DisputeRequest }>, reply: FastifyReply) => {
+    try {
+      const { paymentId, disputeType, details } = request.body;
+
+      const dispute = await paymentService.processPaymentDispute(
+        paymentId,
+        disputeType,
+        details
+      );
+
+      return reply.status(201).send({
+        success: true,
+        data: {
+          disputeId: dispute.id,
+          paymentId: dispute.paymentId,
+          status: dispute.status,
+          disputeType: dispute.disputeType,
+          amount: dispute.amount,
+          createdAt: dispute.createdAt.toISOString(),
+        },
+      });
+    } catch (error) {
+      fastify.log.error('Payment dispute processing error:', error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'DISPUTE_PROCESSING_ERROR',
+          message: 'Failed to process payment dispute',
+        },
+      });
+    }
+  });
+
+  /**
+   * Enhanced Payment Analytics (Argentina-specific)
+   * GET /api/payments/analytics/enhanced
+   */
+  fastify.get('/payments/analytics/enhanced', {
+    schema: {
+      description: 'Get enhanced payment analytics with Argentina-specific metrics',
+      tags: ['payments', 'analytics', 'argentina'],
+      querystring: EnhancedAnalyticsSchema,
+    },
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest<{
+    Querystring: EnhancedAnalyticsRequest;
+  }>, reply: FastifyReply) => {
+    try {
+      const { providerId, from, to, includeArgentinaMetrics = true } = request.query;
+      
+      const dateRange = {
+        from: from ? new Date(from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        to: to ? new Date(to) : new Date(),
+      };
+
+      const analytics = await paymentService.getEnhancedPaymentAnalytics(
+        providerId,
+        dateRange
+      );
+
+      return reply.send({
+        success: true,
+        data: analytics,
+      });
+    } catch (error) {
+      fastify.log.error('Enhanced analytics error:', error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'ANALYTICS_ERROR',
+          message: 'Failed to fetch enhanced payment analytics',
+        },
+      });
+    }
+  });
+
+  /**
+   * Get Argentina Payment Methods Configuration
+   * GET /api/payments/config/argentina
+   */
+  fastify.get('/payments/config/argentina', {
+    schema: {
+      description: 'Get Argentina-specific payment methods configuration',
+      tags: ['payments', 'config', 'argentina'],
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Object({
+            mercadopago: Type.Object({
+              enabled: Type.Boolean(),
+              maxInstallments: Type.Number(),
+              installmentsSupported: Type.Boolean(),
+            }),
+            rapipago: Type.Object({
+              enabled: Type.Boolean(),
+              maxAmount: Type.Number(),
+              minAmount: Type.Number(),
+              expiryHours: Type.Number(),
+              networkFee: Type.Number(),
+            }),
+            pagofacil: Type.Object({
+              enabled: Type.Boolean(),
+              maxAmount: Type.Number(),
+              minAmount: Type.Number(),
+              expiryHours: Type.Number(),
+              networkFee: Type.Number(),
+            }),
+            cbu_transfer: Type.Object({
+              enabled: Type.Boolean(),
+              requiresCBUValidation: Type.Boolean(),
+              processingTimeHours: Type.Number(),
+              maxAmount: Type.Number(),
+              minAmount: Type.Number(),
+            }),
+          }),
+        }),
+      },
+    },
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    return reply.send({
+      success: true,
+      data: {
+        mercadopago: {
+          enabled: true,
+          maxInstallments: paymentConfig.paymentMethods.installmentsMax,
+          installmentsSupported: true,
+        },
+        rapipago: {
+          enabled: true,
+          maxAmount: 50000,
+          minAmount: 100,
+          expiryHours: 72,
+          networkFee: 0.015,
+        },
+        pagofacil: {
+          enabled: true,
+          maxAmount: 50000,
+          minAmount: 100,
+          expiryHours: 72,
+          networkFee: 0.015,
+        },
+        cbu_transfer: {
+          enabled: true,
+          requiresCBUValidation: true,
+          processingTimeHours: 24,
+          maxAmount: 1000000,
+          minAmount: 500,
+        },
+      },
+    });
   });
 }

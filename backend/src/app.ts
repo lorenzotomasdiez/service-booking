@@ -30,6 +30,16 @@ import usersCrudRoutes from './routes/users-crud';
 import servicesCrudRoutes from './routes/services-crud';
 import bookingsCrudRoutes from './routes/bookings-crud';
 import uploadRoutes from './routes/upload';
+import advancedBookingsRoutes from './routes/advanced-bookings';
+
+// Comprehensive booking system routes
+import providerScheduleRoutes from './routes/provider-schedule';
+import bookingManagementRoutes from './routes/booking-management';
+import paymentTestingRoutes from './routes/payment-testing';
+import paymentManagementRoutes from './routes/payment-management';
+
+// T5-001 Advanced Features Routes
+import advancedFeaturesRoutes from './routes/advanced-features';
 
 export function buildServer(): FastifyInstance {
   const server = Fastify({
@@ -129,7 +139,12 @@ export function buildServer(): FastifyInstance {
         { name: 'Services', description: 'Service management' },
         { name: 'Bookings', description: 'Booking management' },
         { name: 'Payments', description: 'Payment processing' },
-        { name: 'Upload', description: 'File upload and management' }
+        { name: 'Upload', description: 'File upload and management' },
+        { name: 'Referrals', description: 'Referral system management' },
+        { name: 'Promotions', description: 'Promotion and discount management' },
+        { name: 'Subscriptions', description: 'Subscription billing management' },
+        { name: 'Analytics', description: 'Provider analytics and insights' },
+        { name: 'Health', description: 'System health monitoring' }
       ]
     }
   });
@@ -152,7 +167,7 @@ export function buildServer(): FastifyInstance {
   server.addHook('onReady', async () => {
     try {
       await database.connect();
-    } catch (error) {
+    } catch (error: any) {
       server.log.error('Failed to connect to database:', error);
       throw error;
     }
@@ -188,6 +203,26 @@ export function buildServer(): FastifyInstance {
   
   // Upload routes
   server.register(uploadRoutes, { prefix: '/api/v1/upload' });
+
+  // Advanced booking routes
+  server.register(advancedBookingsRoutes, { prefix: '/api/v1/bookings' });
+
+  // Provider schedule management routes
+  server.register(providerScheduleRoutes, { prefix: '/api/v1/providers' });
+
+  // Comprehensive booking management routes
+  server.register(bookingManagementRoutes, { prefix: '/api/v1/bookings' });
+
+  // Payment testing routes (only in development)
+  if (process.env.NODE_ENV !== 'production') {
+    server.register(paymentTestingRoutes, { prefix: '/api' });
+  }
+
+  // Enhanced payment management routes
+  server.register(paymentManagementRoutes, { prefix: '/api' });
+
+  // T5-001 Advanced Features Routes (Day 5) - Consolidated
+  server.register(advancedFeaturesRoutes, { prefix: '/api/v1' });
 
   return server;
 }

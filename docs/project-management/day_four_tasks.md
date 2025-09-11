@@ -2,588 +2,618 @@
 
 **Date:** Day 4 of Sprint  
 **Sprint Duration:** 14 days  
-**Focus:** Booking System Implementation & Payment Integration  
+**Focus:** Core Booking System Implementation & Critical Bug Resolution  
 
 ## ⚠️ CRITICAL PATH & EXECUTION ORDER
 
-### **BLOCKING DEPENDENCIES - MUST BE VERIFIED FIRST:**
-1. **TECH LEAD** must verify Day 3 CRUD operations and database models are stable **BEFORE** booking conflict logic implementation
-2. **BACKEND DEVELOPER** must complete booking system APIs (Ticket B4-001) **BEFORE** frontend booking integration
-3. **PAYMENT SPECIALIST** must complete payment integration (Ticket PAY4-001) **BEFORE** payment UI development
+### **BLOCKING DEPENDENCIES - URGENT:**
+1. 🔥 **CRITICAL BUG-001** - Registration API schema validation error **MUST BE FIXED FIRST** (0-1 hour)
+2. **BACKEND DEVELOPER** must deploy BUG-001 fix **BEFORE** any new user testing
+3. **QA ENGINEER** must validate fix **BEFORE** proceeding with new test scenarios
+4. **FRONTEND DEVELOPER** must integrate booking UI **AFTER** backend booking APIs are ready
+
+**Day 3 Foundation Status:** ✅ **OPERATIONAL** - All core infrastructure ready, one critical bug blocking registration
 
 ### **PARALLEL EXECUTION GROUPS:**
-- **Group A (Hours 0-2):** Day 3 Verification & Booking Conflict Resolution Logic
-- **Group B (Hours 2-6):** Booking System APIs & Payment Integration
-- **Group C (Hours 4-8):** Calendar/Time Slot Components & Payment UI
-- **Group D (Hours 6-8):** Manual Testing & DevOps Optimization
+- **Group A (Hours 0-1):** Critical Bug Fix & Hotfix Deployment
+- **Group B (Hours 1-3):** Booking System Backend & Frontend Integration
+- **Group C (Hours 2-6):** Core Booking UI & Provider Service Management
+- **Group D (Hours 4-8):** Advanced Features & Launch Preparation
 
 ---
 
 ## 🔧 TECH LEAD / SENIOR FULL-STACK DEVELOPER
 
-### **Ticket T4-001: Booking Conflict Resolution & Time Slot Availability**
-**Priority:** CRITICAL - CORE BOOKING FUNCTIONALITY  
+### **Ticket T4-001: Booking System Architecture & Real-time Features**
+**Priority:** CRITICAL - ENABLES CORE BOOKING FUNCTIONALITY  
 **Estimated Time:** 8 hours  
-**Dependencies:** T3-001 from Day 3 completed (CRUD operations)  
+**Dependencies:** BUG-001 fix completion (0-1 hour dependency)  
 
 #### **Detailed Tasks:**
-1. **Day 3 System Verification (1 hour)**
-   - Verify all CRUD operations are working correctly
-   - Test database models and relationships integrity
-   - Validate API middleware is handling requests properly
-   - Confirm user management system is stable
-   - Address any critical issues from Day 3
+1. **BUG-001 Fix Coordination (0.5 hours)**
+   - Review Backend Developer's fix implementation
+   - Validate schema changes match frontend expectations
+   - Ensure fix maintains Argentina-specific validation patterns
+   - Coordinate hotfix deployment with DevOps Engineer
+   - Verify fix resolves registration flow completely
 
-2. **Booking Conflict Resolution Logic (3 hours)**
-   - Implement booking overlap detection algorithm
-   - Build buffer time management system
-   - Create concurrent booking prevention logic
-   - Implement booking modification conflict checking
-   - Add booking cancellation impact analysis
-   - Test conflict resolution with edge cases
+2. **Booking System Architecture (2.5 hours)**
+   - Design comprehensive booking conflict resolution system
+   - Implement time slot availability calculation algorithms
+   - Create booking state management (PENDING → CONFIRMED → COMPLETED)
+   - Build complex scheduling rules engine (buffer times, breaks)
+   - Implement double-booking prevention with database constraints
+   - Add booking modification and cancellation logic
 
-3. **Time Slot Availability Calculation (2.5 hours)**
-   - Build dynamic availability calculation engine
-   - Implement working hours and break management
-   - Create availability caching for performance
-   - Add real-time availability updates
-   - Implement availability block management
-   - Build recurring availability pattern support
+3. **Real-time Booking Updates (2.5 hours)**
+   - Enhance Socket.io integration for live booking updates
+   - Implement real-time availability synchronization
+   - Build provider calendar live updates
+   - Create client booking status notifications
+   - Add multi-user conflict resolution for simultaneous bookings
+   - Implement reconnection handling for unstable connections
 
-4. **Email Notification System Setup (1 hour)**
-   - Setup email service integration (Resend/AWS SES)
-   - Create email template system
-   - Implement booking confirmation emails
-   - Add booking modification notifications
-   - Build cancellation and reminder emails
-   - Test email delivery and formatting
+4. **Advanced Booking Features (2 hours)**
+   - Implement recurring appointment templates
+   - Build group session support and management
+   - Create waitlist management system
+   - Add booking reminder system integration
+   - Implement booking analytics and reporting
+   - Build booking export functionality
 
-5. **Performance Optimization (0.5 hours)**
-   - Optimize database queries for booking operations
-   - Implement Redis caching for availability
-   - Add database indexing for performance
-   - Monitor and optimize API response times
+5. **Team Integration Support (0.5 hours)**
+   - Code review for Backend Developer's booking APIs
+   - Architectural guidance for Frontend booking UI
+   - Performance optimization consultation
+   - Security review for booking-related endpoints
 
 #### **Expected Deliverables:**
-- [ ] Booking conflict resolution system operational
-- [ ] Time slot availability engine working
-- [ ] Email notification system functional
-- [ ] Performance optimizations implemented
-- [ ] All booking logic thoroughly tested
+- [ ] BUG-001 fix validated and deployed
+- [ ] Complete booking system with conflict resolution
+- [ ] Real-time booking updates operational
+- [ ] Advanced booking features implemented
+- [ ] Booking analytics foundation ready
 
 #### **Validation Criteria:**
 ```bash
-# These commands should all work:
+# These commands should all work after completion:
 curl -X POST /api/bookings (creates booking with conflict checking)
-curl -X GET /api/services/{id}/availability (returns accurate time slots)
-# Booking conflicts are properly detected and prevented
-# Email notifications send successfully
-# Availability calculations are accurate and fast
+curl -X GET /api/bookings/availability (returns real-time availability)
+# Real-time updates work when bookings are created/modified
+# Double-booking prevention works under concurrent load
+# Booking state transitions work correctly
 ```
 
 #### **Handoff Requirements:**
-- Share booking logic documentation with Backend Developer
-- Provide availability calculation examples to Frontend team
-- Document email template system for content team
-- Conduct booking system walkthrough with QA Engineer
+- Share booking API specifications with Frontend team
+- Document real-time event structure for client integration
+- Provide booking algorithm documentation to QA team
+- Update technical architecture documentation
 
 ---
 
 ## ⚙️ BACKEND DEVELOPER (NODE.JS/FASTIFY SPECIALIST)
 
-### **Ticket B4-001: Booking System APIs with Conflict Checking**
-**Priority:** CRITICAL - BLOCKS FRONTEND BOOKING FEATURES  
+### **Ticket B4-001: Critical Bug Fix & Booking APIs Implementation**
+**Priority:** CRITICAL - BLOCKS ALL USER REGISTRATION  
 **Estimated Time:** 8 hours  
-**Dependencies:** B3-001 from Day 3 & T4-001 (booking logic)  
-**Wait Until:** Hour 2 (after Tech Lead completes booking logic)  
+**Dependencies:** Immediate start required for BUG-001  
 
 #### **Detailed Tasks:**
-1. **Booking System APIs Implementation (3.5 hours)**
-   - Build booking creation API with full validation
-   - Implement booking modification and cancellation APIs
-   - Create booking status management endpoints
-   - Add booking history and listing APIs
-   - Build booking search and filtering
-   - Implement booking conflict checking integration
+1. **🔥 CRITICAL BUG-001 Fix (1 hour) - IMMEDIATE START**
+   - Fix ValidationErrorResponse schema to include "validation" field
+   - Update error handling middleware to match frontend expectations
+   - Test registration flow end-to-end in development
+   - Coordinate with DevOps for immediate hotfix deployment
+   - Validate fix doesn't break existing functionality
+   - Document fix for knowledge transfer
 
-2. **File Upload APIs for Services (1.5 hours)**
-   - Complete service photo upload system
-   - Add multiple image upload support
-   - Implement image validation and processing
-   - Build image gallery management APIs
-   - Add image optimization and resizing
-   - Create secure image deletion endpoints
+2. **Booking System APIs (3 hours)**
+   - Create comprehensive booking CRUD operations
+   - Implement booking conflict detection and resolution
+   - Build availability calculation with complex rules
+   - Add booking status management (PENDING → CONFIRMED → COMPLETED)
+   - Create booking modification and cancellation endpoints
+   - Implement booking search and filtering with pagination
 
-3. **Search and Filtering APIs Enhancement (2 hours)**
-   - Enhance service search with advanced filters
-   - Implement location-based search with geolocation
-   - Add availability-based filtering
-   - Build price range and rating filters
-   - Implement search result pagination
-   - Add search analytics and tracking
+3. **Provider Schedule Management (2 hours)**
+   - Build provider availability management APIs
+   - Implement working hours and break time configuration
+   - Create recurring schedule templates
+   - Add holiday and exception day management
+   - Build bulk availability update operations
+   - Implement schedule conflict validation
 
-4. **Basic Reporting and Analytics Endpoints (1 hour)**
-   - Create booking statistics APIs
-   - Build service performance metrics
-   - Implement user activity tracking
-   - Add revenue reporting endpoints
-   - Create popular services analytics
-   - Build basic dashboard data APIs
+4. **Booking Business Logic (1.5 hours)**
+   - Implement booking confirmation workflow
+   - Build automatic booking expiration for pending bookings
+   - Create booking reminder notification triggers
+   - Add booking analytics data collection
+   - Implement booking capacity management
+   - Build booking approval system for certain services
+
+5. **Integration Testing & Documentation (0.5 hours)**
+   - Test all booking APIs with comprehensive scenarios
+   - Update Swagger documentation with booking endpoints
+   - Create booking API testing collection for QA
+   - Document booking business rules and edge cases
 
 #### **Expected Deliverables:**
-- [ ] Complete booking system API suite
-- [ ] Enhanced file upload system for services
-- [ ] Advanced search and filtering APIs
-- [ ] Basic analytics and reporting endpoints
-- [ ] All APIs documented and tested
+- [x] **URGENT:** BUG-001 fix deployed and validated
+- [ ] Complete booking management API suite
+- [ ] Provider schedule management system
+- [ ] Booking business logic implementation
+- [ ] Comprehensive API documentation updated
 
 #### **Validation Criteria:**
 ```bash
-# These should work:
-curl -X POST /api/bookings (creates booking with full validation)
-curl -X PUT /api/bookings/{id} (modifies booking with conflict check)
-curl -X POST /api/services/{id}/images (uploads service images)
-curl -X GET /api/search/services?location=buenos+aires&available=true
-# All booking operations respect conflict rules
-# Image uploads are validated and processed correctly
-# Search returns accurate results with proper filtering
+# BUG-001 validation (IMMEDIATE):
+curl -X POST /api/auth/register (should work without validation errors)
+# Booking system validation:
+curl -X POST /api/bookings (creates booking with validation)
+curl -X PUT /api/provider/schedule (updates provider availability)
+curl -X GET /api/bookings/conflicts (returns scheduling conflicts)
+# All booking business rules enforced correctly
 ```
 
 #### **Handoff Requirements:**
-- Update Swagger documentation with all booking APIs
-- Provide comprehensive API testing collection
-- Share booking validation rules with Frontend and QA teams
-- Document search and filtering capabilities
+- **IMMEDIATE:** Notify all teams when BUG-001 fix is deployed
+- Share updated booking API documentation with Frontend team
+- Provide booking test scenarios to QA Engineer
+- Document schedule management features for Product Owner review
 
 ---
 
 ## 💻 FRONTEND DEVELOPER (SVELTEKIT SPECIALIST)
 
-### **Ticket F4-001: Booking Interface & Calendar Components**
-**Priority:** CRITICAL - CORE USER BOOKING FLOW  
+### **Ticket F4-001: Core Booking Interface & Service Management UI**
+**Priority:** CRITICAL  
 **Estimated Time:** 8 hours  
-**Dependencies:** F3-001 from Day 3 & B4-001 (booking APIs)  
-**Wait Until:** Hour 4 (after Backend booking APIs available)  
+**Dependencies:** BUG-001 fix deployment + B4-001 booking APIs  
+**Wait Until:** Hour 1 (after BUG-001 fix)  
 
 #### **Detailed Tasks:**
-1. **Service Listing and Search Interface (2 hours)**
-   - Build comprehensive service listing page
-   - Implement advanced search and filtering UI
-   - Create service card components with ratings
-   - Add map integration for location-based search
-   - Build service category browsing
-   - Implement search results pagination
+1. **Registration Flow Testing & Validation (1 hour)**
+   - Test complete registration flow after BUG-001 fix
+   - Validate all user types can register successfully
+   - Test form validation and error handling improvements
+   - Verify Argentina-specific field validation works correctly
+   - Document any remaining UI/UX issues
+   - Test registration flow on mobile devices
 
-2. **Calendar/Time Slot Picker Component (2.5 hours)**
-   - Create interactive calendar component
-   - Build time slot selection with availability display
-   - Implement real-time availability updates
-   - Add buffer time and break visualization
-   - Create mobile-optimized time picker
-   - Build recurring appointment selection
+2. **Core Booking Interface (3.5 hours)**
+   - Build comprehensive service booking interface
+   - Create interactive calendar/time slot selection
+   - Implement real-time availability display
+   - Build booking form with service customization
+   - Add booking confirmation and summary screens
+   - Implement booking modification and cancellation UI
 
-3. **Booking Form and Flow (2.5 hours)**
-   - Create comprehensive booking form
-   - Implement multi-step booking wizard
-   - Add booking summary and confirmation
-   - Build booking modification interface
-   - Create cancellation flow with policies
-   - Add booking status tracking
+3. **Provider Service Management UI (2 hours)**
+   - Create provider service creation and editing forms
+   - Build service category and pricing management
+   - Implement service photo upload and gallery
+   - Add service availability and scheduling configuration
+   - Create service analytics and performance dashboard
+   - Build service approval status management
 
-4. **Provider Profile Pages (1 hour)**
-   - Build detailed service provider profiles
-   - Add service gallery and descriptions
-   - Implement rating and review display
-   - Create availability calendar view
-   - Add contact and booking buttons
-   - Build provider service listings
+4. **Real-time Integration & Notifications (1.5 hours)**
+   - Integrate Socket.io for real-time booking updates
+   - Implement live availability updates on booking interface
+   - Build in-app notification system for booking events
+   - Add booking status change notifications
+   - Create real-time provider dashboard updates
+   - Implement connection status indicators
 
 #### **Expected Deliverables:**
-- [ ] Complete service discovery and search interface
-- [ ] Fully functional calendar and time slot picker
-- [ ] End-to-end booking form and flow
-- [ ] Detailed provider profile pages
-- [ ] All components responsive and accessible
+- [ ] Registration flow fully functional and tested
+- [ ] Complete booking interface with real-time features
+- [ ] Provider service management system
+- [ ] Real-time notifications and updates working
 
 #### **Validation Criteria:**
 ```bash
 # These should work:
 npm run dev (frontend starts without errors)
-# Users can search and filter services effectively
-# Calendar shows accurate availability and allows selection
-# Booking flow completes without errors
-# Provider profiles display all relevant information
-# All components work properly on mobile devices
+# Complete booking flow works end-to-end
+# Real-time updates show immediately
+# Provider can manage services completely
+# All booking forms work on mobile
+# Socket.io connection is stable
 ```
 
 #### **Handoff Requirements:**
-- Share booking components with QA for comprehensive testing
-- Document calendar component usage and configuration
-- Provide test booking scenarios for different user types
-- Test booking flow across different screen sizes
+- Validate registration fix with comprehensive testing
+- Share booking interface components with QA for testing
+- Document real-time feature behavior for testing
+- Test service management on various devices
 
 ---
 
 ## 🎨 UI/UX DESIGNER
 
-### **Ticket D4-001: User Profile and Settings Screens Design**
-**Priority:** MEDIUM  
+### **Ticket D4-001: Booking Flow Optimization & Payment Integration Design**
+**Priority:** HIGH  
 **Estimated Time:** 8 hours  
 **Dependencies:** D3-001 from Day 3 completed  
 
 #### **Detailed Tasks:**
-1. **Mobile and Tablet Adaptations (2 hours)**
-   - Optimize all existing designs for tablet screens
-   - Enhance mobile interactions and touch targets
-   - Create responsive breakpoint specifications
-   - Add gesture-based navigation elements
-   - Optimize form layouts for mobile keyboards
-   - Create mobile-specific navigation patterns
+1. **Booking Flow UX Optimization (2.5 hours)**
+   - Refine service discovery and selection experience
+   - Optimize time slot selection for mobile users
+   - Design booking confirmation flow with clear progress indicators
+   - Create booking modification and cancellation interfaces
+   - Design empty states for no available slots
+   - Add booking success and error state designs
 
-2. **Micro-interactions and Animations (2 hours)**
-   - Design button and form interaction animations
-   - Create loading state animations and skeletons
-   - Add transition animations between screens
-   - Design hover and focus states for all components
-   - Create success and error state animations
-   - Build notification and toast animations
+2. **Payment Integration Design (2 hours)**
+   - Design seamless payment flow integration with MercadoPago
+   - Create payment method selection screens
+   - Design payment confirmation and processing states
+   - Build payment error handling and retry interfaces
+   - Create receipt and invoice display designs
+   - Design refund request and status interfaces
 
-3. **Loading States and Error Messages (2 hours)**
-   - Design comprehensive loading state patterns
-   - Create skeleton screens for all major components
-   - Design error state illustrations and messages
-   - Build retry and recovery action designs
-   - Create empty state designs with helpful actions
-   - Design offline state indicators and messaging
+3. **Provider Dashboard Enhancement (2 hours)**
+   - Design advanced provider calendar management
+   - Create service performance analytics visualizations
+   - Design client communication interfaces
+   - Build provider earnings and payment dashboard
+   - Create service approval and verification interfaces
+   - Design provider onboarding completion flow
 
-4. **Form Validation Visual Feedback (2 hours)**
-   - Design real-time validation feedback patterns
-   - Create error state designs for all form fields
-   - Add success state indicators for form completion
-   - Design helper text and tooltip systems
-   - Create progress indicators for multi-step forms
-   - Build accessibility-focused validation designs
+4. **Mobile Experience Optimization (1.5 hours)**
+   - Optimize booking flow for touch interactions
+   - Design mobile-first calendar and time selection
+   - Create mobile payment flow optimizations
+   - Design mobile notification interfaces
+   - Add mobile-specific micro-interactions
+   - Create mobile accessibility improvements
 
 #### **Expected Deliverables:**
-- [ ] Complete responsive design system for all screen sizes
-- [ ] Comprehensive micro-interaction specifications
-- [ ] All loading and error states designed
-- [ ] Form validation visual system complete
-- [ ] Accessibility annotations for all designs
+- [ ] Optimized booking flow designs for all user scenarios
+- [ ] Complete payment integration design system
+- [ ] Enhanced provider dashboard with analytics
+- [ ] Mobile-optimized experience designs
 
 #### **Validation Criteria:**
-- All designs work seamlessly across mobile, tablet, and desktop
-- Micro-interactions enhance user experience without distraction
-- Loading and error states provide clear user feedback
-- Form validation is immediate and helpful
-- All designs meet accessibility guidelines
+- Booking flow is intuitive and requires minimal steps
+- Payment integration feels seamless and trustworthy
+- Provider dashboard provides clear value and insights
+- Mobile experience is touch-optimized and accessible
+- All designs maintain premium brand positioning
 
 #### **Handoff Requirements:**
-- Export interaction specifications and animations
-- Provide responsive design guidelines and breakpoints
-- Document accessibility requirements for all components
-- Schedule implementation review with Frontend Developer
+- Export booking flow assets for frontend implementation
+- Create detailed payment flow specifications
+- Provide mobile interaction guidelines
+- Schedule design review with Frontend Developer
 
 ---
 
 ## 🧪 QA ENGINEER
 
-### **Ticket Q4-001: Booking Flow Testing & Cross-Browser Compatibility**
-**Priority:** HIGH  
+### **Ticket Q4-001: Booking System Testing & BUG-001 Validation**
+**Priority:** CRITICAL  
 **Estimated Time:** 8 hours  
-**Dependencies:** Q3-001 from Day 3 & booking system implementation  
-**Wait Until:** Hour 4 (after booking system is available)  
+**Dependencies:** BUG-001 fix deployment  
+**Wait Until:** Hour 1 (after fix deployment)  
 
 #### **Detailed Tasks:**
-1. **Booking Flow Testing (3 hours)**
-   - Test complete booking creation flow for all user types
-   - Verify booking modification and cancellation works
-   - Test booking conflict detection and prevention
-   - Validate payment integration within booking flow
-   - Test booking confirmation and notification system
-   - Verify booking history and status tracking
+1. **BUG-001 Fix Validation (1.5 hours)**
+   - Test complete user registration flow for both CLIENT and PROVIDER
+   - Validate all form validation errors display correctly
+   - Test registration with various input combinations
+   - Verify Argentina-specific validation (DNI, CUIT, phone) works
+   - Test registration flow on multiple browsers and devices
+   - Document fix validation results
 
-2. **Payment Integration Testing (2 hours)**
-   - Test MercadoPago payment flow end-to-end
-   - Verify payment success and failure scenarios
-   - Test payment webhook processing
-   - Validate refund and cancellation payment logic
-   - Test payment security and data handling
-   - Verify payment notification system
+2. **Booking System Testing (3 hours)**
+   - Test complete booking flow from service discovery to confirmation
+   - Validate booking conflict detection and prevention
+   - Test concurrent booking scenarios with multiple users
+   - Verify real-time availability updates work correctly
+   - Test booking modification and cancellation flows
+   - Validate booking status transitions and notifications
 
-3. **Cross-Browser Compatibility Testing (2 hours)**
-   - Test booking flow across Chrome, Firefox, Safari
-   - Verify payment integration works on all browsers
-   - Test mobile browser compatibility thoroughly
-   - Validate responsive design across devices
-   - Test JavaScript functionality across browsers
-   - Document browser-specific issues and workarounds
+3. **Provider Service Management Testing (2 hours)**
+   - Test provider service creation and editing functionality
+   - Validate service availability and scheduling configuration
+   - Test service photo upload and management features
+   - Verify service approval and verification workflows
+   - Test provider dashboard functionality and analytics
+   - Validate service search and filtering accuracy
 
-4. **Mobile Responsiveness Testing (1 hour)**
-   - Test booking flow on various mobile devices
-   - Verify touch interactions work correctly
-   - Test form submissions on mobile browsers
-   - Validate calendar and time picker on mobile
-   - Test payment flow on mobile devices
-   - Document mobile-specific issues
+4. **Payment Integration Testing (1.5 hours)**
+   - Test payment flow integration with MercadoPago sandbox
+   - Validate payment confirmation and processing
+   - Test payment failure scenarios and error handling
+   - Verify refund and cancellation payment logic
+   - Test payment notifications and receipt generation
+   - Validate payment security measures
 
 #### **Expected Deliverables:**
-- [ ] Comprehensive booking flow testing report
-- [ ] Payment integration testing documentation
-- [ ] Cross-browser compatibility test results
-- [ ] Mobile responsiveness testing report
-- [ ] Prioritized bug list with reproduction steps
+- [ ] BUG-001 fix validation report with full confirmation
+- [ ] Comprehensive booking system testing documentation
+- [ ] Provider service management testing results
+- [ ] Payment integration testing validation
 
 #### **Validation Criteria:**
-- Booking flow works correctly across all tested scenarios
-- Payment integration is stable and secure
-- Application works consistently across browsers
-- Mobile experience is smooth and functional
-- All critical bugs are documented and reported
+- Registration flow works without errors for all user types
+- Booking system handles all scenarios without conflicts
+- Provider service management is fully functional
+- Payment integration processes successfully in sandbox
+- All tests documented with reproduction steps
 
 #### **Handoff Requirements:**
-- Share detailed bug reports with development teams
-- Provide browser compatibility matrix
-- Document mobile testing results with device specifications
-- Schedule bug triage session with Tech Lead and developers
+- Provide immediate feedback on BUG-001 fix status
+- Share booking system test results with development team
+- Document any new issues discovered during testing
+- Validate all critical user journeys work end-to-end
 
 ---
 
 ## 🚀 DEVOPS ENGINEER
 
-### **Ticket O4-001: Environment Variables & Database Backup Procedures**
-**Priority:** MEDIUM  
+### **Ticket O4-001: Hotfix Deployment & Production Monitoring Setup**
+**Priority:** CRITICAL  
 **Estimated Time:** 8 hours  
-**Dependencies:** O3-001 from Day 3 completed  
+**Dependencies:** B4-001 BUG-001 fix ready  
 
 #### **Detailed Tasks:**
-1. **Staging and Production Environment Setup (3 hours)**
-   - Complete staging environment configuration
-   - Setup production environment with all services
-   - Configure load balancing and auto-scaling
-   - Test environment parity and consistency
-   - Setup environment-specific configurations
-   - Validate all services communicate correctly
+1. **🔥 Critical Hotfix Deployment (1 hour) - IMMEDIATE**
+   - Deploy BUG-001 fix using established hotfix pipeline
+   - Monitor deployment for any infrastructure issues
+   - Validate fix deployment in staging environment first
+   - Execute production deployment with rollback readiness
+   - Monitor system health during and after deployment
+   - Notify all team members of successful deployment
 
-2. **Environment Variables and Secrets Management (2 hours)**
-   - Complete environment variable management system
-   - Setup secure secrets management
-   - Configure environment-specific database connections
-   - Add API key and credential management
-   - Test configuration across all environments
-   - Document environment setup procedures
+2. **Production Monitoring Enhancement (2.5 hours)**
+   - Setup comprehensive application performance monitoring
+   - Implement error tracking and alerting system
+   - Configure database performance monitoring
+   - Add API response time monitoring and alerts
+   - Setup user registration and booking success rate tracking
+   - Implement real-time system health dashboard
 
-3. **Database Backup and Recovery Procedures (2 hours)**
-   - Setup automated database backup system
-   - Configure point-in-time recovery
-   - Test backup restoration procedures
-   - Setup backup monitoring and alerts
-   - Create disaster recovery documentation
-   - Test complete recovery scenarios
+3. **Load Testing & Performance Optimization (2.5 hours)**
+   - Conduct load testing for booking system under concurrent usage
+   - Test database performance under booking conflicts
+   - Validate real-time WebSocket performance at scale
+   - Optimize database connection pooling for Argentina traffic
+   - Test payment processing under load conditions
+   - Document performance baseline metrics
 
-4. **Monitoring and Logging Setup (1 hour)**
-   - Enhance application monitoring system
-   - Setup centralized logging aggregation
-   - Configure alert notifications for critical issues
-   - Add performance monitoring dashboards
-   - Setup uptime monitoring for all services
-   - Create monitoring documentation
+4. **Security Hardening & Compliance (2 hours)**
+   - Implement production-grade security headers
+   - Configure rate limiting for booking and payment endpoints
+   - Setup SSL/TLS security monitoring
+   - Implement payment data encryption validation
+   - Configure automated security scanning
+   - Document security compliance for Argentina regulations
 
 #### **Expected Deliverables:**
-- [ ] Staging and production environments fully operational
-- [ ] Secure environment and secrets management system
-- [ ] Automated backup and recovery procedures
-- [ ] Comprehensive monitoring and logging system
-- [ ] Complete infrastructure documentation
+- [x] **URGENT:** BUG-001 hotfix deployed and validated
+- [ ] Comprehensive production monitoring system
+- [ ] Load testing results and performance optimization
+- [ ] Security hardening implementation completed
 
 #### **Validation Criteria:**
 ```bash
-# These should work:
-# Staging environment mirrors production configuration
-# All environment variables load correctly in each environment
-# Database backups complete successfully and can be restored
-# Monitoring alerts trigger correctly for test scenarios
-# All services scale properly under load
+# Hotfix validation:
+# Registration API returns proper validation responses
+# System monitoring shows normal performance metrics
+# Load testing shows acceptable performance under stress
+# Security scans pass without critical vulnerabilities
+# All monitoring alerts are configured and working
 ```
 
 #### **Handoff Requirements:**
-- Provide environment access credentials to all teams
-- Share monitoring dashboard access and training
-- Document backup and recovery procedures
-- Schedule infrastructure walkthrough with Tech Lead
+- **IMMEDIATE:** Confirm hotfix deployment to all teams
+- Share monitoring dashboard access with Tech Lead and Product Owner
+- Provide load testing results to development team
+- Document security measures for compliance review
 
 ---
 
 ## 💳 PAYMENT INTEGRATION SPECIALIST
 
-### **Ticket PAY4-001: Payment Features Complete Implementation**
+### **Ticket PAY4-001: Advanced Payment Features & Argentina Optimization**
 **Priority:** HIGH  
 **Estimated Time:** 6 hours (Part-time role)  
 **Dependencies:** PAY3-001 from Day 3 completed  
 
 #### **Detailed Tasks:**
-1. **Payment Processing Implementation (2 hours)**
-   - Complete MercadoPago payment processing integration
-   - Implement payment method selection and validation
-   - Add payment confirmation and receipt generation
-   - Build payment retry logic for temporary failures
-   - Test payment processing with various card types
-   - Validate payment security measures
+1. **Argentina Payment Method Optimization (2 hours)**
+   - Optimize MercadoPago integration for Argentina market
+   - Add support for additional local payment methods (Rapipago, Pagofacil)
+   - Implement Argentina-specific payment installment options
+   - Add support for bank transfer payments (CBU validation)
+   - Test payment flow with Argentina credit/debit cards
+   - Validate peso (ARS) currency handling and tax compliance
 
-2. **Refund and Cancellation Logic (2 hours)**
-   - Complete refund processing system implementation
-   - Build automated cancellation fee calculation
-   - Implement partial refund capabilities
-   - Add refund status tracking and notifications
-   - Create refund reporting for service providers
-   - Test all refund scenarios thoroughly
+2. **Advanced Payment Features (2.5 hours)**
+   - Implement smart commission structure (3.5% → 2.8% → 2.5%)
+   - Build payment hold system (10-day hold before provider transfer)
+   - Create payment analytics and reporting dashboard
+   - Implement payment dispute and chargeback handling
+   - Add payment method verification and security
+   - Build provider payment schedule management
 
-3. **Integration Testing with Sandbox (2 hours)**
-   - Test complete payment flow with MercadoPago sandbox
-   - Verify webhook processing for all payment events
-   - Test payment failures and error handling
-   - Validate payment confirmation emails
-   - Test refund processing end-to-end
-   - Document payment integration testing procedures
+3. **Payment Testing & Validation (1.5 hours)**
+   - Test complete payment flow with all Argentina payment methods
+   - Validate payment webhook processing for all scenarios
+   - Test payment failure and retry mechanisms
+   - Verify payment security and encryption
+   - Test refund processing for all payment types
+   - Document payment troubleshooting procedures
 
 #### **Expected Deliverables:**
-- [ ] Complete MercadoPago payment integration
-- [ ] Full refund and cancellation system
-- [ ] Comprehensive payment testing completed
-- [ ] Payment integration documentation updated
-- [ ] Payment error handling validated
+- [ ] Argentina-optimized payment method support
+- [ ] Advanced payment features with commission structure
+- [ ] Comprehensive payment testing validation
 
 #### **Validation Criteria:**
 ```bash
-# These should work:
-# Test payments complete successfully with confirmation
-# Payment failures provide clear error messages
-# Webhooks are received and processed correctly
-# Refunds process automatically with proper notifications
-# Payment security passes all validation tests
+# Payment integration validation:
+# All Argentina payment methods work correctly
+# Commission structure calculates properly
+# Payment holds and transfers work as designed
+# Payment webhooks process all event types correctly
+# Payment security measures pass validation
 ```
 
 #### **Handoff Requirements:**
-- Share payment integration testing results with QA
-- Provide payment flow documentation to Frontend team
-- Document all payment error scenarios and handling
-- Coordinate payment testing with Backend Developer
+- Share Argentina payment optimization results with Product Owner
+- Provide payment testing documentation to QA Engineer
+- Document commission structure for financial reporting
+- Coordinate payment security validation with DevOps
 
 ---
 
 ## 📋 PRODUCT OWNER
 
-### **Ticket P4-001: User Acceptance Testing & Business Logic Validation**
+### **Ticket P4-001: Launch Readiness Assessment & Market Validation**
 **Priority:** HIGH  
 **Estimated Time:** 8 hours  
-**Dependencies:** P3-001 from Day 3 completed  
+**Dependencies:** All Day 4 development progress  
 
 #### **Detailed Tasks:**
-1. **Feature Requirement Clarifications (1.5 hours)**
-   - Review booking system requirements with team
-   - Clarify payment integration business rules
-   - Validate search and filtering requirements
-   - Review notification and email requirements
-   - Document any requirement adjustments needed
-   - Update user stories with implementation feedback
+1. **Feature Completeness Validation (2 hours)**
+   - Review all implemented features against MVP requirements
+   - Validate booking system meets business requirements
+   - Confirm payment integration supports Argentina market needs
+   - Review user experience flow for completeness
+   - Assess feature quality and user value delivery
+   - Document any missing critical functionality
 
-2. **User Acceptance Testing Scenarios Preparation (3 hours)**
-   - Create detailed UAT scenarios for booking flow
-   - Build payment integration testing scenarios
-   - Design search and discovery UAT scenarios
-   - Create mobile user experience testing scenarios
-   - Document expected outcomes for each test
-   - Prepare comprehensive test data sets
+2. **Business Logic & Market Compliance Review (2.5 hours)**
+   - Validate Argentina-specific business rules implementation
+   - Review payment commission structure and pricing model
+   - Confirm legal compliance requirements are met
+   - Validate service provider verification process
+   - Review client protection and dispute resolution
+   - Assess competitive positioning and value proposition
 
-3. **Business Logic Validation (2 hours)**
-   - Review booking conflict resolution rules
-   - Validate payment processing business logic
-   - Review service provider onboarding flow
-   - Validate client booking experience logic
-   - Review notification timing and triggers
-   - Document business rule compliance verification
+3. **Launch Readiness Assessment (2 hours)**
+   - Conduct comprehensive go/no-go evaluation
+   - Review system stability and performance metrics
+   - Assess user experience quality and completeness
+   - Evaluate market readiness and competitive positioning
+   - Review legal and compliance requirements status
+   - Make final launch recommendation
 
-4. **Content Creation for Argentina Market (1.5 hours)**
-   - Complete Spanish translations for booking flow
-   - Create payment-related content and error messages
-   - Write email notification templates in Spanish
-   - Create help content for booking and payment
-   - Review legal compliance for payment processing
-   - Update terms of service with payment terms
+4. **Stakeholder Communication & Next Phase Planning (1.5 hours)**
+   - Prepare launch readiness report for stakeholders
+   - Coordinate final testing and validation activities
+   - Plan Day 5-7 activities based on Day 4 outcomes
+   - Prepare user feedback collection strategy
+   - Document success metrics and KPIs for launch
+   - Plan post-launch monitoring and iteration strategy
 
 #### **Expected Deliverables:**
-- [ ] Updated requirements documentation
-- [ ] Complete UAT scenario documentation for booking flow
-- [ ] Business logic validation reports
-- [ ] Spanish content for all booking and payment features
-- [ ] Legal compliance updates
+- [ ] Complete feature validation and gap analysis
+- [ ] Business logic compliance assessment
+- [ ] Go/No-Go launch recommendation
+- [ ] Next phase planning and stakeholder communication
 
 #### **Validation Criteria:**
-- All booking flow requirements are clearly defined and validated
-- UAT scenarios comprehensively cover user journeys
-- Business logic aligns with Argentina market needs
-- Content is culturally appropriate and legally compliant
-- Payment integration meets business requirements
+- All MVP core features are functional and complete
+- Business logic meets Argentina market requirements
+- System performance and stability meet launch criteria
+- Legal and compliance requirements are satisfied
+- Launch readiness assessment shows green light
 
 #### **Handoff Requirements:**
-- Share UAT scenarios with QA Engineer for execution
-- Provide updated content to Frontend Developer
-- Review business logic validation with Tech Lead
-- Schedule user testing session preparation
+- Share launch readiness assessment with all team members
+- Provide final feature validation to QA Engineer
+- Coordinate go/no-go decision with Tech Lead and DevOps
+- Plan Day 5 activities based on Day 4 results
 
 ---
 
 ## 📊 END OF DAY 4 DELIVERABLES CHECKLIST
 
 ### **CRITICAL PATH ITEMS (Must be completed):**
-- [ ] **Tech Lead:** Booking conflict resolution and time slot availability working
-- [ ] **Backend:** Complete booking system APIs with conflict checking
-- [ ] **Frontend:** Functional calendar/time slot picker and booking flow
-- [ ] **Payment Specialist:** Complete payment integration with MercadoPago
+- [ ] **🔥 BUG-001:** Registration API fix deployed and validated
+- [ ] **Tech Lead:** Booking system architecture and real-time features operational
+- [ ] **Backend:** Complete booking APIs with business logic implemented
+- [ ] **Frontend:** Core booking interface functional with real-time updates
+- [ ] **QA:** Booking system thoroughly tested and validated
 
 ### **HIGH PRIORITY ITEMS:**
-- [ ] **QA:** Comprehensive booking flow and payment testing completed
-- [ ] **Product Owner:** UAT scenarios ready and business logic validated
-- [ ] **DevOps:** Staging/production environments operational
-- [ ] **Designer:** All responsive designs and micro-interactions complete
+- [ ] **Designer:** Booking flow and payment integration designs finalized
+- [ ] **DevOps:** Production monitoring and security hardening completed
+- [ ] **Payment Specialist:** Argentina payment optimization implemented
+- [ ] **Product Owner:** Launch readiness assessment completed
 
 ### **INTEGRATION REQUIREMENTS:**
-- [ ] End-to-end booking flow works from search to payment
-- [ ] Payment integration functional within booking process
-- [ ] Real-time availability updates working
-- [ ] Email notifications sending correctly
+- [ ] Complete booking flow works end-to-end from discovery to payment
+- [ ] Real-time booking updates function correctly across all interfaces
+- [ ] Provider service management fully integrated with booking system
+- [ ] Payment processing works seamlessly with Argentina methods
 
-### **TEAM COORDINATION:**
-- [ ] All Day 4 critical features tested and working
-- [ ] Integration issues resolved or documented
-- [ ] Day 5 priorities aligned with remaining MVP scope
-- [ ] Performance and scalability validated
+### **LAUNCH READINESS CRITERIA:**
+- [ ] All core MVP features functional and tested
+- [ ] System performance meets Argentina market requirements
+- [ ] Payment integration ready for real transactions
+- [ ] Security and compliance requirements satisfied
 
 ---
 
 ## ⏰ DAY 4 SUCCESS CRITERIA
 
 **By end of Day 4, the following should be true:**
-1. **Complete booking system is operational** (search, select, book, confirm)
-2. **Payment integration works end-to-end** with MercadoPago
-3. **Real-time availability and conflict resolution** working correctly
-4. **Mobile-responsive booking experience** tested and functional
-5. **Email notification system** sending booking confirmations
-6. **Production environment ready** for final testing and deployment
-7. **All core MVP features integrated** and working together
+1. **BUG-001 is completely resolved** and registration works flawlessly
+2. **Complete booking system is operational** with real-time updates
+3. **Payment integration is ready** for Argentina market launch
+4. **System performance and monitoring** meet production requirements
+5. **All core MVP features are functional** and thoroughly tested
+6. **Launch readiness assessment** shows green light for soft launch
+7. **Team coordination is optimized** for final sprint days
 
 **Risk Indicators - Address Immediately:**
-- Booking conflicts not being detected or resolved properly
-- Payment integration failing or insecure
-- Calendar/time slot picker not working on mobile
-- Email notifications not sending or formatting incorrectly
-- Performance issues with availability calculations
+- BUG-001 fix introduces new issues or doesn't fully resolve the problem
+- Booking system has critical conflicts or data consistency issues
+- Payment integration fails with Argentina-specific methods
+- System performance degrades under realistic load testing
+- Critical features missing or non-functional for MVP launch
 
-**If any success criteria are not met, this is a critical blocker for MVP completion. Escalate immediately and consider scope adjustments.**
+---
+
+## 🎯 **DAY 4 EXECUTION STRATEGY**
+
+### **🔥 IMMEDIATE ACTIONS (Hour 0-1):**
+1. **Backend Developer:** Deploy BUG-001 fix immediately
+2. **DevOps Engineer:** Execute hotfix deployment with monitoring
+3. **QA Engineer:** Validate fix with comprehensive registration testing
+4. **All Teams:** Coordinate communication about fix deployment status
+
+### **⚡ PARALLEL EXECUTION (Hour 1-6):**
+- **Group B:** Tech Lead + Backend Developer focus on booking system APIs
+- **Group C:** Frontend Developer + Designer integrate booking UI with real-time features
+- **Group D:** Payment Specialist + DevOps optimize Argentina payment integration
+
+### **🎯 INTEGRATION PHASE (Hour 6-8):**
+- All teams coordinate end-to-end testing
+- Product Owner conducts launch readiness assessment
+- Final system validation and performance testing
+- Go/No-Go decision preparation for Day 5 launch
+
+### **📋 SUCCESS METRICS:**
+- BUG-001 resolution: 100% success rate required
+- Booking system: End-to-end flow functional
+- Payment integration: Argentina methods working
+- System performance: <200ms response time maintained
+- Team coordination: All dependencies resolved on schedule
+
+**This Day 4 plan balances urgent bug resolution with critical feature completion, maintaining the aggressive but achievable timeline while ensuring launch readiness quality standards.**
 
 ---
 
 *Document Version: 1.0*  
 *Created: Day 4 of Sprint*  
+*Dependencies: Day 3 foundation complete, BUG-001 requiring immediate attention*  
 *Previous: day_three_tasks.md*  
 *Next: day_five_tasks.md*

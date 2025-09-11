@@ -6,15 +6,27 @@ on:
       - main
       - develop
       - staging
+      - feature/*
   pull_request:
     branches: 
       - main
       - develop
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
 
 env:
   NODE_VERSION: '18'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  PNPM_VERSION: '8'
 
 jobs:
   # Code Quality and Testing
@@ -57,17 +69,43 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install root dependencies
         run: npm ci
 
-      - name: Run TypeScript type checking
-        run: npm run type-check
+      - name: Install backend dependencies
+        run: cd backend && npm ci
 
-      - name: Run ESLint
-        run: npm run lint
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
 
-      - name: Run Prettier check
-        run: npm run format:check
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.npm
+            */node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Run TypeScript type checking (Backend)
+        run: cd backend && npm run typecheck
+
+      - name: Run TypeScript type checking (Frontend)
+        run: cd frontend && npm run check
+
+      - name: Run ESLint (Backend)
+        run: cd backend && npm run lint
+
+      - name: Run ESLint (Frontend)
+        run: cd frontend && npm run lint
+
+      - name: Run Prettier check (Backend)
+        run: cd backend && npm run format:check
+
+      - name: Build backend
+        run: cd backend && npm run build
+
+      - name: Build frontend
+        run: cd frontend && npm run build
 
       - name: Setup test environment
         run: |
@@ -75,22 +113,28 @@ jobs:
           echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/barberpro_test" >> .env.test
           echo "REDIS_URL=redis://localhost:6379" >> .env.test
 
+      - name: Generate Prisma client
+        run: cd backend && npx prisma generate
+
       - name: Run database migrations
-        run: npx prisma migrate deploy
+        run: cd backend && npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/barberpro_test
 
-      - name: Generate Prisma client
-        run: npx prisma generate
-
-      - name: Run unit tests
-        run: npm run test:unit
-
-      - name: Run integration tests
-        run: npm run test:integration
+      - name: Run backend unit tests
+        run: cd backend && npm run test:unit
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/barberpro_test
           REDIS_URL: redis://localhost:6379
+
+      - name: Run backend integration tests
+        run: cd backend && npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/barberpro_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Run frontend tests
+        run: cd frontend && npm run test
 
       - name: Run E2E tests
         run: npm run test:e2e
@@ -98,11 +142,19 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/barberpro_test
           REDIS_URL: redis://localhost:6379
 
-      - name: Upload test coverage
+      - name: Upload backend test coverage
         uses: codecov/codecov-action@v3
         with:
-          file: ./coverage/lcov.info
+          file: ./backend/coverage/lcov.info
           fail_ci_if_error: false
+          flags: backend
+
+      - name: Upload frontend test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./frontend/coverage/lcov.info
+          fail_ci_if_error: false
+          flags: frontend
 
   # Security Scanning
   security:
@@ -131,16 +183,21 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
-  # Build and Push Docker Image
+  # Build and Push Docker Images
   build:
-    name: Build Docker Image
+    name: Build Docker Images
     runs-on: ubuntu-latest
     needs: [test, security]
     if: github.event_name == 'push'
     
+    strategy:
+      matrix:
+        service: [backend, frontend, full-stack]
+    
     outputs:
-      image: ${{ steps.image.outputs.image }}
-      digest: ${{ steps.build.outputs.digest }}
+      backend-image: ${{ steps.backend-image.outputs.image }}
+      frontend-image: ${{ steps.frontend-image.outputs.image }}
+      fullstack-image: ${{ steps.fullstack-image.outputs.image }}
 
     steps:
       - name: Checkout code
@@ -160,15 +217,44 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push Docker image
-        id: build
+      - name: Build and push Backend Docker image
+        if: matrix.service == 'backend'
+        id: build-backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+          target: production
+
+      - name: Build and push Frontend Docker image
+        if: matrix.service == 'frontend'
+        id: build-frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+          target: production
+
+      - name: Build and push Full-Stack Docker image
+        if: matrix.service == 'full-stack'
+        id: build-fullstack
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -176,36 +262,80 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=fullstack
+          cache-to: type=gha,mode=max,scope=fullstack
+          target: production
 
-      - name: Output image
-        id: image
+      - name: Output Backend image
+        if: matrix.service == 'backend'
+        id: backend-image
         run: |
-          echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Output Frontend image
+        if: matrix.service == 'frontend'
+        id: frontend-image
+        run: |
+          echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Output Full-Stack image
+        if: matrix.service == 'full-stack'
+        id: fullstack-image
+        run: |
+          echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-fullstack:${{ github.sha }}" >> $GITHUB_OUTPUT
 
   # Deploy to Staging
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/staging'
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/staging' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
     environment:
       name: staging
       url: https://staging.barberpro.com.ar
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Railway CLI
+        run: |
+          curl -fsSL https://railway.app/install.sh | sh
+          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+
       - name: Deploy to Railway (Staging)
         run: |
-          echo "Deploying to Railway staging environment..."
-          echo "Image: ${{ needs.build.outputs.image }}"
-          # Railway CLI deployment would go here
-          # railway deploy --environment staging
+          echo "🚀 Deploying to Railway staging environment..."
+          railway login --token ${{ secrets.RAILWAY_TOKEN }}
+          railway environment staging
+          railway up --service backend
+          railway up --service frontend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Wait for deployment
+        run: |
+          echo "⏳ Waiting for deployment to be ready..."
+          sleep 60
 
       - name: Run health check
         run: |
-          echo "Running health check on staging environment..."
-          curl -f https://staging.barberpro.com.ar/health || exit 1
+          echo "🔍 Running health check on staging environment..."
+          for i in {1..10}; do
+            if curl -f https://staging.barberpro.com.ar/api/health; then
+              echo "✅ Health check passed!"
+              break
+            else
+              echo "❌ Health check failed, attempt $i/10"
+              sleep 30
+            fi
+          done
+
+      - name: Run smoke tests
+        run: |
+          echo "🧪 Running smoke tests..."
+          curl -f https://staging.barberpro.com.ar/api/health || exit 1
+          curl -f https://staging.barberpro.com.ar/ || exit 1
 
       - name: Notify team
         if: always()
@@ -214,7 +344,11 @@ jobs:
           status: ${{ job.status }}
           channel: '#deployments'
           username: 'GitHub Actions'
-          text: 'Staging deployment completed'
+          text: |
+            🚀 Staging deployment ${{ job.status }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Environment: https://staging.barberpro.com.ar
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
@@ -270,17 +404,75 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+
+      - name: Generate Prisma client
+        run: cd backend && npx prisma generate
 
       - name: Run migrations (Staging)
         if: github.ref == 'refs/heads/develop'
-        run: npx prisma migrate deploy
+        run: |
+          echo "🗄️ Running database migrations for staging..."
+          cd backend && npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
       - name: Run migrations (Production)
         if: github.ref == 'refs/heads/main'
-        run: npx prisma migrate deploy
+        run: |
+          echo "🗄️ Running database migrations for production..."
+          cd backend && npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+
+      - name: Verify migration success
+        run: |
+          echo "✅ Verifying migration success..."
+          cd backend && npx prisma db push --skip-generate
+        env:
+          DATABASE_URL: ${{ github.ref == 'refs/heads/main' && secrets.PRODUCTION_DATABASE_URL || secrets.STAGING_DATABASE_URL }}
+
+  # Hotfix deployment for critical bugs like BUG-001
+  hotfix-deploy:
+    name: Hotfix Deployment
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'HOTFIX')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Railway CLI
+        run: |
+          curl -fsSL https://railway.app/install.sh | sh
+          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+
+      - name: Fast hotfix deployment
+        run: |
+          echo "🚨 HOTFIX DEPLOYMENT - Bypassing normal pipeline..."
+          railway login --token ${{ secrets.RAILWAY_TOKEN }}
+          railway environment production
+          railway up --service backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Verify hotfix
+        run: |
+          echo "🔍 Verifying hotfix deployment..."
+          sleep 30
+          curl -f https://barberpro.com.ar/api/health || exit 1
+
+      - name: Notify critical fix
+        uses: 8398a7/action-slack@v3
+        with:
+          status: 'success'
+          channel: '#critical-alerts'
+          username: 'GitHub Actions'
+          text: |
+            🚨 HOTFIX DEPLOYED TO PRODUCTION
+            Commit: ${{ github.sha }}
+            Message: ${{ github.event.head_commit.message }}
+            Time: $(date)
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

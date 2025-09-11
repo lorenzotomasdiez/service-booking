@@ -14,6 +14,7 @@ async function seed() {
     await prisma.payment.deleteMany();
     await prisma.booking.deleteMany();
     await prisma.service.deleteMany();
+    await prisma.serviceCategory.deleteMany();
     await prisma.provider.deleteMany();
     await prisma.user.deleteMany();
 
@@ -180,6 +181,76 @@ async function seed() {
       }
     });
 
+    // Create service categories first
+    console.log('📋 Creating service categories...');
+    const categories = await Promise.all([
+      prisma.serviceCategory.create({
+        data: {
+          name: 'Corte',
+          description: 'Servicios de corte de cabello',
+          sortOrder: 1
+        }
+      }),
+      prisma.serviceCategory.create({
+        data: {
+          name: 'Corte y Barba',
+          description: 'Servicios de corte de cabello y arreglo de barba',
+          sortOrder: 2
+        }
+      }),
+      prisma.serviceCategory.create({
+        data: {
+          name: 'Afeitado',
+          description: 'Servicios de afeitado tradicional',
+          sortOrder: 3
+        }
+      }),
+      prisma.serviceCategory.create({
+        data: {
+          name: 'Tratamientos',
+          description: 'Tratamientos capilares especializados',
+          sortOrder: 4
+        }
+      }),
+      prisma.serviceCategory.create({
+        data: {
+          name: 'Especial',
+          description: 'Servicios especiales y combos',
+          sortOrder: 5
+        }
+      }),
+      prisma.serviceCategory.create({
+        data: {
+          name: 'Servicio Completo',
+          description: 'Servicios completos y premium',
+          sortOrder: 6
+        }
+      }),
+      prisma.serviceCategory.create({
+        data: {
+          name: 'Corte y Peinado',
+          description: 'Corte de cabello con peinado',
+          sortOrder: 7
+        }
+      }),
+      prisma.serviceCategory.create({
+        data: {
+          name: 'Coloración',
+          description: 'Servicios de coloración y tinturas',
+          sortOrder: 8
+        }
+      }),
+      prisma.serviceCategory.create({
+        data: {
+          name: 'Tratamiento',
+          description: 'Tratamientos capilares especializados',
+          sortOrder: 9
+        }
+      })
+    ]);
+
+    const [corteCategory, corteBarbaCategory, afeitadoCategory, tratamientosCategory, especialCategory, servicioCompletoCategory, cortePeinadoCategory, coloracionCategory, tratamientoCategory] = categories;
+
     // Create services for each provider
     console.log('✂️ Creating services...');
     
@@ -191,7 +262,7 @@ async function seed() {
           description: 'Corte tradicional con tijera y máquina. Incluye lavado y peinado.',
           duration: 30,
           price: 2500.00,
-          category: 'Corte',
+          categoryId: corteCategory.id,
           providerId: provider1.id,
           images: []
         }
@@ -202,7 +273,7 @@ async function seed() {
           description: 'Corte completo más arreglo de barba. Incluye lavado y productos de acabado.',
           duration: 45,
           price: 3500.00,
-          category: 'Corte y Barba',
+          categoryId: corteBarbaCategory.id,
           providerId: provider1.id,
           images: []
         }
@@ -213,7 +284,7 @@ async function seed() {
           description: 'Afeitado clásico con navaja, toallas calientes y productos premium.',
           duration: 30,
           price: 2000.00,
-          category: 'Afeitado',
+          categoryId: afeitadoCategory.id,
           providerId: provider1.id,
           images: []
         }
@@ -224,7 +295,7 @@ async function seed() {
           description: 'Corte + barba + afeitado + lavado. La experiencia completa de barbería.',
           duration: 60,
           price: 4500.00,
-          category: 'Servicio Completo',
+          categoryId: servicioCompletoCategory.id,
           providerId: provider1.id,
           images: []
         }
@@ -239,7 +310,7 @@ async function seed() {
           description: 'Corte de vanguardia con técnicas modernas. Incluye consultoría de estilo.',
           duration: 40,
           price: 3000.00,
-          category: 'Corte',
+          categoryId: corteCategory.id,
           providerId: provider2.id,
           images: []
         }
@@ -250,7 +321,7 @@ async function seed() {
           description: 'Corte moderno + peinado profesional con productos de alta gama.',
           duration: 50,
           price: 4000.00,
-          category: 'Corte y Peinado',
+          categoryId: cortePeinadoCategory.id,
           providerId: provider2.id,
           images: []
         }
@@ -261,7 +332,7 @@ async function seed() {
           description: 'Coloración profesional con productos premium. Incluye corte y peinado.',
           duration: 90,
           price: 6000.00,
-          category: 'Coloración',
+          categoryId: coloracionCategory.id,
           providerId: provider2.id,
           images: []
         }
@@ -272,7 +343,7 @@ async function seed() {
           description: 'Tratamiento intensivo para el cuidado del cabello. Hidratación y nutrición profunda.',
           duration: 60,
           price: 3500.00,
-          category: 'Tratamiento',
+          categoryId: tratamientoCategory.id,
           providerId: provider2.id,
           images: []
         }

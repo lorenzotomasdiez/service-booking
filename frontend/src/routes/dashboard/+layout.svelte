@@ -2,16 +2,32 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { authStore, isAuthenticated, user, isProvider, isClient } from '$lib/stores/auth';
+	import { OnboardingFlow } from '$lib/components';
 	import { onMount } from 'svelte';
 	
 	let sidebarOpen = false;
+	let showOnboarding = false;
 
 	onMount(() => {
 		// Verify authentication on mount
 		if (!$isAuthenticated) {
 			goto('/login');
+			return;
+		}
+
+		// Check if onboarding should be shown
+		const onboardingCompleted = localStorage.getItem('onboarding_completed');
+		if (!onboardingCompleted && $user && !$user.isProfileComplete) {
+			// Show onboarding after a brief delay to let the dashboard load
+			setTimeout(() => {
+				showOnboarding = true;
+			}, 1000);
 		}
 	});
+
+	function handleOnboardingComplete() {
+		showOnboarding = false;
+	}
 
 	function toggleSidebar() {
 		sidebarOpen = !sidebarOpen;
@@ -353,3 +369,9 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Onboarding Flow -->
+<OnboardingFlow 
+	bind:open={showOnboarding} 
+	on:complete={handleOnboardingComplete}
+/>

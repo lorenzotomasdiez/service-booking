@@ -2,7 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { prisma } from './database';
-import { redis } from './redis';
+import redis from './redis';
 
 export interface AuthenticatedSocket extends SocketIOServer {
   userId: string;
@@ -38,8 +38,7 @@ export class SocketService {
         credentials: true
       },
       transports: ['websocket', 'polling'],
-      // Enable compression for Argentina's mobile networks
-      compression: true,
+      // Note: compression is enabled by default in newer versions
       // Connection timeout optimized for Argentina networks
       pingTimeout: 60000,
       pingInterval: 25000
@@ -465,7 +464,7 @@ export class SocketService {
       const key = `offline_updates:${userId}`;
       const updates = await redis.lrange(key, 0, -1);
       await redis.del(key); // Clear after retrieving
-      return updates.map(update => JSON.parse(update));
+      return updates.map((update: string) => JSON.parse(update));
     } catch (error) {
       console.error('Error getting offline updates:', error);
       return [];
@@ -480,7 +479,7 @@ export class SocketService {
       const key = `offline_notifications:${userId}`;
       const notifications = await redis.lrange(key, 0, -1);
       await redis.del(key); // Clear after retrieving
-      return notifications.map(notification => JSON.parse(notification));
+      return notifications.map((notification: string) => JSON.parse(notification));
     } catch (error) {
       console.error('Error getting offline notifications:', error);
       return [];

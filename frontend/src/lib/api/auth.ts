@@ -15,7 +15,7 @@ export const registerSchema = z.object({
 	confirmPassword: z.string(),
 	firstName: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
 	lastName: z.string().min(2, 'El apellido debe tener al menos 2 caracteres'),
-	phone: z.string().min(10, 'Ingresa un número de teléfono válido'),
+	phone: z.string().regex(/^\+54\s9\s\d{2,4}\s\d{4}-\d{4}$/, 'Formato de teléfono inválido. Usar +54 9 XX XXXX-XXXX'),
 	role: z.enum(['client', 'provider'], { required_error: 'Selecciona un tipo de cuenta' }),
 	acceptTerms: z.boolean().refine((val) => val === true, 'Debes aceptar los términos y condiciones')
 }).refine((data) => data.password === data.confirmPassword, {

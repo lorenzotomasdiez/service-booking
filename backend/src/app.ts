@@ -14,6 +14,7 @@ import { createMetricsMiddleware } from './services/monitoring';
 
 // Security middleware
 import { setupAllSecurityMiddleware, securityConfig } from './middleware/security';
+import { setupValidationMiddleware } from './middleware/validation';
 
 // Route imports
 import healthRoutes from './routes/health';
@@ -23,6 +24,12 @@ import servicesRoutes from './routes/services';
 import bookingsRoutes from './routes/bookings';
 import searchRoutes from './routes/search';
 import paymentsRoutes from './routes/payments';
+
+// New CRUD routes
+import usersCrudRoutes from './routes/users-crud';
+import servicesCrudRoutes from './routes/services-crud';
+import bookingsCrudRoutes from './routes/bookings-crud';
+import uploadRoutes from './routes/upload';
 
 export function buildServer(): FastifyInstance {
   const server = Fastify({
@@ -125,6 +132,9 @@ export function buildServer(): FastifyInstance {
 
   // Setup comprehensive security middleware
   setupAllSecurityMiddleware(server);
+  
+  // Setup validation middleware
+  setupValidationMiddleware(server);
 
   // Register plugins
   server.register(cors, securityConfig.cors as any);
@@ -186,7 +196,8 @@ export function buildServer(): FastifyInstance {
         { name: 'Providers', description: 'Service provider management' },
         { name: 'Services', description: 'Service management' },
         { name: 'Bookings', description: 'Booking management' },
-        { name: 'Payments', description: 'Payment processing' }
+        { name: 'Payments', description: 'Payment processing' },
+        { name: 'Upload', description: 'File upload and management' }
       ]
     }
   });
@@ -230,11 +241,21 @@ export function buildServer(): FastifyInstance {
   // Register routes
   server.register(healthRoutes, { prefix: '/api' });
   server.register(authRoutes, { prefix: '/api/auth' });
+  
+  // Original routes (legacy)
   server.register(usersRoutes, { prefix: '/api/users' });
   server.register(servicesRoutes, { prefix: '/api/services' });
   server.register(bookingsRoutes, { prefix: '/api/bookings' });
   server.register(searchRoutes, { prefix: '/api/search' });
   server.register(paymentsRoutes, { prefix: '/api' });
+  
+  // New CRUD routes with validation
+  server.register(usersCrudRoutes, { prefix: '/api/v1/users' });
+  server.register(servicesCrudRoutes, { prefix: '/api/v1' });
+  server.register(bookingsCrudRoutes, { prefix: '/api/v1/bookings' });
+  
+  // Upload routes
+  server.register(uploadRoutes, { prefix: '/api/v1/upload' });
 
   return server;
 }

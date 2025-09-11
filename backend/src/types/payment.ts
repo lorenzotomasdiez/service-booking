@@ -263,6 +263,51 @@ export class PaymentWebhookError extends PaymentError {
   }
 }
 
+// Retry Configuration Types
+export interface PaymentRetryConfig {
+  maxRetries: number;
+  retryDelayMs: number;
+  exponentialBackoff: boolean;
+}
+
+// Payment Method Validation Types
+export interface PaymentMethodValidation {
+  credit_card: PaymentMethodRules;
+  debit_card: PaymentMethodRules;
+  bank_transfer: PaymentMethodRules;
+  rapipago: PaymentMethodRules;
+  pagofacil: PaymentMethodRules;
+  account_money: PaymentMethodRules;
+}
+
+export interface PaymentMethodRules {
+  maxInstallments: number;
+  minAmount: number;
+  maxAmount: number;
+}
+
+// Enhanced Payment Status Tracking
+export interface PaymentStatusHistory {
+  status: string;
+  timestamp: Date;
+  externalStatus?: string;
+  notes?: string;
+}
+
+// Cancellation Types
+export interface CancellationResult {
+  refunded: boolean;
+  penaltyAmount?: number;
+  refundAmount?: number;
+  cancellationFee?: number;
+}
+
+export interface CancellationPolicy {
+  hoursBeforeBooking: number;
+  penaltyPercentage: number;
+  description: string;
+}
+
 // Utility Types
 export type PaymentProvider = 'mercadopago' | 'todopago' | 'decidir' | 'payu';
 

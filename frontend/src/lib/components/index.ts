@@ -6,6 +6,9 @@ export { default as Input } from './Input.svelte';
 export { default as Card } from './Card.svelte';
 export { default as Modal } from './Modal.svelte';
 export { default as Loading } from './Loading.svelte';
+export { default as ImageUpload } from './ImageUpload.svelte';
+export { default as ProgressIndicator } from './ProgressIndicator.svelte';
+export { default as OnboardingFlow } from './OnboardingFlow.svelte';
 
 // Component Types
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'success' | 'danger';
@@ -22,3 +25,6 @@ export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | 'full';
 export type LoadingVariant = 'spinner' | 'skeleton' | 'pulse' | 'dots';
 export type LoadingSize = 'sm' | 'md' | 'lg' | 'xl';
 export type LoadingColor = 'primary' | 'secondary' | 'neutral' | 'white';
+
+export type ProgressVariant = 'primary' | 'success' | 'warning' | 'danger';
+export type ProgressSize = 'sm' | 'md' | 'lg';

@@ -45,9 +45,16 @@ const RefundRequestSchema = Type.Object({
   reason: Type.Optional(Type.String()),
 });
 
+const CancellationRequestSchema = Type.Object({
+  bookingId: Type.String(),
+  reason: Type.String({ minLength: 5, maxLength: 500 }),
+  applyPenalty: Type.Optional(Type.Boolean()),
+});
+
 type CreatePaymentRequest = Static<typeof CreatePaymentSchema>;
 type PaymentParams = Static<typeof PaymentParamsSchema>;
 type RefundRequest = Static<typeof RefundRequestSchema>;
+type CancellationRequest = Static<typeof CancellationRequestSchema>;
 
 export default async function paymentRoutes(fastify: FastifyInstance) {
   const paymentService = new MercadoPagoPaymentService(prisma);
@@ -264,7 +271,7 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
           latestPayment = await prisma.payment.findUnique({
             where: { id: payment.id },
             include: { booking: true },
-          });
+          }) || payment;
         } catch (error) {
           fastify.log.warn('Failed to update payment status from MercadoPago:', error);
         }
@@ -601,6 +608,359 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
         error: {
           code: 'INTERNAL_ERROR',
           message: 'Failed to fetch payment analytics',
+        },
+      });
+    }
+  });
+
+  /**
+   * Process Booking Cancellation with Payment Logic
+   * POST /api/payments/cancel
+   */
+  fastify.post<{
+    Body: CancellationRequest;
+  }>('/payments/cancel', {
+    schema: {
+      description: 'Cancel booking with payment handling and potential refund',
+      tags: ['payments', 'bookings'],
+      body: CancellationRequestSchema,
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Object({
+            refunded: Type.Boolean(),
+            refundAmount: Type.Optional(Type.Number()),
+            penaltyAmount: Type.Optional(Type.Number()),
+            message: Type.String(),
+          }),
+        }),
+      },
+    },
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest<{ Body: CancellationRequest }>, reply: FastifyReply) => {
+    try {
+      const userId = (request as any).user.userId;
+      const { bookingId, reason, applyPenalty = false } = request.body;
+
+      // Verify user has permission to cancel this booking
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: { provider: true },
+      });
+
+      if (!booking) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'BOOKING_NOT_FOUND',
+            message: 'Booking not found',
+          },
+        });
+      }
+
+      // Authorization check - client or provider can cancel
+      if (booking.clientId !== userId && booking.provider.userId !== userId) {
+        return reply.status(403).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'You are not authorized to cancel this booking',
+          },
+        });
+      }
+
+      const result = await paymentService.processCancellation(
+        bookingId,
+        userId,
+        reason,
+        applyPenalty
+      );
+
+      let message = 'Booking cancelled successfully';
+      if (result.refunded) {
+        message += ` with refund of ARS ${result.refundAmount}`;
+        if (result.penaltyAmount) {
+          message += ` (penalty: ARS ${result.penaltyAmount})`;
+        }
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          refunded: result.refunded,
+          refundAmount: result.refundAmount,
+          penaltyAmount: result.penaltyAmount,
+          message,
+        },
+      });
+    } catch (error) {
+      fastify.log.error('Cancellation processing error:', error);
+
+      if (error instanceof PaymentValidationError) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+          },
+        });
+      }
+
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to process cancellation',
+        },
+      });
+    }
+  });
+
+  /**
+   * Get Payment Status Tracking
+   * GET /api/payments/:paymentId/status
+   */
+  fastify.get<{
+    Params: PaymentParams;
+  }>('/payments/:paymentId/status', {
+    schema: {
+      description: 'Get detailed payment status tracking information',
+      tags: ['payments'],
+      params: PaymentParamsSchema,
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Object({
+            currentStatus: Type.String(),
+            statusHistory: Type.Array(Type.Object({
+              status: Type.String(),
+              timestamp: Type.String(),
+              externalStatus: Type.Optional(Type.String()),
+            })),
+            lastUpdated: Type.String(),
+          }),
+        }),
+      },
+    },
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest<{ Params: PaymentParams }>, reply: FastifyReply) => {
+    try {
+      const userId = (request as any).user.userId;
+      const { paymentId } = request.params;
+
+      // Verify user has access to this payment
+      const payment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+        include: {
+          booking: {
+            include: { provider: true },
+          },
+        },
+      });
+
+      if (!payment) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'PAYMENT_NOT_FOUND',
+            message: 'Payment not found',
+          },
+        });
+      }
+
+      // Authorization check
+      if (payment.booking.clientId !== userId && payment.booking.provider.userId !== userId) {
+        return reply.status(403).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'You are not authorized to view this payment status',
+          },
+        });
+      }
+
+      const statusInfo = await paymentService.trackPaymentStatus(paymentId);
+
+      return reply.send({
+        success: true,
+        data: {
+          currentStatus: statusInfo.currentStatus,
+          statusHistory: statusInfo.statusHistory.map(entry => ({
+            status: entry.status,
+            timestamp: entry.timestamp.toISOString(),
+            externalStatus: entry.externalStatus,
+          })),
+          lastUpdated: statusInfo.lastUpdated.toISOString(),
+        },
+      });
+    } catch (error) {
+      fastify.log.error('Payment status tracking error:', error);
+
+      if (error instanceof PaymentValidationError) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+          },
+        });
+      }
+
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to fetch payment status',
+        },
+      });
+    }
+  });
+
+  /**
+   * Retry Failed Payment
+   * POST /api/payments/:paymentId/retry
+   */
+  fastify.post<{
+    Params: PaymentParams;
+  }>('/payments/:paymentId/retry', {
+    schema: {
+      description: 'Retry a failed payment',
+      tags: ['payments'],
+      params: PaymentParamsSchema,
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Object({
+            id: Type.String(),
+            status: Type.String(),
+            preferenceId: Type.Optional(Type.String()),
+            initPoint: Type.Optional(Type.String()),
+            retryAttempt: Type.Number(),
+          }),
+        }),
+      },
+    },
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest<{ Params: PaymentParams }>, reply: FastifyReply) => {
+    try {
+      const userId = (request as any).user.userId;
+      const { paymentId } = request.params;
+
+      // Get the failed payment
+      const payment = await prisma.payment.findUnique({
+        where: { id: paymentId },
+        include: {
+          booking: {
+            include: {
+              provider: true,
+              service: true,
+            },
+          },
+        },
+      });
+
+      if (!payment) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'PAYMENT_NOT_FOUND',
+            message: 'Payment not found',
+          },
+        });
+      }
+
+      // Authorization check
+      if (payment.booking.clientId !== userId) {
+        return reply.status(403).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'You are not authorized to retry this payment',
+          },
+        });
+      }
+
+      // Check if payment is in a retriable state
+      if (payment.status === 'PAID') {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'PAYMENT_ALREADY_PAID',
+            message: 'Payment has already been completed',
+          },
+        });
+      }
+
+      if (payment.status !== 'FAILED' && payment.status !== 'REJECTED') {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'PAYMENT_NOT_RETRIABLE',
+            message: 'Payment is not in a retriable state',
+          },
+        });
+      }
+
+      // Create new payment request from existing payment data
+      const metadata = payment.metadata as any;
+      const retryRequest: PaymentRequest = {
+        bookingId: payment.bookingId,
+        amount: Number(payment.amount),
+        currency: payment.currency as 'ARS',
+        description: payment.description || `Retry payment for booking ${payment.bookingId}`,
+        clientEmail: metadata?.clientInfo?.email || '',
+        clientName: metadata?.clientInfo?.name || '',
+        clientPhone: metadata?.clientInfo?.phone,
+        clientDni: metadata?.clientInfo?.dni,
+        returnUrls: {
+          success: `${process.env.FRONTEND_URL}/payment/success`,
+          failure: `${process.env.FRONTEND_URL}/payment/failure`,
+          pending: `${process.env.FRONTEND_URL}/payment/pending`,
+        },
+        metadata: {
+          ...metadata,
+          retryOf: paymentId,
+          retryAttempt: (metadata?.retryAttempt || 0) + 1,
+        },
+      };
+
+      // Mark old payment as cancelled
+      await prisma.payment.update({
+        where: { id: paymentId },
+        data: { status: 'CANCELLED' },
+      });
+
+      // Create new payment
+      const newPayment = await paymentService.createPayment(retryRequest);
+
+      return reply.send({
+        success: true,
+        data: {
+          id: newPayment.id,
+          status: newPayment.status,
+          preferenceId: newPayment.preferenceId,
+          initPoint: newPayment.initPoint,
+          retryAttempt: retryRequest.metadata?.retryAttempt || 1,
+        },
+      });
+    } catch (error) {
+      fastify.log.error('Payment retry error:', error);
+
+      if (error instanceof PaymentValidationError) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+          },
+        });
+      }
+
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to retry payment',
         },
       });
     }

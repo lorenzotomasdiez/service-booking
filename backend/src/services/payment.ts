@@ -7,6 +7,7 @@ import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
+import { setTimeout } from 'timers/promises';
 import paymentConfig from '../config/payment';
 import {
   PaymentRequest,
@@ -20,6 +21,8 @@ import {
   PaymentValidationError,
   MercadoPagoWebhook,
   PaymentAuditLog,
+  PaymentRetryConfig,
+  PaymentMethodValidation,
 } from '../types/payment';
 
 export class MercadoPagoPaymentService implements PaymentGateway {
@@ -27,9 +30,15 @@ export class MercadoPagoPaymentService implements PaymentGateway {
   private preference: Preference;
   private payment: Payment;
   private prisma: PrismaClient;
+  private retryConfig: PaymentRetryConfig;
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
+    this.retryConfig = {
+      maxRetries: paymentConfig.paymentMethods.retryAttempts,
+      retryDelayMs: paymentConfig.paymentMethods.retryDelayMs,
+      exponentialBackoff: true,
+    };
     this.initializeMercadoPago();
   }
 
@@ -54,11 +63,19 @@ export class MercadoPagoPaymentService implements PaymentGateway {
   }
 
   /**
-   * Create a payment preference for MercadoPago
+   * Create a payment preference for MercadoPago with retry logic
    */
   async createPayment(request: PaymentRequest): Promise<PaymentResponse> {
+    return this.executeWithRetry('createPayment', () => this.createPaymentInternal(request));
+  }
+
+  /**
+   * Internal payment creation method
+   */
+  private async createPaymentInternal(request: PaymentRequest): Promise<PaymentResponse> {
     try {
       await this.validatePaymentRequest(request);
+      await this.validatePaymentMethod(request);
 
       const booking = await this.prisma.booking.findUnique({
         where: { id: request.bookingId },
@@ -139,7 +156,7 @@ export class MercadoPagoPaymentService implements PaymentGateway {
           paymentMethod: 'mercadopago',
           externalId: preference.id,
           externalStatus: 'created',
-          gatewayData: preference,
+          gatewayData: preference as any,
           description: request.description,
           metadata: {
             preferenceId: preference.id,
@@ -220,6 +237,10 @@ export class MercadoPagoPaymentService implements PaymentGateway {
         };
       }
 
+      if (!dbPayment.externalId) {
+        throw new PaymentValidationError('Payment has no external ID');
+      }
+      
       const mpPayment = await this.payment.get({ id: dbPayment.externalId });
 
       // Update payment status in database
@@ -231,7 +252,7 @@ export class MercadoPagoPaymentService implements PaymentGateway {
 
       return {
         id: updatedPayment.id,
-        status: this.mapMercadoPagoStatus(mpPayment.status),
+        status: this.mapMercadoPagoStatus(mpPayment.status || 'pending'),
         externalReference: mpPayment.external_reference || '',
         gatewayData: mpPayment,
         createdAt: updatedPayment.createdAt,
@@ -247,7 +268,14 @@ export class MercadoPagoPaymentService implements PaymentGateway {
   /**
    * Process payment refund
    */
-  async processRefund(paymentId: string, amount?: number): Promise<PaymentResponse> {
+  async processRefund(paymentId: string, amount?: number, reason?: string): Promise<PaymentResponse> {
+    return this.executeWithRetry('processRefund', () => this.processRefundInternal(paymentId, amount, reason));
+  }
+
+  /**
+   * Internal refund processing method
+   */
+  private async processRefundInternal(paymentId: string, amount?: number, reason?: string): Promise<PaymentResponse> {
     try {
       const dbPayment = await this.prisma.payment.findUnique({
         where: { id: paymentId },
@@ -285,6 +313,7 @@ export class MercadoPagoPaymentService implements PaymentGateway {
         details: {
           refundAmount,
           originalAmount: Number(dbPayment.amount),
+          reason: reason || 'No reason provided',
         },
       });
 
@@ -342,7 +371,7 @@ export class MercadoPagoPaymentService implements PaymentGateway {
       }
 
       // Update payment status
-      const newStatus = this.mapMercadoPagoStatus(mpPayment.status);
+      const newStatus = this.mapMercadoPagoStatus(mpPayment.status || 'pending');
       const paidAt = newStatus === PaymentStatusEnum.APPROVED ? new Date() : undefined;
 
       await this.updatePaymentStatus(
@@ -375,7 +404,7 @@ export class MercadoPagoPaymentService implements PaymentGateway {
         success: true,
         paymentId: dbPayment.id,
         status: newStatus,
-        amount: Number(mpPayment.transaction_amount),
+        amount: Number(mpPayment.transaction_amount || 0),
         processedAt: new Date(),
         metadata: { mercadopagoPayment: mpPayment },
       };
@@ -448,6 +477,314 @@ export class MercadoPagoPaymentService implements PaymentGateway {
     };
   }
 
+  /**
+   * Execute operation with retry logic
+   */
+  private async executeWithRetry<T>(
+    operation: string,
+    fn: () => Promise<T>
+  ): Promise<T> {
+    let lastError: Error | undefined;
+    
+    for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
+      try {
+        const result = await fn();
+        
+        if (attempt > 1) {
+          await this.logPaymentAudit({
+            paymentId: 'retry',
+            action: `${operation.toUpperCase()}_RETRY_SUCCESS`,
+            details: { attempt, operation },
+          });
+        }
+        
+        return result;
+      } catch (error: any) {
+        lastError = error;
+        
+        const isRetryable = this.isRetryableError(error);
+        const isLastAttempt = attempt === this.retryConfig.maxRetries;
+        
+        await this.logPaymentAudit({
+          paymentId: 'retry',
+          action: `${operation.toUpperCase()}_RETRY_ATTEMPT`,
+          details: {
+            attempt,
+            error: error?.message || 'Unknown error',
+            isRetryable,
+            isLastAttempt,
+            operation,
+          },
+        });
+        
+        if (!isRetryable || isLastAttempt) {
+          throw error;
+        }
+        
+        // Calculate delay with exponential backoff
+        const delay = this.retryConfig.exponentialBackoff
+          ? this.retryConfig.retryDelayMs * Math.pow(2, attempt - 1)
+          : this.retryConfig.retryDelayMs;
+        
+        await setTimeout(Math.min(delay, 30000)); // Cap at 30 seconds
+      }
+    }
+    
+    throw lastError || new PaymentGatewayError('Maximum retry attempts exceeded');
+  }
+
+  /**
+   * Determine if an error is retryable
+   */
+  private isRetryableError(error: any): boolean {
+    // Network errors are typically retryable
+    if (error.code === 'ECONNRESET' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+      return true;
+    }
+    
+    // MercadoPago specific retryable errors
+    if (error.status >= 500 && error.status < 600) {
+      return true; // Server errors
+    }
+    
+    if (error.status === 429) {
+      return true; // Rate limiting
+    }
+    
+    // Validation errors are not retryable
+    if (error instanceof PaymentValidationError) {
+      return false;
+    }
+    
+    // Gateway timeouts are retryable
+    if (error.message?.includes('timeout') || error.message?.includes('TIMEOUT')) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Validate payment method specific requirements
+   */
+  private async validatePaymentMethod(request: PaymentRequest): Promise<void> {
+    const validationRules: PaymentMethodValidation = {
+      credit_card: {
+        maxInstallments: paymentConfig.paymentMethods.installmentsMax,
+        minAmount: 100, // ARS 100 minimum
+        maxAmount: 999999.99,
+      },
+      debit_card: {
+        maxInstallments: 1, // Debit cards don't support installments
+        minAmount: 50,
+        maxAmount: 500000,
+      },
+      bank_transfer: {
+        maxInstallments: 1,
+        minAmount: 200,
+        maxAmount: 1000000,
+      },
+      rapipago: {
+        maxInstallments: 1,
+        minAmount: 100,
+        maxAmount: 50000, // Cash payment limits
+      },
+      pagofacil: {
+        maxInstallments: 1,
+        minAmount: 100,
+        maxAmount: 50000,
+      },
+      account_money: {
+        maxInstallments: 1,
+        minAmount: 50,
+        maxAmount: 999999.99,
+      },
+    };
+
+    const method = request.paymentMethod as keyof PaymentMethodValidation;
+    if (method && validationRules[method]) {
+      const rules = validationRules[method];
+      
+      if (request.amount < rules.minAmount) {
+        throw new PaymentValidationError(
+          `Amount too low for ${method}. Minimum: ARS ${rules.minAmount}`
+        );
+      }
+      
+      if (request.amount > rules.maxAmount) {
+        throw new PaymentValidationError(
+          `Amount too high for ${method}. Maximum: ARS ${rules.maxAmount}`
+        );
+      }
+      
+      if (request.installments && request.installments > rules.maxInstallments) {
+        throw new PaymentValidationError(
+          `Too many installments for ${method}. Maximum: ${rules.maxInstallments}`
+        );
+      }
+    }
+  }
+
+  /**
+   * Process booking cancellation with payment logic
+   */
+  async processCancellation(
+    bookingId: string,
+    cancelledBy: string,
+    reason: string,
+    applyPenalty: boolean = false
+  ): Promise<{ refunded: boolean; penaltyAmount?: number; refundAmount?: number }> {
+    try {
+      const booking = await this.prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: {
+          payment: true,
+          service: true,
+          provider: true,
+        },
+      });
+
+      if (!booking) {
+        throw new PaymentValidationError('Booking not found');
+      }
+
+      if (!booking.payment) {
+        // No payment to refund
+        await this.prisma.booking.update({
+          where: { id: bookingId },
+          data: {
+            status: 'CANCELLED',
+            cancelledBy,
+            cancelReason: reason,
+            cancelledAt: new Date(),
+          },
+        });
+        return { refunded: false };
+      }
+
+      if (booking.payment.status !== 'PAID') {
+        // Payment not completed, just cancel
+        await this.prisma.booking.update({
+          where: { id: bookingId },
+          data: {
+            status: 'CANCELLED',
+            cancelledBy,
+            cancelReason: reason,
+            cancelledAt: new Date(),
+            paymentStatus: 'CANCELLED',
+          },
+        });
+
+        await this.prisma.payment.update({
+          where: { id: booking.payment.id },
+          data: { status: 'CANCELLED' },
+        });
+
+        return { refunded: false };
+      }
+
+      // Calculate refund amount with potential penalty
+      const originalAmount = Number(booking.payment.amount);
+      let refundAmount = originalAmount;
+      let penaltyAmount = 0;
+
+      if (applyPenalty) {
+        // Apply cancellation penalty (e.g., 20% for last-minute cancellations)
+        const timeDifference = booking.startTime.getTime() - new Date().getTime();
+        const hoursUntilBooking = timeDifference / (1000 * 60 * 60);
+
+        if (hoursUntilBooking < 24) {
+          penaltyAmount = originalAmount * 0.2; // 20% penalty
+        } else if (hoursUntilBooking < 48) {
+          penaltyAmount = originalAmount * 0.1; // 10% penalty
+        }
+
+        refundAmount = originalAmount - penaltyAmount;
+      }
+
+      // Process refund
+      await this.processRefund(
+        booking.payment.id,
+        refundAmount,
+        `Booking cancellation: ${reason}`
+      );
+
+      // Update booking status
+      await this.prisma.booking.update({
+        where: { id: bookingId },
+        data: {
+          status: 'CANCELLED',
+          cancelledBy,
+          cancelReason: reason,
+          cancelledAt: new Date(),
+        },
+      });
+
+      await this.logPaymentAudit({
+        paymentId: booking.payment.id,
+        action: 'BOOKING_CANCELLED_WITH_REFUND',
+        details: {
+          bookingId,
+          originalAmount,
+          refundAmount,
+          penaltyAmount,
+          reason,
+          cancelledBy,
+        },
+      });
+
+      return {
+        refunded: true,
+        refundAmount,
+        penaltyAmount: penaltyAmount > 0 ? penaltyAmount : undefined,
+      };
+    } catch (error: any) {
+      await this.logPaymentAudit({
+        paymentId: 'unknown',
+        action: 'CANCELLATION_FAILED',
+        details: {
+          bookingId,
+          error: error?.message || 'Unknown error',
+          reason,
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Track payment status changes
+   */
+  async trackPaymentStatus(paymentId: string): Promise<{
+    currentStatus: string;
+    statusHistory: any[];
+    lastUpdated: Date;
+  }> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+    });
+
+    if (!payment) {
+      throw new PaymentValidationError('Payment not found');
+    }
+
+    // In a production system, you would have a separate table for status history
+    // For now, we'll simulate with the current status
+    const statusHistory = [
+      {
+        status: payment.status,
+        timestamp: payment.updatedAt,
+        externalStatus: payment.externalStatus,
+      },
+    ];
+
+    return {
+      currentStatus: payment.status,
+      statusHistory,
+      lastUpdated: payment.updatedAt,
+    };
+  }
+
   // Private helper methods
 
   private async validatePaymentRequest(request: PaymentRequest): Promise<void> {
@@ -493,7 +830,7 @@ export class MercadoPagoPaymentService implements PaymentGateway {
       data: {
         status: status.toUpperCase() as any,
         externalStatus: gatewayData.status,
-        gatewayData: gatewayData as any,
+        gatewayData: (gatewayData as Record<string, any>) || null,
         paidAt,
         ...(status === PaymentStatusEnum.REJECTED && { failedAt: new Date() }),
         ...(status === PaymentStatusEnum.REFUNDED && { refundedAt: new Date() }),

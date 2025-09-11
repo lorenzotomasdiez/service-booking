@@ -1,13 +1,46 @@
-FROM node:18-alpine AS builder
+# ============================================================================
+# BarberPro Backend Production Dockerfile
+# Optimized Node.js + Fastify + Prisma for Argentina deployment
+# ============================================================================
 
-# Set working directory
+FROM node:18-alpine AS base
+
+# Install system dependencies and security updates
+RUN apk update && apk upgrade && apk add --no-cache \
+    libc6-compat \
+    openssl \
+    ca-certificates \
+    curl \
+    wget \
+    tini \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 barberpro && \
+    adduser --system --uid 1001 --ingroup barberpro barberpro
+
+# ============================================================================
+# Dependencies Stage
+# ============================================================================
+FROM base AS deps
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including dev dependencies)
-RUN npm ci
+# Install production dependencies
+RUN npm ci --only=production --no-audit --prefer-offline && \
+    npm cache clean --force
+
+# ============================================================================
+# Builder Stage
+# ============================================================================
+FROM base AS builder
+WORKDIR /app
+
+# Install all dependencies for building
+COPY package*.json ./
+RUN npm ci --no-audit --prefer-offline
 
 # Copy source code
 COPY . .
@@ -15,40 +48,64 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build the application
+# Build TypeScript
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine AS production
-
-# Set working directory
+# ============================================================================
+# Production Stage
+# ============================================================================
+FROM base AS production
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+ENV NODE_ENV=production
+ENV PORT=3000
 
-# Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Copy production dependencies
+COPY --from=deps --chown=barberpro:barberpro /app/node_modules ./node_modules
 
-# Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/prisma ./prisma
+# Copy built application
+COPY --from=builder --chown=barberpro:barberpro /app/dist ./dist
+COPY --from=builder --chown=barberpro:barberpro /app/prisma ./prisma
+COPY --chown=barberpro:barberpro package*.json ./
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S barberpro -u 1001
+# Create startup script with proper database handling
+COPY --chown=barberpro:barberpro <<EOF /app/start.sh
+#!/bin/sh
+set -e
 
-# Change ownership of the app directory to the nodejs user
-RUN chown -R barberpro:nodejs /app
+echo "🚀 Starting BarberPro Backend Server..."
+
+# Wait for database to be ready
+echo "⏳ Waiting for database connection..."
+until npx prisma db push --skip-generate 2>/dev/null; do
+  echo "Database not ready yet, waiting..."
+  sleep 2
+done
+
+# Run migrations
+echo "📊 Running database migrations..."
+npx prisma migrate deploy
+
+# Start server
+echo "🔧 Starting Fastify server on port 3000..."
+exec node dist/server.js
+EOF
+RUN chmod +x /app/start.sh
+
+# Health check script
+COPY --chown=barberpro:barberpro <<EOF /usr/local/bin/health-check.sh
+#!/bin/sh
+curl -f http://localhost:3000/api/health || exit 1
+EOF
+RUN chmod +x /usr/local/bin/health-check.sh
+
 USER barberpro
 
-# Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD /usr/local/bin/health-check.sh
 
-# Start the application
-CMD ["npm", "start"]
+# Use tini for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["/app/start.sh"]

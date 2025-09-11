@@ -12,9 +12,33 @@
 
 	let todayAppointments: any[] = [];
 	let recentBookings: any[] = [];
+	let profileCompletion = 0;
+	let showProfileBanner = false;
 
 	onMount(async () => {
 		// TODO: Load real data from API
+		// Calculate profile completion
+		if ($user) {
+			const requiredFields = [
+				$user.firstName,
+				$user.lastName,
+				$user.phone,
+				$user.email,
+				$user.profile?.bio,
+				$user.profile?.location?.address,
+				$user.profile?.location?.city,
+				$user.profile?.location?.state,
+				$user.avatar,
+				$user.profile?.services?.length > 0 ? 'services' : '',
+				$user.profile?.experience > 0 ? 'experience' : '',
+				$user.profile?.workingHours ? 'hours' : ''
+			];
+			
+			const completedFields = requiredFields.filter(field => field && field.length > 0);
+			profileCompletion = Math.round((completedFields.length / requiredFields.length) * 100);
+			showProfileBanner = profileCompletion < 90;
+		}
+
 		// Simulate loading
 		setTimeout(() => {
 			stats = {
@@ -108,6 +132,61 @@
 				</a>
 			</div>
 		</div>
+
+		<!-- Professional Profile Completion Banner -->
+		{#if showProfileBanner}
+			<div class="mb-8 bg-gradient-to-r from-success-50 to-primary-50 border border-success-200 rounded-lg p-6">
+				<div class="flex items-start justify-between">
+					<div class="flex-1">
+						<div class="flex items-center mb-3">
+							<svg class="w-5 h-5 text-success-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+							</svg>
+							<h3 class="text-lg font-semibold text-success-800">
+								Optimiza tu perfil profesional
+							</h3>
+						</div>
+						
+						<p class="text-success-700 mb-4">
+							Tu perfil profesional está {profileCompletion}% completo. Un perfil completo atrae hasta 3x más clientes.
+						</p>
+						
+						<div class="w-full bg-success-200 rounded-full h-2 mb-4">
+							<div 
+								class="bg-success-600 h-2 rounded-full transition-all duration-300" 
+								style="width: {profileCompletion}%"
+							></div>
+						</div>
+						
+						<div class="flex space-x-4">
+							<a href="/dashboard/provider/profile" class="inline-flex items-center text-success-700 hover:text-success-800 font-medium">
+								Completar perfil
+								<svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+								</svg>
+							</a>
+							{#if profileCompletion >= 70}
+								<span class="inline-flex items-center text-success-600 text-sm">
+									<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+									</svg>
+									¡Excelente progreso!
+								</span>
+							{/if}
+						</div>
+					</div>
+					
+					<button 
+						class="text-success-400 hover:text-success-600 ml-4"
+						on:click={() => showProfileBanner = false}
+					>
+						<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+					</button>
+				</div>
+			</div>
+		{/if}
 
 		<!-- Stats Cards -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

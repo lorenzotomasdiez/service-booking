@@ -47,8 +47,9 @@ services:
   # Backend API (Fastify)
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile.dev
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
     container_name: barberpro-backend
     environment:
       NODE_ENV: development
@@ -57,11 +58,13 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev-jwt-secret-key-not-for-production
       LOG_LEVEL: debug
+      CORS_ORIGIN: http://localhost:5173
     ports:
       - "3000:3000"
     volumes:
-      - .:/app
+      - ./backend:/app
       - /app/node_modules
+      - /app/dist
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,29 +73,40 @@ services:
     networks:
       - barberpro-network
     restart: unless-stopped
-    command: npm run dev:backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # Frontend (SvelteKit)
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile.dev
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
     container_name: barberpro-frontend
     environment:
-      NODE_ENV: development
       VITE_API_URL: http://localhost:3000/api
       VITE_APP_URL: http://localhost:5173
     ports:
-      - "5173:5173"
+      - "5173:80"
     volumes:
-      - .:/app
+      - ./frontend:/app
       - /app/node_modules
+      - /app/build
     depends_on:
       - backend
     networks:
       - barberpro-network
     restart: unless-stopped
-    command: npm run dev:frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Database Administration (pgAdmin)
   pgadmin:

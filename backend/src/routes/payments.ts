@@ -1377,4 +1377,242 @@ export default async function paymentRoutes(fastify: FastifyInstance) {
       },
     });
   });
+
+  /**
+   * Get Smart Commission Structure
+   * GET /api/payments/commission/smart/:providerId
+   */
+  fastify.get<{
+    Params: { providerId: string };
+  }>('/payments/commission/smart/:providerId', {
+    schema: {
+      description: 'Get smart commission structure with tier analysis',
+      tags: ['payments', 'commission'],
+      params: Type.Object({
+        providerId: Type.String(),
+      }),
+    },
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest<{ Params: { providerId: string } }>, reply: FastifyReply) => {
+    try {
+      const userId = (request as any).user.userId;
+      const { providerId } = request.params;
+
+      // Verify provider ownership
+      const provider = await prisma.provider.findUnique({
+        where: { id: providerId },
+      });
+
+      if (!provider || provider.userId !== userId) {
+        return reply.status(403).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'You are not authorized to view this commission structure',
+          },
+        });
+      }
+
+      const commissionStructure = await paymentService.getSmartCommissionStructure(providerId);
+
+      return reply.send({
+        success: true,
+        data: commissionStructure,
+      });
+    } catch (error: any) {
+      fastify.log.error('Smart commission structure error:', error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'COMMISSION_STRUCTURE_ERROR',
+          message: 'Failed to get smart commission structure',
+        },
+      });
+    }
+  });
+
+  /**
+   * Get Payment Method Recommendations
+   * POST /api/payments/recommendations
+   */
+  fastify.post<{
+    Body: {
+      amount: number;
+      clientProfile?: {
+        preferredMethods?: string[];
+        installmentHistory?: number[];
+        locationProvince?: string;
+      };
+    };
+  }>('/payments/recommendations', {
+    schema: {
+      description: 'Get payment method recommendations based on amount and client profile',
+      tags: ['payments', 'recommendations'],
+      body: Type.Object({
+        amount: Type.Number({ minimum: 1 }),
+        clientProfile: Type.Optional(Type.Object({
+          preferredMethods: Type.Optional(Type.Array(Type.String())),
+          installmentHistory: Type.Optional(Type.Array(Type.Number())),
+          locationProvince: Type.Optional(Type.String()),
+        })),
+      }),
+    },
+  }, async (request: FastifyRequest<{
+    Body: {
+      amount: number;
+      clientProfile?: {
+        preferredMethods?: string[];
+        installmentHistory?: number[];
+        locationProvince?: string;
+      };
+    };
+  }>, reply: FastifyReply) => {
+    try {
+      const { amount, clientProfile } = request.body;
+
+      const recommendations = await paymentService.getPaymentMethodRecommendations(
+        amount,
+        clientProfile
+      );
+
+      return reply.send({
+        success: true,
+        data: recommendations,
+      });
+    } catch (error: any) {
+      fastify.log.error('Payment recommendations error:', error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'RECOMMENDATIONS_ERROR',
+          message: 'Failed to get payment method recommendations',
+        },
+      });
+    }
+  });
+
+  /**
+   * Get Payment Performance Monitoring
+   * GET /api/payments/monitoring/performance
+   */
+  fastify.get('/payments/monitoring/performance', {
+    schema: {
+      description: 'Get real-time payment performance monitoring and alerts',
+      tags: ['payments', 'monitoring'],
+    },
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      // Check if user has admin role for monitoring access
+      const userId = (request as any).user.userId;
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user || user.role !== 'ADMIN') {
+        return reply.status(403).send({
+          success: false,
+          error: {
+            code: 'UNAUTHORIZED',
+            message: 'Admin access required for payment monitoring',
+          },
+        });
+      }
+
+      const monitoring = await paymentService.getPaymentPerformanceMonitoring();
+
+      return reply.send({
+        success: true,
+        data: monitoring,
+      });
+    } catch (error: any) {
+      fastify.log.error('Payment performance monitoring error:', error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'MONITORING_ERROR',
+          message: 'Failed to get payment performance monitoring',
+        },
+      });
+    }
+  });
+
+  /**
+   * Process Advanced Refund
+   * POST /api/payments/:paymentId/advanced-refund
+   */
+  fastify.post<{
+    Params: { paymentId: string };
+    Body: {
+      amount?: number;
+      reason: string;
+      refundMethod?: 'original' | 'bank_transfer' | 'mercadopago_wallet';
+      customerNotification?: boolean;
+      complianceNote?: string;
+    };
+  }>('/payments/:paymentId/advanced-refund', {
+    schema: {
+      description: 'Process advanced refund with Argentina compliance features',
+      tags: ['payments', 'refund'],
+      params: Type.Object({
+        paymentId: Type.String(),
+      }),
+      body: Type.Object({
+        amount: Type.Optional(Type.Number({ minimum: 0.01 })),
+        reason: Type.String({ minLength: 5, maxLength: 500 }),
+        refundMethod: Type.Optional(Type.Union([
+          Type.Literal('original'),
+          Type.Literal('bank_transfer'),
+          Type.Literal('mercadopago_wallet'),
+        ])),
+        customerNotification: Type.Optional(Type.Boolean()),
+        complianceNote: Type.Optional(Type.String()),
+      }),
+    },
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest<{
+    Params: { paymentId: string };
+    Body: {
+      amount?: number;
+      reason: string;
+      refundMethod?: 'original' | 'bank_transfer' | 'mercadopago_wallet';
+      customerNotification?: boolean;
+      complianceNote?: string;
+    };
+  }>, reply: FastifyReply) => {
+    try {
+      const { paymentId } = request.params;
+      const refundData = request.body;
+
+      const advancedRefund = await paymentService.processAdvancedRefund(
+        paymentId,
+        refundData
+      );
+
+      return reply.send({
+        success: true,
+        data: advancedRefund,
+      });
+    } catch (error: any) {
+      fastify.log.error('Advanced refund error:', error);
+      
+      if (error instanceof PaymentValidationError) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: error.code,
+            message: error.message,
+          },
+        });
+      }
+
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: 'ADVANCED_REFUND_ERROR',
+          message: 'Failed to process advanced refund',
+        },
+      });
+    }
+  });
 }

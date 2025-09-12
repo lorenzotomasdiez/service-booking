@@ -41,6 +41,9 @@ import paymentManagementRoutes from './routes/payment-management';
 // T5-001 Advanced Features Routes
 import advancedFeaturesRoutes from './routes/advanced-features';
 
+// PAY5-001 Argentina Payment Validation Routes
+import argentinaPaymentValidationRoutes from './routes/argentina-payment-validation';
+
 export function buildServer(): FastifyInstance {
   const server = Fastify({
     logger: {
@@ -223,6 +226,9 @@ export function buildServer(): FastifyInstance {
 
   // T5-001 Advanced Features Routes (Day 5) - Consolidated
   server.register(advancedFeaturesRoutes, { prefix: '/api/v1' });
+
+  // PAY5-001 Argentina Payment Validation Routes (Day 5 Payment Optimization)
+  server.register(argentinaPaymentValidationRoutes, { prefix: '/api' });
 
   return server;
 }

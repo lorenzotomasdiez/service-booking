@@ -4,7 +4,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import '@jest/globals';
+import { jest, beforeAll, afterAll, beforeEach } from '@jest/globals';
 
 // Global test timeout
 jest.setTimeout(30000);

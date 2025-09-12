@@ -4,6 +4,10 @@ import jwt from 'jsonwebtoken';
 import { prisma } from './database';
 import redis from './redis';
 
+// Import monitoring services for launch day analytics
+import { createLaunchDayMonitoringService } from './launch-day-monitoring';
+import { createRealTimeAnalyticsService } from './real-time-analytics';
+
 export interface AuthenticatedSocket extends SocketIOServer {
   userId: string;
   userRole: string;
@@ -28,8 +32,13 @@ export interface NotificationData {
 export class SocketService {
   private io: SocketIOServer;
   private connectedUsers: Map<string, string[]> = new Map(); // userId -> socketIds[]
+  private monitoringService: any;
+  private analyticsService: any;
 
   constructor(server: HTTPServer) {
+    // Initialize monitoring services
+    this.monitoringService = createLaunchDayMonitoringService();
+    this.analyticsService = createRealTimeAnalyticsService();
     this.io = new SocketIOServer(server, {
       cors: {
         origin: process.env.NODE_ENV === 'production' 
@@ -91,11 +100,29 @@ export class SocketService {
    * Setup event handlers
    */
   private setupEventHandlers(): void {
-    this.io.on('connection', (socket: any) => {
+    this.io.on('connection', async (socket: any) => {
       console.log(`User ${socket.userId} connected with socket ${socket.id}`);
 
       // Track connected user
       this.addUserConnection(socket.userId, socket.id);
+
+      // Update connection count in monitoring
+      this.monitoringService.updateRealTimeConnections(this.getOnlineUsersCount());
+
+      // Start user session tracking for analytics
+      const sessionMetadata = {
+        device: socket.handshake.headers['user-agent']?.includes('Mobile') ? 'mobile' : 'desktop',
+        location: socket.handshake.headers['x-location'] || 'Argentina',
+        referralSource: socket.handshake.query.ref || null,
+        timezone: socket.handshake.query.tz || 'America/Argentina/Buenos_Aires'
+      };
+      
+      await this.analyticsService.startUserSession(socket.userId, socket.id, sessionMetadata);
+
+      // Track Argentina activity
+      if (sessionMetadata.location) {
+        await this.analyticsService.trackArgentinaActivity('session_start', sessionMetadata.location, sessionMetadata);
+      }
 
       // Join user-specific room
       socket.join(`user:${socket.userId}`);
@@ -127,6 +154,9 @@ export class SocketService {
       socket.on('disconnect', (reason: string) => {
         console.log(`User ${socket.userId} disconnected: ${reason}`);
         this.removeUserConnection(socket.userId, socket.id);
+        
+        // Update connection count in monitoring
+        this.monitoringService.updateRealTimeConnections(this.getOnlineUsersCount());
         
         // Update presence status
         this.updateUserPresence(socket.userId, 'offline');

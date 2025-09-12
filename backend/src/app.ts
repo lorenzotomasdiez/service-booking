@@ -44,6 +44,15 @@ import advancedFeaturesRoutes from './routes/advanced-features';
 // PAY5-001 Argentina Payment Validation Routes
 import argentinaPaymentValidationRoutes from './routes/argentina-payment-validation';
 
+// B6A-001 Launch Day Monitoring and Analytics Routes (Day 6)
+import launchDayMonitoringRoutes from './routes/launch-day-monitoring';
+
+// Q6A-001 Quality Monitoring Routes for Launch Day Testing
+import qualityMonitoringRoutes from './routes/quality-monitoring';
+
+// PAY6A-001 Live Payment Monitoring and Argentina Market Optimization (Day 6)
+import paymentMonitoringRoutes from './routes/payment-monitoring';
+
 export function buildServer(): FastifyInstance {
   const server = Fastify({
     logger: {
@@ -229,6 +238,15 @@ export function buildServer(): FastifyInstance {
 
   // PAY5-001 Argentina Payment Validation Routes (Day 5 Payment Optimization)
   server.register(argentinaPaymentValidationRoutes, { prefix: '/api' });
+
+  // B6A-001 Launch Day Monitoring and Analytics Routes (Day 6)
+  server.register(launchDayMonitoringRoutes, { prefix: '/api/v1' });
+
+  // Q6A-001 Quality Monitoring Routes for Launch Day Testing
+  server.register(qualityMonitoringRoutes, { prefix: '/' });
+
+  // PAY6A-001 Live Payment Monitoring and Argentina Market Optimization (Day 6)
+  server.register(paymentMonitoringRoutes, { prefix: '/api' });
 
   return server;
 }

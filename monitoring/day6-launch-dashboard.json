@@ -1,0 +1,600 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "BarberPro Day 6 Launch Infrastructure Management Dashboard",
+    "tags": ["barberpro", "day6", "launch", "infrastructure", "argentina"],
+    "timezone": "America/Argentina/Buenos_Aires",
+    "refresh": "15s",
+    "schemaVersion": 30,
+    "version": 1,
+    "time": {
+      "from": "now-4h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚀 Launch Day Infrastructure Status",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "up{job=\"barberpro-backend\"}",
+            "legendFormat": "Backend Status"
+          },
+          {
+            "expr": "up{job=\"postgres\"}",
+            "legendFormat": "Database Status"
+          },
+          {
+            "expr": "up{job=\"redis\"}",
+            "legendFormat": "Cache Status"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            },
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "DOWN"
+                  },
+                  "1": {
+                    "text": "UP"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "🇦🇷 Argentina Response Time SLA",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 8,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{country=\"AR\"}[5m]))",
+            "legendFormat": "P95 Response Time"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.15
+                },
+                {
+                  "color": "red",
+                  "value": 0.2
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "⚖️ Auto-scaling Status",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 16,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "count(up{job=\"barberpro-backend\"} == 1)",
+            "legendFormat": "Active Instances"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 2
+                },
+                {
+                  "color": "green",
+                  "value": 3
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "🗃️ Database Connection Pool Health",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 6
+        },
+        "targets": [
+          {
+            "expr": "pg_stat_activity_count{state=\"active\"}",
+            "legendFormat": "Active Connections"
+          },
+          {
+            "expr": "pg_stat_activity_count{state=\"idle\"}",
+            "legendFormat": "Idle Connections"
+          },
+          {
+            "expr": "pg_settings_max_connections",
+            "legendFormat": "Max Connections"
+          }
+        ],
+        "yAxes": [
+          {
+            "min": 0,
+            "max": 200
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 160,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "💰 Real-time Business Metrics",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 6
+        },
+        "targets": [
+          {
+            "expr": "rate(booking_completed_total[1m]) * 60",
+            "legendFormat": "Bookings per Hour"
+          },
+          {
+            "expr": "rate(payment_successful_total[1m]) * 60",
+            "legendFormat": "Payments per Hour"
+          },
+          {
+            "expr": "rate(user_registration_total[1m]) * 60",
+            "legendFormat": "New Users per Hour"
+          }
+        ],
+        "yAxes": [
+          {
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "⚡ Infrastructure Resource Utilization",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 14
+        },
+        "targets": [
+          {
+            "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU Usage %"
+          },
+          {
+            "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+            "legendFormat": "Memory Usage %"
+          }
+        ],
+        "yAxes": [
+          {
+            "min": 0,
+            "max": 100,
+            "unit": "percent"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 75,
+            "colorMode": "warning",
+            "op": "gt"
+          },
+          {
+            "value": 85,
+            "colorMode": "critical",
+            "op": "gt"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "🌍 CDN Performance Argentina",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 14
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service=\"cdn\",region=\"argentina\"}[5m]))",
+            "legendFormat": "CDN P95 Response Time"
+          },
+          {
+            "expr": "rate(http_requests_total{service=\"cdn\",region=\"argentina\",status=\"200\"}[5m]) / rate(http_requests_total{service=\"cdn\",region=\"argentina\"}[5m]) * 100",
+            "legendFormat": "CDN Success Rate %"
+          }
+        ],
+        "yAxes": [
+          {
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "💳 MercadoPago Payment Performance",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 0,
+          "y": 22
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(payment_duration_seconds_bucket{provider=\"mercadopago\"}[5m]))",
+            "legendFormat": "Payment P95 Latency"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 2
+                },
+                {
+                  "color": "red",
+                  "value": 3
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "🚨 Incident Response Status",
+        "type": "table",
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 8,
+          "y": 22
+        },
+        "targets": [
+          {
+            "expr": "increase(barberpro_incidents_total[1h])",
+            "legendFormat": "Incidents Last Hour"
+          },
+          {
+            "expr": "barberpro_incidents_resolved_automatically_total / barberpro_incidents_total * 100",
+            "legendFormat": "Auto-Resolution Rate %"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "📊 Launch Day Performance Score",
+        "type": "gauge",
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 16,
+          "y": 22
+        },
+        "targets": [
+          {
+            "expr": "(\n  # Infrastructure health (30%)\n  (avg(up{job=\"barberpro-backend\"}) * 30) +\n  # Response time SLA (25%)\n  ((histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) < 0.2) * 25) +\n  # Database performance (20%)\n  ((pg_stat_activity_count{state=\"active\"} < 160) * 20) +\n  # Business metrics (15%)\n  ((rate(booking_completed_total[5m]) > 0.01) * 15) +\n  # Payment performance (10%)\n  ((histogram_quantile(0.95, rate(payment_duration_seconds_bucket[5m])) < 2) * 10)\n) / 100",
+            "legendFormat": "Performance Score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.7
+                },
+                {
+                  "color": "green",
+                  "value": 0.85
+                }
+              ]
+            },
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "🇦🇷 Argentina Business Hours Activity",
+        "type": "heatmap",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 28
+        },
+        "targets": [
+          {
+            "expr": "sum by (hour) (rate(http_requests_total[1h]))",
+            "legendFormat": "Requests per Hour"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "🔄 Auto-scaling Events Timeline",
+        "type": "graph",
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 36
+        },
+        "targets": [
+          {
+            "expr": "barberpro_autoscaling_events_total",
+            "legendFormat": "Scale Up Events"
+          },
+          {
+            "expr": "barberpro_autoscaling_scale_down_total",
+            "legendFormat": "Scale Down Events"
+          },
+          {
+            "expr": "count(up{job=\"barberpro-backend\"} == 1)",
+            "legendFormat": "Current Instances"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "📱 Mobile vs Desktop Performance",
+        "type": "piechart",
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 0,
+          "y": 42
+        },
+        "targets": [
+          {
+            "expr": "sum by (device_type) (rate(http_requests_total[1h]))",
+            "legendFormat": "{{device_type}}"
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "🎯 Launch Day Success Metrics",
+        "type": "table",
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 12,
+          "y": 42
+        },
+        "targets": [
+          {
+            "expr": "barberpro_launch_day_uptime_percentage",
+            "legendFormat": "Uptime %"
+          },
+          {
+            "expr": "barberpro_launch_day_booking_success_rate",
+            "legendFormat": "Booking Success Rate %"
+          },
+          {
+            "expr": "barberpro_launch_day_payment_success_rate",
+            "legendFormat": "Payment Success Rate %"
+          },
+          {
+            "expr": "barberpro_launch_day_incident_count",
+            "legendFormat": "Total Incidents"
+          },
+          {
+            "expr": "barberpro_launch_day_incident_resolution_time_avg",
+            "legendFormat": "Avg Resolution Time (min)"
+          }
+        ]
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        },
+        {
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "ALERTS{alertstate=\"firing\",launch_day=\"true\"}",
+          "iconColor": "red",
+          "name": "Launch Day Alerts",
+          "titleFormat": "Alert: {{alertname}}",
+          "textFormat": "{{description}}"
+        },
+        {
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "barberpro_autoscaling_events_total",
+          "iconColor": "blue",
+          "name": "Auto-scaling Events",
+          "titleFormat": "Scaling Event",
+          "textFormat": "{{event_type}}: {{instances}} instances"
+        }
+      ]
+    },
+    "templating": {
+      "list": [
+        {
+          "allValue": null,
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "datasource": "Prometheus",
+          "definition": "label_values(up, instance)",
+          "hide": 0,
+          "includeAll": true,
+          "label": "Instance",
+          "multi": true,
+          "name": "instance",
+          "options": [],
+          "query": "label_values(up, instance)",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "type": "query"
+        },
+        {
+          "allValue": null,
+          "current": {
+            "text": "production",
+            "value": "production"
+          },
+          "datasource": "Prometheus", 
+          "definition": "label_values(environment)",
+          "hide": 0,
+          "includeAll": false,
+          "label": "Environment",
+          "multi": false,
+          "name": "environment",
+          "options": [
+            {
+              "selected": true,
+              "text": "production",
+              "value": "production"
+            },
+            {
+              "selected": false,
+              "text": "staging",
+              "value": "staging"
+            }
+          ],
+          "query": "label_values(environment)",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "type": "query"
+        }
+      ]
+    },
+    "links": [
+      {
+        "icon": "external link",
+        "includeVars": false,
+        "tags": [],
+        "title": "BarberPro Production",
+        "type": "link",
+        "url": "https://barberpro.com.ar"
+      },
+      {
+        "icon": "external link",
+        "includeVars": false,
+        "tags": [],
+        "title": "Launch Day Runbook",
+        "type": "link",
+        "url": "https://docs.barberpro.com.ar/runbooks/launch-day"
+      },
+      {
+        "icon": "external link",
+        "includeVars": false,
+        "tags": [],
+        "title": "Incident Response",
+        "type": "link",
+        "url": "https://docs.barberpro.com.ar/incident-response"
+      }
+    ]
+  }
+}

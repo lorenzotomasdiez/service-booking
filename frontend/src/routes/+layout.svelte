@@ -4,6 +4,9 @@
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
 	import { authStore, isAuthenticated, user } from '$lib/stores/auth';
+	import { performanceStore } from '$lib/stores/performance';
+	import { uxOptimizationService } from '$lib/services/ux-optimization';
+	import UserGuidance from '$lib/components/ux/UserGuidance.svelte';
 	
 	// Mobile navigation state
 	let mobileMenuOpen = false;
@@ -13,6 +16,29 @@
 		mounted = true;
 		// Initialize authentication state
 		authStore.initializeAuth();
+		
+		// Initialize launch day monitoring and optimizations
+		if (browser) {
+			// Start performance monitoring
+			performanceStore.startMonitoring();
+			
+			// Initialize UX optimizations for Argentina mobile users
+			uxOptimizationService.initialize();
+			
+			// Register service worker for PWA functionality
+			if ('serviceWorker' in navigator) {
+				navigator.serviceWorker.register('/sw.js')
+					.then(registration => {
+						console.log('[Layout] Service Worker registered:', registration);
+					})
+					.catch(error => {
+						console.warn('[Layout] Service Worker registration failed:', error);
+					});
+			}
+			
+			// Initialize performance monitoring for launch day
+			console.log('[Layout] Launch day monitoring initialized');
+		}
 	});
 
 	// Close mobile menu when route changes
@@ -276,3 +302,6 @@
 		aria-label="Cerrar menú"
 	></div>
 {/if}
+
+<!-- Launch Day User Guidance System -->
+<UserGuidance contextualHelp={true} adaptToUser={true} showProgress={true} />

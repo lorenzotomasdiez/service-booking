@@ -75,6 +75,17 @@ import { registerWhatsAppIntegrationRoutes } from './services/whatsapp-integrati
 import { registerBackendOptimizationRoutes } from './services/backend-optimization';
 import { registerB8IntegrationRoutes } from './services/b8-001-integration';
 
+// B9-001 Day 9 Backend Developer Services (Business Logic Optimization & Integration Consolidation)
+import day9BusinessOptimizationRoutes from './routes/day9-business-optimization';
+
+// PAY9-001 Day 9 Advanced Payment Features (Enterprise Billing, Multi-Vertical, Payment Intelligence)
+import day9AdvancedPaymentsRoutes from './routes/day9-advanced-payments';
+
+// T9-001 Day 9 Technical Lead Services (Template Architecture & Premium Features)
+import { registerTemplateDeploymentRoutes } from './services/template-deployment';
+import { registerEnterpriseInfrastructureRoutes } from './services/enterprise-infrastructure';
+import { registerDay9CoordinationRoutes } from './services/day9-coordination';
+
 export function buildServer(): FastifyInstance {
   const server = Fastify({
     logger: {
@@ -294,6 +305,12 @@ export function buildServer(): FastifyInstance {
   registerWhatsAppIntegrationRoutes(server);
   registerBackendOptimizationRoutes(server);
   registerB8IntegrationRoutes(server);
+
+  // B9-001 Day 9 Backend Developer Services (Business Logic Optimization & Integration Consolidation)
+  server.register(day9BusinessOptimizationRoutes, { prefix: '/api/v1/day9' });
+
+  // PAY9-001 Day 9 Advanced Payment Features (Enterprise Billing, Multi-Vertical, Payment Intelligence)
+  server.register(day9AdvancedPaymentsRoutes, { prefix: '/api/day9-payments' });
 
   return server;
 }

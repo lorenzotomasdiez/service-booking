@@ -4,16 +4,52 @@ import { advancedAnalyticsService } from './advanced-analytics';
 
 // Premium Feature Development & Scaling Service
 // T7A-001: Premium Feature Development & Scaling (1 hour)
+// T9-001: Premium Features Implementation with Performance Optimization (Day 9)
 
 export interface PremiumFeature {
   id: string;
   name: string;
   description: string;
-  category: 'analytics' | 'automation' | 'marketing' | 'operations' | 'integrations';
-  tier: 'basic' | 'premium' | 'enterprise';
+  category: 'analytics' | 'automation' | 'marketing' | 'operations' | 'integrations' | 'enterprise';
+  tier: 'basic' | 'premium' | 'enterprise' | 'white_label';
   enabled: boolean;
   config: Record<string, any>;
   restrictions?: FeatureRestriction[];
+  performanceImpact?: PerformanceImpact;
+  subscriptionTier?: SubscriptionTier;
+}
+
+export interface PerformanceImpact {
+  responseTimeImprovement: number; // percentage
+  throughputIncrease: number; // percentage
+  resourceOptimization: number; // percentage
+  userExperienceScore: number; // 1-5 rating
+}
+
+export interface SubscriptionTier {
+  id: string;
+  name: string;
+  monthlyPrice: number; // ARS
+  yearlyPrice: number; // ARS
+  features: string[];
+  limits: SubscriptionLimits;
+  performance: PerformanceProfile;
+}
+
+export interface SubscriptionLimits {
+  maxBookingsPerMonth: number;
+  maxClients: number;
+  maxLocations: number;
+  maxStaff: number;
+  maxAnalyticsReports: number;
+  maxAutomatedMessages: number;
+}
+
+export interface PerformanceProfile {
+  apiResponseTime: string;
+  prioritySupport: boolean;
+  advancedCaching: boolean;
+  dedicatedResources: boolean;
 }
 
 export interface FeatureRestriction {

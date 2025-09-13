@@ -34,7 +34,10 @@
     "security:audit": "npm audit && docker run --rm -v $(pwd):/app clair:latest",
     "performance:test": "artillery run tests/performance/load-test.yml",
     "docker:build": "docker build -t barberpro-backend:latest .",
-    "docker:run": "docker run -p 3000:3000 --env-file .env.production barberpro-backend:latest"
+    "docker:run": "docker run -p 3000:3000 --env-file .env.production barberpro-backend:latest",
+    "day9:demo": "tsx day9-demo.ts",
+    "day9:payment-demo": "tsx day9-demo.ts",
+    "day9:simple-demo": "tsx day9-simple-demo.ts"
   },
   "keywords": [],
   "author": "",

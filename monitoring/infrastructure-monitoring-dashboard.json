@@ -1,0 +1,267 @@
+{
+  "dashboard_name": "BarberPro Infrastructure Scaling Monitor",
+  "version": "1.0",
+  "environment": "production",
+  "argentina_optimized": true,
+  
+  "monitoring_sections": {
+    "infrastructure_health": {
+      "description": "Real-time infrastructure health monitoring for scaling decisions",
+      "metrics": [
+        {
+          "name": "api_response_time",
+          "target": "<200ms",
+          "warning_threshold": "250ms",
+          "critical_threshold": "400ms",
+          "region_specific": "argentina"
+        },
+        {
+          "name": "database_query_performance",
+          "target": "<100ms",
+          "warning_threshold": "150ms",
+          "critical_threshold": "300ms",
+          "connection_pool_utilization": "<80%"
+        },
+        {
+          "name": "cache_hit_rate",
+          "target": ">90%",
+          "warning_threshold": "<85%",
+          "critical_threshold": "<75%",
+          "cache_types": ["redis", "application", "database_query"]
+        },
+        {
+          "name": "cdn_performance",
+          "edge_locations": ["buenos-aires", "cordoba", "rosario", "mendoza"],
+          "cache_hit_rate": ">95%",
+          "latency_target": "<50ms"
+        }
+      ]
+    },
+    
+    "auto_scaling_monitoring": {
+      "description": "Auto-scaling behavior and performance tracking",
+      "scaling_groups": [
+        {
+          "name": "barberpro-web",
+          "min_instances": 3,
+          "max_instances": 15,
+          "current_capacity": 5,
+          "cpu_utilization": "<70%",
+          "memory_utilization": "<80%"
+        },
+        {
+          "name": "barberpro-api", 
+          "min_instances": 2,
+          "max_instances": 10,
+          "current_capacity": 3,
+          "response_time": "<200ms",
+          "concurrent_users": 1400
+        },
+        {
+          "name": "barberpro-booking",
+          "min_instances": 2,
+          "max_instances": 8,
+          "current_capacity": 3,
+          "queue_length": "<50",
+          "processing_time": "<3000ms"
+        }
+      ],
+      "scaling_events": {
+        "scale_up_triggers": [
+          "response_time > 200ms for 3m",
+          "cpu_utilization > 80% for 5m",
+          "concurrent_users > 1000",
+          "booking_queue_length > 30"
+        ],
+        "scale_down_triggers": [
+          "response_time < 100ms for 10m",
+          "cpu_utilization < 40% for 15m", 
+          "concurrent_users < 300",
+          "booking_queue_length < 5"
+        ]
+      }
+    },
+    
+    "argentina_market_performance": {
+      "description": "Argentina-specific market performance metrics",
+      "business_metrics": [
+        {
+          "name": "booking_conversion_rate",
+          "target": ">15%",
+          "current": "18.5%",
+          "trend": "increasing"
+        },
+        {
+          "name": "payment_success_rate",
+          "target": ">95%",
+          "mercadopago_specific": ">97%",
+          "peso_conversion_latency": "<2s"
+        },
+        {
+          "name": "user_satisfaction_score",
+          "target": ">4.5/5",
+          "current": "4.7/5",
+          "regional_breakdown": "argentina_specific"
+        },
+        {
+          "name": "provider_availability",
+          "peak_hours": "09:00-12:00, 17:00-20:00",
+          "target_coverage": ">90%"
+        }
+      ],
+      "geographic_distribution": {
+        "buenos_aires": {
+          "users": "45%",
+          "providers": "40%",
+          "response_time": "<150ms"
+        },
+        "cordoba": {
+          "users": "15%", 
+          "providers": "18%",
+          "response_time": "<180ms"
+        },
+        "rosario": {
+          "users": "12%",
+          "providers": "15%",
+          "response_time": "<170ms"
+        },
+        "mendoza": {
+          "users": "8%",
+          "providers": "10%",
+          "response_time": "<190ms"
+        }
+      }
+    },
+    
+    "database_scaling_health": {
+      "description": "Database infrastructure health for 5x traffic",
+      "primary_database": {
+        "instance_type": "db.r6g.xlarge",
+        "storage": "500GB",
+        "connection_utilization": "<80%",
+        "query_performance": "<100ms avg",
+        "backup_status": "daily_automated"
+      },
+      "read_replicas": {
+        "count": 3,
+        "regions": ["us-east-1a", "us-east-1b", "us-east-1c"],
+        "replication_lag": "<5s",
+        "load_distribution": "balanced"
+      },
+      "connection_pooling": {
+        "max_connections": 200,
+        "active_connections": "monitoring",
+        "pool_efficiency": ">85%",
+        "timeout_incidents": "0"
+      }
+    },
+    
+    "security_monitoring": {
+      "description": "Enhanced security monitoring for scaled infrastructure",
+      "threat_detection": {
+        "ddos_attacks": "automatic_mitigation",
+        "rate_limiting": "120_requests_per_minute",
+        "geo_filtering": "argentina_optimized",
+        "suspicious_activity": "real_time_alerts"
+      },
+      "compliance_monitoring": {
+        "pdpa_argentina": "compliant",
+        "pci_dss": "level_1_compliant",
+        "data_localization": "argentina_enforced",
+        "ssl_certificate": "tls_1.3_valid"
+      }
+    },
+    
+    "cost_optimization_tracking": {
+      "description": "Cost efficiency monitoring for scaled infrastructure",
+      "resource_utilization": {
+        "spot_instances": "40%",
+        "reserved_instances": "30%",
+        "on_demand_instances": "30%",
+        "cost_per_booking": "<$0.50",
+        "cost_per_user": "<$2.00"
+      },
+      "scaling_cost_analysis": {
+        "daily_scaling_budget": "$2000",
+        "peak_hour_costs": "monitored",
+        "optimization_opportunities": "identified",
+        "infrastructure_margin": ">60%"
+      }
+    }
+  },
+  
+  "alerting_configuration": {
+    "critical_alerts": {
+      "api_response_time": {
+        "threshold": "400ms",
+        "escalation": "immediate",
+        "notification": ["devops_team", "technical_lead"]
+      },
+      "database_performance": {
+        "threshold": "200ms avg query time",
+        "escalation": "15_minutes",
+        "notification": ["devops_team", "backend_team"]
+      },
+      "scaling_failures": {
+        "threshold": "auto_scaling_event_failure",
+        "escalation": "immediate",
+        "notification": ["devops_team", "product_owner"]
+      },
+      "security_incidents": {
+        "threshold": "ddos_or_breach_detected",
+        "escalation": "immediate", 
+        "notification": ["all_teams", "security_team"]
+      }
+    },
+    
+    "warning_alerts": {
+      "performance_degradation": {
+        "threshold": "250ms response time",
+        "escalation": "30_minutes",
+        "notification": ["devops_team"]
+      },
+      "resource_utilization": {
+        "threshold": "80% cpu or memory",
+        "escalation": "45_minutes",
+        "notification": ["devops_team"]
+      },
+      "cost_anomalies": {
+        "threshold": "20% over budget",
+        "escalation": "60_minutes",
+        "notification": ["devops_team", "product_owner"]
+      }
+    }
+  },
+  
+  "automated_responses": {
+    "scaling_triggers": {
+      "high_load": "auto_scale_up",
+      "low_load": "auto_scale_down",
+      "database_pressure": "activate_read_replicas",
+      "cache_misses": "increase_cache_size"
+    },
+    
+    "incident_responses": {
+      "ddos_attack": "activate_shield_advanced",
+      "database_failure": "failover_to_replica",
+      "application_errors": "restart_unhealthy_instances",
+      "cache_failure": "bypass_to_database"
+    }
+  },
+  
+  "reporting_schedule": {
+    "real_time": {
+      "update_interval": "30s",
+      "metrics": ["response_time", "active_users", "error_rates"]
+    },
+    "hourly": {
+      "reports": ["scaling_events", "cost_analysis", "performance_summary"]
+    },
+    "daily": {
+      "reports": ["infrastructure_health", "argentina_market_analysis", "security_summary"]
+    },
+    "weekly": {
+      "reports": ["scaling_optimization", "cost_efficiency", "capacity_planning"]
+    }
+  }
+}

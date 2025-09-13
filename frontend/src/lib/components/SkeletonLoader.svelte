@@ -2,14 +2,15 @@
 <script lang="ts">
 	export let variant: 'text' | 'avatar' | 'card' | 'list' | 'button' | 'provider' | 'booking' | 'dashboard' = 'text';
 	export let count = 1;
-	export let class: string = '';
+	let className = '';
+	export { className as class };
 	export let animated = true;
 	export let rounded = false;
 	export let width: string | undefined = undefined;
 	export let height: string | undefined = undefined;
 </script>
 
-<div class="skeleton-container {class}">
+<div class="skeleton-container {className}">
 	{#each Array(count) as _, index}
 		<div class="skeleton-item {variant} {animated ? 'animate-pulse' : ''}" class:rounded>
 			{#if variant === 'text'}

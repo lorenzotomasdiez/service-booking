@@ -5,8 +5,10 @@
 	import { browser } from '$app/environment';
 	import { authStore, isAuthenticated, user } from '$lib/stores/auth';
 	import { performanceStore } from '$lib/stores/performance';
+	import { frontendMonitoringStore } from '$lib/stores/frontend-monitoring';
 	import { uxOptimizationService } from '$lib/services/ux-optimization';
 	import UserGuidance from '$lib/components/ux/UserGuidance.svelte';
+	import ErrorBoundary from '$lib/components/monitoring/ErrorBoundary.svelte';
 	
 	// Mobile navigation state
 	let mobileMenuOpen = false;
@@ -22,14 +24,22 @@
 			// Start performance monitoring
 			performanceStore.startMonitoring();
 			
+			// Start frontend monitoring for real-time analytics
+			frontendMonitoringStore.startMonitoring();
+			
 			// Initialize UX optimizations for Argentina mobile users
 			uxOptimizationService.initialize();
 			
 			// Register service worker for PWA functionality
 			if ('serviceWorker' in navigator) {
-				navigator.serviceWorker.register('/sw.js')
+				navigator.serviceWorker.register('/service-worker.js')
 					.then(registration => {
 						console.log('[Layout] Service Worker registered:', registration);
+						
+						// Enable background sync for offline booking queue
+						if ('sync' in registration) {
+							registration.sync.register('booking-sync');
+						}
 					})
 					.catch(error => {
 						console.warn('[Layout] Service Worker registration failed:', error);
@@ -64,6 +74,7 @@
 	];
 </script>
 
+<ErrorBoundary config={{ argentina: true, enableRetry: true, enableReporting: true }} name="MainLayout">
 <div class="min-h-screen bg-neutral-50 flex flex-col">
 	<!-- Mobile-first header -->
 	<header class="bg-white shadow-soft border-b border-neutral-200 sticky top-0 z-40">
@@ -290,6 +301,7 @@
 		</div>
 	</footer>
 </div>
+</ErrorBoundary>
 
 <!-- Mobile menu overlay -->
 {#if mobileMenuOpen}

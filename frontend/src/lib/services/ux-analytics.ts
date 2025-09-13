@@ -515,6 +515,14 @@ class UXAnalyticsService {
     if (hour >= 18 && hour < 22) return 'evening';
     return 'night';
   }
+
+  // Public method for external event tracking
+  public trackExternalEvent(eventType: string, data: any): void {
+    this.trackEvent('interaction', {
+      customEventType: eventType,
+      ...data
+    });
+  }
 }
 
 // Export singleton instance

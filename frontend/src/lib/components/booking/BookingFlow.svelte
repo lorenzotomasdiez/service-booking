@@ -4,7 +4,7 @@
   import { fade, fly } from 'svelte/transition';
   import { bookingStore, canCreateBooking, isBookingFlowActive } from '$lib/stores/booking';
   import { socketService } from '$lib/services/socket';
-  import { uxAnalytics } from '$lib/services/ux-analytics';
+  import { uxAnalyticsService } from '$lib/services/ux-analytics';
   import BookingCalendar from './BookingCalendar.svelte';
   import ServiceSelector from './ServiceSelector.svelte';
   import BookingForm from './BookingForm.svelte';
@@ -68,11 +68,11 @@
     bookingStore.startBookingFlow(provider, preselectedService);
     
     // Start UX tracking for booking flow
-    uxAnalytics.startBookingFlow(provider.id, preselectedService?.id);
+    uxAnalyticsService.startBookingFlow(provider.id, preselectedService?.id);
     
     if (preselectedService) {
       currentStep = 2;
-      uxAnalytics.progressBookingFlow('date_time', { preselectedService: preselectedService.name });
+      uxAnalyticsService.progressBookingFlow('date_time', { preselectedService: preselectedService.name });
     }
   });
   
@@ -89,7 +89,7 @@
     currentStep = 2;
     
     // Track service selection in UX analytics
-    uxAnalytics.progressBookingFlow('date_time', { 
+    uxAnalyticsService.progressBookingFlow('date_time', { 
       selectedService: event.detail.name,
       servicePrice: event.detail.price
     });
@@ -99,7 +99,7 @@
     bookingStore.selectDate(event.detail);
     
     // Track date selection
-    uxAnalytics.trackEvent('booking_flow', {
+    uxAnalyticsService.trackEvent('booking_flow', {
       action: 'date_selected',
       selectedDate: event.detail,
       step: 'date_time'
@@ -111,9 +111,9 @@
     currentStep = 3;
     
     // Track time slot selection and progression to form
-    uxAnalytics.progressBookingFlow('form_completion', { 
+    uxAnalyticsService.progressBookingFlow('form_completion', { 
       selectedTimeSlot: event.detail,
-      totalSelectionTime: Date.now() - uxAnalytics.getCurrentSessionAnalytics().startTime
+      totalSelectionTime: Date.now() - uxAnalyticsService.getCurrentSessionAnalytics().startTime
     });
   };
   
@@ -139,7 +139,7 @@
         currentStep = 4;
         
         // Track successful booking completion
-        uxAnalytics.completeBookingFlow(
+        uxAnalyticsService.completeBookingFlow(
           result.booking!.id,
           formData.paymentMethod || 'cash'
         );
@@ -187,7 +187,7 @@
   
   const cancelBooking = () => {
     // Track booking abandonment
-    uxAnalytics.abandonBookingFlow('user_cancelled');
+    uxAnalyticsService.abandonBookingFlow('user_cancelled');
     
     bookingStore.resetBookingFlow();
     dispatch('bookingCancelled');

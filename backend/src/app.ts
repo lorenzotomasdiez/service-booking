@@ -53,6 +53,22 @@ import qualityMonitoringRoutes from './routes/quality-monitoring';
 // PAY6A-001 Live Payment Monitoring and Argentina Market Optimization (Day 6)
 import paymentMonitoringRoutes from './routes/payment-monitoring';
 
+// T7A-001 Day 7 Track A Technical Lead Services (Argentina Expansion & Template Replication)
+import { registerGeoLocationRoutes } from './services/geo-location';
+import { registerAPIOptimizationRoutes } from './services/api-optimization';
+import { registerLocalizationRoutes } from './services/argentina-localization';
+import { registerTemplateReplicationRoutes } from './services/template-replication';
+import { registerMultiTenantRoutes, multiTenantService } from './services/multi-tenant';
+import { registerAdvancedAnalyticsRoutes } from './services/advanced-analytics';
+import { registerPremiumFeaturesRoutes } from './services/premium-features';
+
+// B7A-001 Day 7 Track A Backend Developer Services (Argentina Expansion & Psychology Vertical)
+import { registerPsychologyVerticalRoutes } from './services/psychology-vertical';
+
+// T8-001 Day 8 Technical Coordination Services (Geographic Expansion & Template Deployment)
+import { registerDay8PremiumEnhancementRoutes } from './services/day8-premium-enhancement';
+import { registerDay8TeamScalingRoutes } from './services/day8-team-scaling';
+
 export function buildServer(): FastifyInstance {
   const server = Fastify({
     logger: {
@@ -89,6 +105,9 @@ export function buildServer(): FastifyInstance {
   
   // Setup validation middleware
   setupValidationMiddleware(server);
+  
+  // Setup multi-tenant resolution middleware (T7A-001)
+  server.addHook('onRequest', multiTenantService.createTenantResolutionMiddleware());
 
   // Register plugins
   server.register(cors, securityConfig.cors as any);
@@ -247,6 +266,22 @@ export function buildServer(): FastifyInstance {
 
   // PAY6A-001 Live Payment Monitoring and Argentina Market Optimization (Day 6)
   server.register(paymentMonitoringRoutes, { prefix: '/api' });
+
+  // T7A-001 Day 7 Track A Technical Lead Services (Argentina Expansion & Template Replication)
+  registerGeoLocationRoutes(server);
+  registerAPIOptimizationRoutes(server);
+  registerLocalizationRoutes(server);
+  registerTemplateReplicationRoutes(server);
+  registerMultiTenantRoutes(server);
+  registerAdvancedAnalyticsRoutes(server);
+  registerPremiumFeaturesRoutes(server);
+
+  // B7A-001 Day 7 Track A Backend Developer Services (Argentina Expansion & Psychology Vertical)
+  registerPsychologyVerticalRoutes(server);
+
+  // T8-001 Day 8 Technical Coordination Services (Geographic Expansion & Template Deployment)
+  registerDay8PremiumEnhancementRoutes(server);
+  registerDay8TeamScalingRoutes(server);
 
   return server;
 }

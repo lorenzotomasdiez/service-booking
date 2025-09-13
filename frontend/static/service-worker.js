@@ -1,8 +1,15 @@
-// Service Worker for BarberPro PWA - Optimized for Argentina mobile users
-const CACHE_NAME = 'barberpro-v1.0.0';
-const STATIC_CACHE = 'barberpro-static-v1.0.0';
-const DYNAMIC_CACHE = 'barberpro-dynamic-v1.0.0';
-const IMAGE_CACHE = 'barberpro-images-v1.0.0';
+// BarberPro Service Worker - Day 8 Advanced PWA Features
+// Version 2.0 - Enhanced offline functionality and Argentina mobile optimization
+
+const CACHE_NAME = 'barberpro-v2.0.0';
+const OFFLINE_CACHE = 'barberpro-offline-v2.0.0';
+const DYNAMIC_CACHE = 'barberpro-dynamic-v2.0.0';
+const IMAGE_CACHE = 'barberpro-images-v2.0.0';
+
+// Argentina-specific optimization for mobile networks
+const NETWORK_TIMEOUT = 3000; // 3s timeout for Argentina mobile networks
+const CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
+const IMAGE_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // Resources to cache immediately for offline functionality
 const STATIC_ASSETS = [

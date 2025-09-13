@@ -859,4 +859,131 @@ export function registerPsychologyVerticalRoutes(server: FastifyInstance) {
       });
     }
   });
+
+  // B8-001: Psychology provider registration endpoint
+  server.post('/api/psychology/providers', {
+    schema: {
+      tags: ['Psychology'],
+      summary: 'Register psychology provider',
+      security: [{ bearerAuth: [] }]
+    }
+  }, async (request, reply) => {
+    try {
+      await request.jwtVerify();
+      const userId = (request.user as any).id;
+      const psychologyData = request.body as PsychologyProvider;
+
+      const profile = await psychologyVerticalService.createPsychologyProviderProfile(userId, psychologyData);
+
+      return reply.send({
+        success: true,
+        data: profile,
+        message: 'Psychology provider registered successfully'
+      });
+    } catch (error) {
+      server.log.error('Psychology provider registration error:', error);
+      return reply.code(400).send({
+        error: 'Error registering psychology provider',
+        message: error.message
+      });
+    }
+  });
+
+  // B8-001: Mental health questionnaires endpoint
+  server.get('/api/psychology/questionnaires', {
+    schema: {
+      tags: ['Psychology'],
+      summary: 'Get mental health questionnaires',
+      security: [{ bearerAuth: [] }]
+    }
+  }, async (request, reply) => {
+    try {
+      const questionnaires = [
+        {
+          id: 'gad7',
+          name: 'Generalized Anxiety Disorder 7-item',
+          description: 'Evaluación de trastorno de ansiedad generalizada',
+          questions: [
+            'Sentirse nervioso, ansioso o muy alterado',
+            'No poder parar o controlar las preocupaciones',
+            'Preocuparse demasiado por diferentes cosas',
+            'Tener dificultades para relajarse'
+          ],
+          scale: 'likert_4'
+        },
+        {
+          id: 'phq9',
+          name: 'Patient Health Questionnaire-9',
+          description: 'Evaluación de depresión',
+          questions: [
+            'Poco interés o placer en hacer cosas',
+            'Sentirse decaído, deprimido o sin esperanza',
+            'Problemas para dormir o dormir demasiado',
+            'Sentirse cansado o con poca energía'
+          ],
+          scale: 'likert_4'
+        },
+        {
+          id: 'dass21',
+          name: 'Depression Anxiety Stress Scales',
+          description: 'Evaluación completa de depresión, ansiedad y estrés',
+          questions: [
+            'Me costó mucho relajarme',
+            'Me di cuenta que tenía la boca seca',
+            'No podía sentir ningún sentimiento positivo',
+            'Experimenté dificultades para respirar'
+          ],
+          scale: 'likert_4'
+        }
+      ];
+
+      return reply.send({
+        success: true,
+        data: {
+          questionnaires,
+          totalAvailable: questionnaires.length
+        }
+      });
+    } catch (error) {
+      server.log.error('Psychology questionnaires error:', error);
+      return reply.code(500).send({
+        error: 'Error retrieving questionnaires',
+        message: 'Error al obtener cuestionarios'
+      });
+    }
+  });
+
+  // B8-001: Therapy session booking endpoint
+  server.post('/api/psychology/sessions', {
+    schema: {
+      tags: ['Psychology'],
+      summary: 'Book therapy session',
+      security: [{ bearerAuth: [] }]
+    }
+  }, async (request, reply) => {
+    try {
+      await request.jwtVerify();
+      const clientId = (request.user as any).id;
+      const { providerId, sessionData, intakeForm } = request.body as any;
+
+      const booking = await psychologyVerticalService.createTherapySessionBooking(
+        clientId,
+        providerId,
+        sessionData,
+        intakeForm
+      );
+
+      return reply.send({
+        success: true,
+        data: booking,
+        message: 'Therapy session booked successfully'
+      });
+    } catch (error) {
+      server.log.error('Therapy session booking error:', error);
+      return reply.code(400).send({
+        error: 'Error booking therapy session',
+        message: error.message
+      });
+    }
+  });
 }

@@ -936,4 +936,132 @@ export function registerGeoLocationRoutes(server: FastifyInstance) {
       });
     }
   });
+
+  // B8-001: Córdoba provider search API
+  server.get('/api/providers/search', {
+    schema: {
+      tags: ['Geographic'],
+      summary: 'Search providers by city (Córdoba, Rosario, La Plata)',
+      querystring: {
+        type: 'object',
+        properties: {
+          city: { type: 'string' },
+          service: { type: 'string' },
+          radius: { type: 'number', default: 25 }
+        },
+        required: ['city']
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { city, service, radius = 25 } = request.query as any;
+      
+      // Find city coordinates
+      const targetCity = ARGENTINA_CITIES.find(c => 
+        c.name.toLowerCase() === city.toLowerCase()
+      );
+      
+      if (!targetCity) {
+        return reply.code(404).send({
+          error: 'City not found',
+          message: `Ciudad ${city} no encontrada`
+        });
+      }
+
+      // Search providers in the city
+      const providers = await geoLocationService.findProvidersInRadius(
+        targetCity.latitude,
+        targetCity.longitude,
+        radius
+      );
+
+      // Filter by service if specified
+      let filteredProviders = providers;
+      if (service) {
+        filteredProviders = providers.filter(provider =>
+          provider.services.some(s => 
+            s.name.toLowerCase().includes(service.toLowerCase())
+          )
+        );
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          city: targetCity.name,
+          province: targetCity.province,
+          providers: filteredProviders,
+          totalFound: filteredProviders.length,
+          searchRadius: radius
+        }
+      });
+    } catch (error) {
+      server.log.error('City provider search error:', error);
+      return reply.code(500).send({
+        error: 'Error searching providers by city',
+        message: 'Error al buscar proveedores por ciudad'
+      });
+    }
+  });
+
+  // B8-001: Geographic booking matching
+  server.post('/api/bookings/geo-match', {
+    schema: {
+      tags: ['Geographic'],
+      summary: 'Location-based booking matching',
+      body: {
+        type: 'object',
+        required: ['latitude', 'longitude', 'serviceType'],
+        properties: {
+          latitude: { type: 'number' },
+          longitude: { type: 'number' },
+          serviceType: { type: 'string' },
+          preferredTime: { type: 'string' },
+          maxDistance: { type: 'number', default: 25 }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    try {
+      const { latitude, longitude, serviceType, preferredTime, maxDistance = 25 } = request.body as any;
+      
+      // Get optimal provider matching
+      const matching = await geoLocationService.getOptimalProviderMatching(
+        { latitude, longitude },
+        serviceType
+      );
+
+      // Enhance with booking availability if preferred time is provided
+      let availabilityInfo = null;
+      if (preferredTime) {
+        const requestedTime = new Date(preferredTime);
+        availabilityInfo = {
+          requestedTime: preferredTime,
+          availableProviders: matching.providers.filter(provider => {
+            // Mock availability check - would integrate with booking system
+            return Math.random() > 0.3; // 70% chance of availability
+          }).length
+        };
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          ...matching,
+          availabilityInfo,
+          matchingCriteria: {
+            location: { latitude, longitude },
+            serviceType,
+            maxDistance
+          }
+        }
+      });
+    } catch (error) {
+      server.log.error('Geographic booking matching error:', error);
+      return reply.code(500).send({
+        error: 'Error in geographic booking matching',
+        message: 'Error en la coincidencia geográfica de reservas'
+      });
+    }
+  });
 }

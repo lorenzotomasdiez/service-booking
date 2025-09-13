@@ -180,6 +180,106 @@ export const paymentConfig = {
     },
   },
 
+  // PAY8-001: Day 8 Advanced Payment Features
+  advancedFeatures: {
+    // Advanced Subscription Billing
+    subscriptionBilling: {
+      enabled: process.env.ADVANCED_SUBSCRIPTION_BILLING_ENABLED === 'true',
+      dynamicCommissionEnabled: process.env.DYNAMIC_COMMISSION_ENABLED !== 'false',
+      loyaltyPointsEnabled: process.env.LOYALTY_POINTS_ENABLED !== 'false',
+      prorationEnabled: process.env.SUBSCRIPTION_PRORATION_ENABLED !== 'false',
+    },
+    
+    // Installment Optimization
+    installmentOptimization: {
+      enabled: process.env.INSTALLMENT_OPTIMIZATION_ENABLED !== 'false',
+      argentinacultural: process.env.ARGENTINA_CULTURAL_INSTALLMENTS_ENABLED !== 'false',
+      smartRecommendations: process.env.SMART_INSTALLMENT_RECOMMENDATIONS_ENABLED !== 'false',
+      seasonalPromotions: process.env.SEASONAL_INSTALLMENT_PROMOTIONS_ENABLED !== 'false',
+    },
+    
+    // Advanced Refund & Dispute Management
+    refundDisputeSystem: {
+      enabled: process.env.ADVANCED_REFUND_SYSTEM_ENABLED !== 'false',
+      automaticEligibility: process.env.AUTOMATIC_REFUND_ELIGIBILITY_ENABLED !== 'false',
+      disputeResolution: process.env.DISPUTE_RESOLUTION_ENABLED !== 'false',
+      argentinaConsumerLaw: process.env.ARGENTINA_CONSUMER_LAW_COMPLIANCE_ENABLED !== 'false',
+    },
+    
+    // Payment Intelligence & ML
+    paymentIntelligence: {
+      enabled: process.env.PAYMENT_INTELLIGENCE_ENABLED !== 'false',
+      fraudDetectionML: process.env.ML_FRAUD_DETECTION_ENABLED !== 'false',
+      behaviorAnalysis: process.env.PAYMENT_BEHAVIOR_ANALYSIS_ENABLED !== 'false',
+      predictiveAnalytics: process.env.PREDICTIVE_PAYMENT_ANALYTICS_ENABLED !== 'false',
+    },
+    
+    // Loyalty Points System
+    loyaltyPoints: {
+      earningRate: parseFloat(process.env.LOYALTY_POINTS_EARNING_RATE || '0.1'), // 10 points per ARS 100
+      redemptionRate: parseFloat(process.env.LOYALTY_POINTS_REDEMPTION_RATE || '0.01'), // 1 point = ARS 0.01
+      minimumRedemption: parseInt(process.env.LOYALTY_POINTS_MINIMUM_REDEMPTION || '1000'),
+      maximumDiscount: parseFloat(process.env.LOYALTY_POINTS_MAXIMUM_DISCOUNT || '0.30'), // 30% max
+      expiryDays: parseInt(process.env.LOYALTY_POINTS_EXPIRY_DAYS || '365'),
+    },
+  },
+
+  // Argentina Market Optimizations
+  argentinaOptimizations: {
+    // Cultural Adaptations
+    cultural: {
+      enabled: process.env.ARGENTINA_CULTURAL_OPTIMIZATIONS_ENABLED !== 'false',
+      spanishLocalization: process.env.SPANISH_LOCALIZATION_ENABLED !== 'false',
+      familyOriented: process.env.FAMILY_ORIENTED_FEATURES_ENABLED !== 'false',
+      seasonalAdjustments: process.env.SEASONAL_ADJUSTMENTS_ENABLED !== 'false',
+    },
+    
+    // Economic Adaptations
+    economic: {
+      pesoStabilityProtection: process.env.PESO_STABILITY_PROTECTION_ENABLED !== 'false',
+      inflationAdjustments: process.env.INFLATION_ADJUSTMENTS_ENABLED !== 'false',
+      smartRounding: process.env.SMART_PESO_ROUNDING_ENABLED !== 'false',
+      exchangeRateHedging: process.env.EXCHANGE_RATE_HEDGING_ENABLED !== 'false',
+    },
+    
+    // Regional Preferences
+    regional: {
+      provincialAdaptations: process.env.PROVINCIAL_ADAPTATIONS_ENABLED !== 'false',
+      bankNetworkOptimization: process.env.BANK_NETWORK_OPTIMIZATION_ENABLED !== 'false',
+      cashPaymentNetworks: process.env.CASH_PAYMENT_NETWORKS_ENABLED !== 'false',
+    },
+  },
+
+  // Psychology Vertical Payment Features
+  psychologyVertical: {
+    enabled: process.env.PSYCHOLOGY_PAYMENTS_ENABLED === 'true',
+    
+    // Obras Sociales Integration
+    obrasSociales: {
+      enabled: process.env.OBRAS_SOCIALES_INTEGRATION_ENABLED === 'true',
+      apiTimeout: parseInt(process.env.OBRAS_SOCIALES_API_TIMEOUT || '30000'),
+      retryAttempts: parseInt(process.env.OBRAS_SOCIALES_RETRY_ATTEMPTS || '3'),
+      cacheValidityMinutes: parseInt(process.env.OBRAS_SOCIALES_CACHE_VALIDITY || '60'),
+    },
+    
+    // Confidential Billing
+    confidentialBilling: {
+      enabled: process.env.CONFIDENTIAL_BILLING_ENABLED === 'true',
+      encryptionLevel: process.env.CONFIDENTIAL_BILLING_ENCRYPTION_LEVEL || 'AES-256',
+      anonymousBillingCodes: process.env.ANONYMOUS_BILLING_CODES_ENABLED === 'true',
+      discreteDescriptions: process.env.DISCRETE_BILLING_DESCRIPTIONS_ENABLED === 'true',
+    },
+    
+    // Therapy Payment Plans
+    therapyPaymentPlans: {
+      enabled: process.env.THERAPY_PAYMENT_PLANS_ENABLED === 'true',
+      weeklyPayments: process.env.WEEKLY_THERAPY_PAYMENTS_ENABLED === 'true',
+      monthlyPackages: process.env.MONTHLY_THERAPY_PACKAGES_ENABLED === 'true',
+      prepaidSessions: process.env.PREPAID_THERAPY_SESSIONS_ENABLED === 'true',
+      slidingScale: process.env.SLIDING_SCALE_THERAPY_PRICING_ENABLED === 'true',
+    },
+  },
+
   // Fraud Prevention
   fraudPrevention: {
     enabled: process.env.FRAUD_PREVENTION_ENABLED === 'true',

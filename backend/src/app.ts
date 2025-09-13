@@ -69,6 +69,12 @@ import { registerPsychologyVerticalRoutes } from './services/psychology-vertical
 import { registerDay8PremiumEnhancementRoutes } from './services/day8-premium-enhancement';
 import { registerDay8TeamScalingRoutes } from './services/day8-team-scaling';
 
+// B8-001 Day 8 Backend Developer Services (Argentina Expansion & Psychology Vertical Implementation)
+import { registerAdvancedBookingLogicRoutes } from './services/advanced-booking-logic';
+import { registerWhatsAppIntegrationRoutes } from './services/whatsapp-integration';
+import { registerBackendOptimizationRoutes } from './services/backend-optimization';
+import { registerB8IntegrationRoutes } from './services/b8-001-integration';
+
 export function buildServer(): FastifyInstance {
   const server = Fastify({
     logger: {
@@ -282,6 +288,12 @@ export function buildServer(): FastifyInstance {
   // T8-001 Day 8 Technical Coordination Services (Geographic Expansion & Template Deployment)
   registerDay8PremiumEnhancementRoutes(server);
   registerDay8TeamScalingRoutes(server);
+
+  // B8-001 Day 8 Backend Developer Services (Argentina Expansion & Psychology Vertical Implementation)
+  registerAdvancedBookingLogicRoutes(server);
+  registerWhatsAppIntegrationRoutes(server);
+  registerBackendOptimizationRoutes(server);
+  registerB8IntegrationRoutes(server);
 
   return server;
 }

@@ -2,6 +2,7 @@
 // Version 2.0 - Enhanced offline functionality and Argentina mobile optimization
 
 const CACHE_NAME = 'barberpro-v2.0.0';
+const STATIC_CACHE = 'barberpro-v2.0.0'; // Added missing STATIC_CACHE constant
 const OFFLINE_CACHE = 'barberpro-offline-v2.0.0';
 const DYNAMIC_CACHE = 'barberpro-dynamic-v2.0.0';
 const IMAGE_CACHE = 'barberpro-images-v2.0.0';
@@ -15,9 +16,7 @@ const IMAGE_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 const STATIC_ASSETS = [
   '/',
   '/offline',
-  '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
+  '/manifest.json'
 ];
 
 // API endpoints to cache with network-first strategy

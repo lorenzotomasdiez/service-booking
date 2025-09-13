@@ -62,7 +62,7 @@ class UXAnalyticsService {
   private currentSession: UserSession;
   private bookingFlowState: BookingFlowStep | null = null;
   private interactionQueue: UXEvent[] = [];
-  private isOnline: boolean = navigator.onLine;
+  private isOnline: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
   constructor() {
     this.sessionId = this.generateSessionId();
@@ -88,6 +88,18 @@ class UXAnalyticsService {
   }
 
   private getDeviceInfo(): DeviceInfo {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      return {
+        type: 'desktop',
+        os: 'unknown',
+        browser: 'unknown',
+        screenSize: '1920x1080',
+        isTouch: false,
+        connection: 'unknown'
+      };
+    }
+
     const ua = navigator.userAgent;
     const connection = (navigator as any).connection;
     
@@ -107,6 +119,8 @@ class UXAnalyticsService {
   }
 
   private getOS(): string {
+    if (typeof navigator === 'undefined') return 'unknown';
+    
     const ua = navigator.userAgent;
     if (/Android/i.test(ua)) return 'Android';
     if (/iPhone|iPad|iPod/i.test(ua)) return 'iOS';
@@ -117,6 +131,8 @@ class UXAnalyticsService {
   }
 
   private getBrowser(): string {
+    if (typeof navigator === 'undefined') return 'unknown';
+    
     const ua = navigator.userAgent;
     if (ua.includes('Chrome') && !ua.includes('Chromium')) return 'Chrome';
     if (ua.includes('Firefox')) return 'Firefox';
@@ -137,6 +153,11 @@ class UXAnalyticsService {
   }
 
   private setupEventListeners(): void {
+    // Skip if not in browser environment
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
     // Page visibility changes
     document.addEventListener('visibilitychange', () => {
       this.trackEvent('page_view', {
@@ -230,6 +251,11 @@ class UXAnalyticsService {
   }
 
   private startPerformanceMonitoring(): void {
+    // Skip if not in browser environment
+    if (typeof window === 'undefined' || typeof performance === 'undefined') {
+      return;
+    }
+
     // Monitor page load performance
     window.addEventListener('load', () => {
       setTimeout(() => {
@@ -525,8 +551,40 @@ class UXAnalyticsService {
   }
 }
 
-// Export singleton instance
-export const uxAnalytics = new UXAnalyticsService();
+// Export singleton instance - browser check for SSR compatibility
+class BrowserSafeUXAnalyticsProxy {
+  private instance: UXAnalyticsService | null = null;
+
+  private getInstance(): UXAnalyticsService {
+    if (typeof window === 'undefined') {
+      // Return a no-op proxy for SSR
+      return {
+        trackEvent: () => {},
+        trackExternalEvent: () => {},
+        trackSearchBehavior: () => {},
+        trackPaymentMethodSelection: () => {},
+        getCurrentSessionAnalytics: () => ({ session: {} }),
+        getArgentinaMarketInsights: () => ({ market: {} }),
+        exportAnalytics: () => Promise.resolve('{}')
+      } as any;
+    }
+
+    if (!this.instance) {
+      this.instance = new UXAnalyticsService();
+    }
+    return this.instance;
+  }
+
+  trackEvent(...args: any[]) { return this.getInstance().trackEvent(...args); }
+  trackExternalEvent(...args: any[]) { return this.getInstance().trackExternalEvent(...args); }
+  trackSearchBehavior(...args: any[]) { return this.getInstance().trackSearchBehavior(...args); }
+  trackPaymentMethodSelection(...args: any[]) { return this.getInstance().trackPaymentMethodSelection(...args); }
+  getCurrentSessionAnalytics(...args: any[]) { return this.getInstance().getCurrentSessionAnalytics(...args); }
+  getArgentinaMarketInsights(...args: any[]) { return this.getInstance().getArgentinaMarketInsights(...args); }
+  exportAnalytics(...args: any[]) { return this.getInstance().exportAnalytics(...args); }
+}
+
+export const uxAnalytics = new BrowserSafeUXAnalyticsProxy();
 
 // Export types for use in other modules
 export type {

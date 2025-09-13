@@ -627,9 +627,11 @@
       tooltipVisible = false;
     }
 
-    // Remove any modals
-    const modals = document.querySelectorAll('.guidance-modal');
-    modals.forEach(modal => modal.remove());
+    // Remove any modals (browser check for SSR)
+    if (typeof document !== 'undefined') {
+      const modals = document.querySelectorAll('.guidance-modal');
+      modals.forEach(modal => modal.remove());
+    }
   }
 
   function updateProgressIndicator(current: number, total: number) {

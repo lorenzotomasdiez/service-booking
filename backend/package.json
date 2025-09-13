@@ -37,7 +37,9 @@
     "docker:run": "docker run -p 3000:3000 --env-file .env.production barberpro-backend:latest",
     "day9:demo": "tsx day9-demo.ts",
     "day9:payment-demo": "tsx day9-demo.ts",
-    "day9:simple-demo": "tsx day9-simple-demo.ts"
+    "day9:simple-demo": "tsx day9-simple-demo.ts",
+    "day10:enterprise-demo": "tsx day10-enterprise-demo.ts",
+    "day10:ai-demo": "tsx day10-ai-demo.ts"
   },
   "keywords": [],
   "author": "",

@@ -86,6 +86,13 @@ import { registerTemplateDeploymentRoutes } from './services/template-deployment
 import { registerEnterpriseInfrastructureRoutes } from './services/enterprise-infrastructure';
 import { registerDay9CoordinationRoutes } from './services/day9-coordination';
 
+// T10-001 Day 10 Enterprise Architecture & AI-Powered Platform Enhancement
+import { registerEnterpriseRoutes } from './services/enterprise-multi-tenant';
+import { registerAIRoutes } from './services/ai-powered-features';
+import { registerPerformanceRoutes } from './services/enterprise-performance';
+import { registerEnterpriseCoordinationRoutes } from './services/enterprise-coordination';
+
+
 export function buildServer(): FastifyInstance {
   const server = Fastify({
     logger: {
@@ -192,7 +199,12 @@ export function buildServer(): FastifyInstance {
         { name: 'Promotions', description: 'Promotion and discount management' },
         { name: 'Subscriptions', description: 'Subscription billing management' },
         { name: 'Analytics', description: 'Provider analytics and insights' },
-        { name: 'Health', description: 'System health monitoring' }
+        { name: 'Health', description: 'System health monitoring' },
+        { name: 'Enterprise Business Logic', description: 'Enterprise scheduling, billing, and workflow automation' },
+        { name: 'AI & Machine Learning', description: 'AI-powered recommendations, predictions, and intelligence' },
+        { name: 'Partnership Integration', description: 'B2B partner integrations, webhooks, and marketplace APIs' },
+        { name: 'Enterprise Performance', description: 'Database optimization, caching, and enterprise scaling' },
+        { name: 'Business Intelligence', description: 'Advanced analytics and business intelligence' }
       ]
     }
   });
@@ -311,6 +323,17 @@ export function buildServer(): FastifyInstance {
 
   // PAY9-001 Day 9 Advanced Payment Features (Enterprise Billing, Multi-Vertical, Payment Intelligence)
   server.register(day9AdvancedPaymentsRoutes, { prefix: '/api/day9-payments' });
+
+  // T9-001 Day 9 Technical Lead Services (Template Architecture & Premium Features)
+  registerTemplateDeploymentRoutes(server);
+  registerEnterpriseInfrastructureRoutes(server);
+  registerDay9CoordinationRoutes(server);
+
+  // T10-001 Day 10 Enterprise Architecture & AI-Powered Platform Enhancement
+  registerEnterpriseRoutes(server);
+  registerAIRoutes(server);
+  registerPerformanceRoutes(server);
+  registerEnterpriseCoordinationRoutes(server);
 
   return server;
 }

@@ -1,0 +1,322 @@
+# Enterprise Multi-Tenant Infrastructure Configuration
+# BarberPro Day 10 - O10-001 Implementation
+# Enterprise-grade multi-tenant architecture with tenant isolation
+
+version: '3.8'
+
+services:
+  # Multi-Tenant Application Gateway
+  enterprise-gateway:
+    image: barberpro/enterprise-gateway:latest
+    ports:
+      - "443:443"
+      - "80:80"
+    environment:
+      - TENANT_ISOLATION_MODE=strict
+      - MAX_CONCURRENT_TENANTS=100
+      - ENTERPRISE_RATE_LIMIT=1000/minute
+      - MULTI_TENANT_DATABASE=enabled
+    volumes:
+      - ./ssl:/etc/ssl/certs
+      - ./tenant-configs:/etc/tenant-configs
+    networks:
+      - enterprise-network
+    depends_on:
+      - tenant-registry
+      - enterprise-database
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+
+  # Tenant Registry Service
+  tenant-registry:
+    image: barberpro/tenant-registry:latest
+    environment:
+      - DATABASE_URL=postgresql://enterprise_user:${ENTERPRISE_DB_PASSWORD}@enterprise-database:5432/tenant_registry
+      - TENANT_ONBOARDING_AUTO=true
+      - MAX_TENANTS_PER_CLUSTER=100
+      - TENANT_RESOURCE_QUOTAS=enabled
+    volumes:
+      - tenant-registry-data:/var/lib/tenant-registry
+    networks:
+      - enterprise-network
+    depends_on:
+      - enterprise-database
+    deploy:
+      replicas: 2
+
+  # Enterprise Database Cluster
+  enterprise-database:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=barberpro_enterprise
+      - POSTGRES_USER=enterprise_user
+      - POSTGRES_PASSWORD=${ENTERPRISE_DB_PASSWORD}
+      - POSTGRES_MULTIPLE_DATABASES=enabled
+      - MAX_CONNECTIONS=1000
+      - SHARED_PRELOAD_LIBRARIES=pg_stat_statements,auto_explain
+    volumes:
+      - enterprise-db-data:/var/lib/postgresql/data
+      - ./scripts/multi-tenant-init.sql:/docker-entrypoint-initdb.d/01-multi-tenant.sql
+      - ./scripts/tenant-isolation.sql:/docker-entrypoint-initdb.d/02-isolation.sql
+    networks:
+      - enterprise-network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+  # Enterprise Database Read Replicas
+  enterprise-database-replica:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_MASTER_SERVICE=enterprise-database
+      - POSTGRES_REPLICATION_MODE=slave
+      - POSTGRES_REPLICATION_USER=replicator
+      - POSTGRES_REPLICATION_PASSWORD=${REPLICA_PASSWORD}
+    networks:
+      - enterprise-network
+    depends_on:
+      - enterprise-database
+    deploy:
+      replicas: 2
+
+  # Enterprise Redis Cluster
+  enterprise-redis-cluster:
+    image: redis:7-alpine
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+      --tcp-keepalive 300
+    volumes:
+      - enterprise-redis-data:/data
+    networks:
+      - enterprise-network
+    deploy:
+      replicas: 6
+      resources:
+        limits:
+          memory: 2G
+
+  # Tenant Isolation Manager
+  tenant-isolation-manager:
+    image: barberpro/tenant-isolation:latest
+    environment:
+      - ISOLATION_LEVEL=namespace
+      - RESOURCE_QUOTAS=enabled
+      - NETWORK_POLICIES=strict
+      - DATA_ENCRYPTION=tenant_keys
+    volumes:
+      - ./tenant-policies:/etc/policies
+    networks:
+      - enterprise-network
+    deploy:
+      replicas: 2
+
+  # Enterprise Message Queue
+  enterprise-rabbitmq:
+    image: rabbitmq:3.11-management-alpine
+    environment:
+      - RABBITMQ_DEFAULT_USER=enterprise
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+      - RABBITMQ_DEFAULT_VHOST=enterprise
+      - RABBITMQ_VM_MEMORY_HIGH_WATERMARK=0.8
+    volumes:
+      - enterprise-rabbitmq-data:/var/lib/rabbitmq
+      - ./rabbitmq/enterprise.conf:/etc/rabbitmq/rabbitmq.conf
+    networks:
+      - enterprise-network
+    ports:
+      - "15672:15672"  # Management UI
+      - "5672:5672"    # AMQP
+    deploy:
+      replicas: 3
+
+  # Enterprise Monitoring Stack
+  enterprise-prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/enterprise-prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/rules:/etc/prometheus/rules
+      - enterprise-prometheus-data:/prometheus
+    networks:
+      - enterprise-network
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=90d'
+      - '--web.enable-lifecycle'
+    deploy:
+      replicas: 2
+
+  enterprise-grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_ENTERPRISE_LICENSE_TEXT=${GRAFANA_ENTERPRISE_LICENSE}
+    volumes:
+      - enterprise-grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - enterprise-network
+    ports:
+      - "3000:3000"
+    depends_on:
+      - enterprise-prometheus
+
+  # Enterprise Log Aggregation
+  enterprise-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}
+    volumes:
+      - enterprise-elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - enterprise-network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  enterprise-logstash:
+    image: docker.elastic.co/logstash/logstash:8.8.0
+    volumes:
+      - ./logging/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+      - ./logging/patterns:/usr/share/logstash/patterns
+    networks:
+      - enterprise-network
+    depends_on:
+      - enterprise-elasticsearch
+    environment:
+      - "LS_JAVA_OPTS=-Xmx2g -Xms2g"
+
+  enterprise-kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://enterprise-elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
+    networks:
+      - enterprise-network
+    ports:
+      - "5601:5601"
+    depends_on:
+      - enterprise-elasticsearch
+
+  # Enterprise Backup Service
+  enterprise-backup:
+    image: barberpro/enterprise-backup:latest
+    environment:
+      - BACKUP_SCHEDULE=0 2 * * *  # Daily at 2 AM
+      - RETENTION_DAYS=30
+      - BACKUP_ENCRYPTION=enabled
+      - S3_BUCKET=barberpro-enterprise-backups
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - RTO_TARGET=1h  # 1 hour Recovery Time Objective
+      - RPO_TARGET=15m # 15 minutes Recovery Point Objective
+    volumes:
+      - enterprise-backup-data:/backups
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - enterprise-network
+    depends_on:
+      - enterprise-database
+      - enterprise-redis-cluster
+
+  # Enterprise Service Mesh Proxy
+  enterprise-envoy:
+    image: envoyproxy/envoy:v1.27-latest
+    volumes:
+      - ./service-mesh/envoy-enterprise.yaml:/etc/envoy/envoy.yaml
+      - ./ssl/enterprise:/etc/ssl/envoy
+    networks:
+      - enterprise-network
+    ports:
+      - "10000:10000"  # Admin interface
+    deploy:
+      replicas: 3
+
+  # Enterprise Health Check Service
+  enterprise-healthcheck:
+    image: barberpro/healthcheck:latest
+    environment:
+      - CHECK_INTERVAL=30s
+      - ALERT_WEBHOOK=${SLACK_WEBHOOK_URL}
+      - HEALTH_ENDPOINTS=gateway,database,redis,rabbitmq
+      - SLA_TARGET=99.9
+    networks:
+      - enterprise-network
+    depends_on:
+      - enterprise-gateway
+      - enterprise-database
+      - enterprise-redis-cluster
+
+networks:
+  enterprise-network:
+    driver: overlay
+    encrypted: true
+    attachable: false
+    ipam:
+      config:
+        - subnet: 10.1.0.0/16
+
+volumes:
+  enterprise-db-data:
+    driver: local
+  enterprise-redis-data:
+    driver: local
+  enterprise-rabbitmq-data:
+    driver: local
+  enterprise-prometheus-data:
+    driver: local
+  enterprise-grafana-data:
+    driver: local
+  enterprise-elasticsearch-data:
+    driver: local
+  enterprise-backup-data:
+    driver: local
+  tenant-registry-data:
+    driver: local
+
+# Enterprise Configuration Templates
+configs:
+  tenant-template:
+    file: ./templates/tenant-config-template.yml
+  monitoring-template:
+    file: ./templates/monitoring-template.yml
+  security-template:
+    file: ./templates/security-template.yml
+
+# Enterprise Secrets Management
+secrets:
+  enterprise-db-password:
+    external: true
+  rabbitmq-password:
+    external: true
+  grafana-password:
+    external: true
+  elasticsearch-password:
+    external: true

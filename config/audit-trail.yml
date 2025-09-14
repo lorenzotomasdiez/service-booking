@@ -1,0 +1,83 @@
+# Audit Trail Configuration
+audit_trail:
+  # Comprehensive Logging
+  logging_systems:
+    # Application Logs
+    application_logs:
+      log_level: "info"
+      format: "structured_json"
+      retention_period: "2 years"
+
+      categories:
+        - category: "Authentication"
+          details: "login_attempts, password_changes, mfa_events"
+          retention: "5 years"
+
+        - category: "Data_Access"
+          details: "data_queries, exports, modifications"
+          retention: "7 years"
+
+        - category: "Financial_Transactions"
+          details: "payments, refunds, invoices"
+          retention: "10 years"
+
+        - category: "System_Events"
+          details: "deployments, configuration_changes, errors"
+          retention: "2 years"
+
+    # Infrastructure Logs
+    infrastructure_logs:
+      cloudtrail:
+        enabled: true
+        s3_bucket: "barberpro-audit-logs"
+        encryption: "SSE-S3"
+        log_file_validation: true
+
+        events:
+          - category: "Data Events"
+            resources: ["S3", "RDS"]
+            read_events: true
+            write_events: true
+
+          - category: "Management Events"
+            resources: ["IAM", "ECS", "CloudFormation"]
+            read_events: true
+            write_events: true
+
+    # Security Logs
+    security_logs:
+      waf_logs:
+        enabled: true
+        destination: "S3"
+        retention_period: "1 year"
+
+      guardduty_logs:
+        enabled: true
+        export_format: "JSON"
+        retention_period: "2 years"
+
+  # Regulatory Reporting
+  regulatory_reporting:
+    financial_reports:
+      - report: "Monthly Transaction Summary"
+        frequency: "monthly"
+        recipients: ["finance@barberpro.com.ar"]
+        format: "PDF"
+        encryption: "enabled"
+
+      - report: "Quarterly Revenue Report"
+        frequency: "quarterly"
+        recipients: ["ceo@barberpro.com.ar"]
+        format: "Excel"
+        encryption: "enabled"
+
+    compliance_reports:
+      - report: "Data Processing Activity Report"
+        frequency: "quarterly"
+        recipients: ["compliance@barberpro.com.ar"]
+        format: "PDF"
+
+      - report: "Security Incident Report"
+        frequency: "monthly"
+        recipients: ["security@barberpro.com.ar"]
+        format: "PDF"

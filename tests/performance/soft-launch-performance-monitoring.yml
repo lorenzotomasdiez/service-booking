@@ -1,0 +1,342 @@
+# Q12-001: Soft Launch Performance Monitoring Configuration
+# Real-world performance testing for 50-user soft launch with Argentina market conditions
+
+config:
+  target: 'http://localhost:3000'
+  phases:
+    # Phase 1: Gradual user onboarding (first 2 hours)
+    - duration: 7200
+      arrivalRate: 1
+      name: "Gradual Onboarding"
+
+    # Phase 2: Peak usage simulation (middle 4 hours)
+    - duration: 14400
+      arrivalRate: 5
+      name: "Peak Usage"
+
+    # Phase 3: Sustained operations (final 2 hours)
+    - duration: 7200
+      arrivalRate: 3
+      name: "Sustained Operations"
+
+  processor: "./tests/performance/soft-launch-processor.js"
+
+  # Argentina-specific configuration
+  defaults:
+    headers:
+      'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8'
+      'User-Agent': 'BarberPro-SoftLaunch-Test/1.0'
+      'X-Country-Code': 'AR'
+      'X-Timezone': 'America/Argentina/Buenos_Aires'
+
+  # Performance targets based on soft launch requirements
+  ensure:
+    thresholds:
+      - http.response_time:
+          p95: 200  # 95% of requests under 200ms
+          p99: 500  # 99% of requests under 500ms
+      - http.request_rate: 8  # Support up to 8 requests/second
+      - http.codes.200: 99    # 99% success rate minimum
+      - http.codes.500: 0.5   # Less than 0.5% server errors
+
+# Real user journey scenarios for Argentina market
+scenarios:
+  # Scenario 1: Buenos Aires Professional Onboarding
+  - name: "Buenos Aires Provider Onboarding"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/auth/register"
+          json:
+            email: "{{ $randomEmail }}"
+            dni: "{{ $randomInt(10000000, 99999999) }}"
+            phone: "+54 11 {{ $randomInt(1000, 9999) }}-{{ $randomInt(1000, 9999) }}"
+            businessName: "Barbería {{ $randomString(10) }}"
+            location: "CABA"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+            - json: "$.userId"
+              as: "userId"
+          expect:
+            - statusCode: 201
+            - contentType: json
+            - hasProperty: token
+
+      - post:
+          url: "/api/auth/verify-email"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            verificationCode: "123456"
+          expect:
+            - statusCode: 200
+
+      - post:
+          url: "/api/profile/complete"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            businessType: "barbershop"
+            address: "Av. Santa Fe {{ $randomInt(1000, 9999) }}, CABA"
+            services:
+              - name: "Corte de cabello"
+                price: "{{ $randomInt(1200, 2000) }}"
+                duration: 30
+              - name: "Arreglo de barba"
+                price: "{{ $randomInt(800, 1200) }}"
+                duration: 20
+          expect:
+            - statusCode: 200
+
+      - post:
+          url: "/api/payments/setup"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            paymentMethod: "mercadopago"
+            accountDetails:
+              email: "{{ $randomEmail }}"
+              cuitCuil: "20{{ $randomInt(10000000, 99999999) }}3"
+          expect:
+            - statusCode: 200
+            - hasProperty: paymentConfigured
+
+  # Scenario 2: Customer Booking Flow
+  - name: "Customer Service Booking"
+    weight: 40
+    flow:
+      - get:
+          url: "/api/providers/search"
+          qs:
+            location: "CABA"
+            service: "haircut"
+            radius: "5"
+          expect:
+            - statusCode: 200
+            - contentType: json
+          capture:
+            - json: "$.providers[0].id"
+              as: "providerId"
+
+      - post:
+          url: "/api/customers/register"
+          json:
+            name: "{{ $randomFirstName }} {{ $randomLastName }}"
+            email: "{{ $randomEmail }}"
+            phone: "+54 9 11 {{ $randomInt(1000, 9999) }}-{{ $randomInt(1000, 9999) }}"
+          capture:
+            - json: "$.token"
+              as: "customerToken"
+          expect:
+            - statusCode: 201
+
+      - get:
+          url: "/api/providers/{{ providerId }}/availability"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          qs:
+            date: "{{ $isoDate(1) }}"  # Tomorrow
+          expect:
+            - statusCode: 200
+          capture:
+            - json: "$.slots[0].time"
+              as: "bookingTime"
+
+      - post:
+          url: "/api/bookings/create"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          json:
+            providerId: "{{ providerId }}"
+            serviceId: "haircut"
+            dateTime: "{{ $isoDate(1) }}T{{ bookingTime }}"
+            paymentMethod: "mercadopago"
+          expect:
+            - statusCode: 201
+            - hasProperty: bookingId
+          capture:
+            - json: "$.bookingId"
+              as: "bookingId"
+
+      - post:
+          url: "/api/payments/process"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          json:
+            bookingId: "{{ bookingId }}"
+            paymentMethod: "mercadopago"
+            cardToken: "test_card_token_approved"
+          expect:
+            - statusCode: 200
+            - json: "$.status"
+              equals: "approved"
+
+  # Scenario 3: Provider Operations Management
+  - name: "Provider Daily Operations"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "provider.test@barberpro.com"
+            password: "TestProvider123!"
+          capture:
+            - json: "$.token"
+              as: "providerToken"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/api/provider/dashboard"
+          headers:
+            Authorization: "Bearer {{ providerToken }}"
+          expect:
+            - statusCode: 200
+            - hasProperty: todayBookings
+
+      - get:
+          url: "/api/bookings/pending"
+          headers:
+            Authorization: "Bearer {{ providerToken }}"
+          expect:
+            - statusCode: 200
+          capture:
+            - json: "$.bookings[0].id"
+              as: "pendingBookingId"
+
+      - patch:
+          url: "/api/bookings/{{ pendingBookingId }}/accept"
+          headers:
+            Authorization: "Bearer {{ providerToken }}"
+          expect:
+            - statusCode: 200
+
+      - post:
+          url: "/api/availability/update"
+          headers:
+            Authorization: "Bearer {{ providerToken }}"
+          json:
+            date: "{{ $isoDate(1) }}"
+            slots:
+              - time: "09:00"
+                available: true
+              - time: "10:00"
+                available: true
+              - time: "11:00"
+                available: false
+          expect:
+            - statusCode: 200
+
+  # Scenario 4: AI Customer Success Platform Testing
+  - name: "AI Platform Interactions"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "customer.test@barberpro.com"
+            password: "TestCustomer123!"
+          capture:
+            - json: "$.token"
+              as: "customerToken"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/api/ai/recommendations"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          expect:
+            - statusCode: 200
+            - hasProperty: recommendations
+            - json: "$.recommendations"
+              hasLength: ">= 3"
+
+      - post:
+          url: "/api/ai/feedback"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          json:
+            interactionId: "rec_{{ $uuid }}"
+            rating: "{{ $randomInt(4, 5) }}"
+            feedback: "Excellent recommendation"
+          expect:
+            - statusCode: 200
+
+      - get:
+          url: "/api/ai/insights/churn-prediction"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          expect:
+            - statusCode: 200
+            - hasProperty: churnRisk
+            - hasProperty: retentionRecommendations
+
+# Custom metrics for soft launch quality validation
+metrics:
+  - name: "soft_launch_onboarding_time"
+    unit: "milliseconds"
+
+  - name: "payment_processing_success_rate"
+    unit: "percentage"
+
+  - name: "ai_recommendation_accuracy"
+    unit: "percentage"
+
+  - name: "customer_satisfaction_score"
+    unit: "rating"
+
+  - name: "provider_booking_acceptance_rate"
+    unit: "percentage"
+
+# Argentina-specific monitoring
+plugins:
+  metrics-by-endpoint:
+    useOnlyRequestNames: true
+
+  publish-metrics:
+    - type: cloudwatch
+      region: us-east-1
+      dimensions:
+        - name: "Environment"
+          value: "soft-launch"
+        - name: "Country"
+          value: "Argentina"
+
+  hdrhistogram: {}
+
+  expect:
+    outputFormat: json
+
+  statsd:
+    host: localhost
+    port: 8125
+    prefix: "barberpro.softlaunch"
+
+# Real-time alerting for soft launch monitoring
+alerts:
+  thresholds:
+    - metric: "http.response_time.p95"
+      threshold: 200
+      operator: ">"
+      action: "alert"
+      message: "Response time exceeding 200ms target"
+
+    - metric: "http.codes.2xx.rate"
+      threshold: 99
+      operator: "<"
+      action: "alert"
+      message: "Success rate below 99% threshold"
+
+    - metric: "soft_launch_onboarding_time"
+      threshold: 2820000  # 47 minutes in milliseconds
+      operator: ">"
+      action: "alert"
+      message: "Customer onboarding exceeding 47-minute target"
+
+    - metric: "payment_processing_success_rate"
+      threshold: 99.5
+      operator: "<"
+      action: "alert"
+      message: "Payment success rate below 99.5% target"

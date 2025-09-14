@@ -1,0 +1,66 @@
+# Business Continuity Configuration
+business_continuity:
+  # Operational Resilience
+  operational_resilience:
+    primary_region: "sa-east-1"  # São Paulo
+    secondary_region: "us-east-1"  # Virginia (DR)
+
+    # RTO/RPO Targets
+    rto_target: "< 1 hour"
+    rpo_target: "< 15 minutes"
+
+    # Critical Services
+    critical_services:
+      - service: "barberpro-backend"
+        priority: "critical"
+        rto: "< 30 minutes"
+        rpo: "< 5 minutes"
+
+      - service: "barberpro-database"
+        priority: "critical"
+        rto: "< 1 hour"
+        rpo: "< 15 minutes"
+
+      - service: "barberpro-cache"
+        priority: "high"
+        rto: "< 15 minutes"
+        rpo: "< 1 minute"
+
+  # Multi-Region Setup
+  multi_region_setup:
+    data_replication:
+      database_replication:
+        type: "cross_region_read_replica"
+        destination: "us-east-1"
+        lag_threshold: "< 60 seconds"
+        monitoring: "continuous"
+
+      file_storage_replication:
+        source_bucket: "barberpro-production-uploads"
+        destination_bucket: "barberpro-production-uploads-dr"
+        replication_rule: "all_objects"
+
+    # Failover Procedures
+    failover_procedures:
+      automated_failover:
+        database_failover:
+          type: "automated"
+          failover_time: "< 60 seconds"
+          health_check_frequency: "30 seconds"
+
+        application_failover:
+          type: "dns_based"
+          failover_time: "< 5 minutes"
+          health_check: "/api/health/detailed"
+
+  # Business Impact Analysis
+  business_impact_analysis:
+    revenue_impact:
+      per_hour_downtime: "ARS 35,000"
+      critical_threshold: "2 hours"
+      maximum_tolerable_downtime: "8 hours"
+
+    customer_impact:
+      affected_users_per_minute: 150
+      reputation_impact_threshold: "30 minutes"
+      customer_communication_required: "15 minutes"

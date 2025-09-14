@@ -7,8 +7,11 @@
 	import { performanceStore } from '$lib/stores/performance';
 	import { frontendMonitoringStore } from '$lib/stores/frontend-monitoring';
 	import { uxOptimizationService } from '$lib/services/ux-optimization';
+	import performanceOptimizationService from '$lib/services/performance-optimization';
+	import customerSuccessService from '$lib/services/customer-success';
 	import UserGuidance from '$lib/components/ux/UserGuidance.svelte';
 	import ErrorBoundary from '$lib/components/monitoring/ErrorBoundary.svelte';
+	import CustomerHealthWidget from '$lib/components/analytics/CustomerHealthWidget.svelte';
 	
 	// Mobile navigation state
 	let mobileMenuOpen = false;
@@ -29,6 +32,10 @@
 			
 			// Initialize UX optimizations for Argentina mobile users
 			uxOptimizationService.initialize();
+			
+			// Initialize F11-001 Customer Experience Platform features
+			performanceOptimizationService.optimizeForMobile();
+			performanceOptimizationService.markCriticalResourcesLoaded();
 			
 			// Register service worker for PWA functionality
 			if ('serviceWorker' in navigator) {
@@ -65,7 +72,7 @@
 		{ href: '/', label: 'Inicio' },
 		{ href: '/servicios', label: 'Servicios' },
 		{ href: '/como-funciona', label: 'Cómo Funciona' },
-		{ href: '/ayuda', label: 'Ayuda' }
+		{ href: '/soporte', label: 'Soporte' }
 	];
 
 	const authItems = [
@@ -130,6 +137,12 @@
 						>
 							Dashboard
 						</a>
+						<!-- Customer Experience Health Indicator -->
+						{#if $user.role === 'customer'}
+							<div class="relative">
+								<CustomerHealthWidget userId={$user.id} compact={true} />
+							</div>
+						{/if}
 					{:else}
 						<!-- Auth Buttons -->
 						<a

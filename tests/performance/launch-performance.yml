@@ -1,0 +1,389 @@
+# Q11-001: Launch Readiness Performance Testing
+# Comprehensive load testing for BarberPro production environment
+# Focus: 5000+ concurrent users, Argentina market conditions
+
+config:
+  target: 'http://localhost:3000'
+  http:
+    timeout: 30
+    pool: 50
+  phases:
+    # Warm-up phase
+    - name: warm-up
+      duration: 120
+      arrivalRate: 5
+      rampTo: 50
+    
+    # Load testing phase - Normal traffic
+    - name: load-test
+      duration: 300
+      arrivalRate: 100
+      rampTo: 500
+    
+    # Peak traffic simulation
+    - name: peak-traffic
+      duration: 180
+      arrivalRate: 500
+      rampTo: 1000
+    
+    # Stress testing - Beyond normal capacity
+    - name: stress-test
+      duration: 120
+      arrivalRate: 1000
+      rampTo: 2000
+    
+    # Sustained high load
+    - name: sustained-load
+      duration: 600
+      arrivalRate: 800
+    
+    # Spike testing
+    - name: spike-test
+      duration: 60
+      arrivalRate: 3000
+    
+    # Cool-down phase
+    - name: cool-down
+      duration: 180
+      arrivalRate: 3000
+      rampTo: 10
+
+  # Argentina-specific configuration
+  variables:
+    argentina_timezone: 'America/Argentina/Buenos_Aires'
+    argentina_locale: 'es-AR'
+    argentina_currency: 'ARS'
+    
+  # Performance thresholds
+  ensure:
+    - http.response_time.p95: 200  # 95% of responses under 200ms
+    - http.response_time.p99: 500  # 99% of responses under 500ms
+    - http.codes.200: 95           # 95% success rate
+    - http.codes.500: 1            # Max 1% server errors
+
+  # Plugins for enhanced monitoring
+  plugins:
+    expect: {}
+    metrics-by-endpoint: {}
+    hls: 
+      uri: http://localhost:3000/health
+
+  # Environment variables
+  environments:
+    production:
+      target: 'https://api.barberpro.com'
+    staging:
+      target: 'https://staging-api.barberpro.com'
+    local:
+      target: 'http://localhost:3000'
+
+scenarios:
+  # Core API Performance Testing
+  - name: health-check-performance
+    weight: 10
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+            - hasProperty: status
+            - equals: 
+                - "{{ status }}"
+                - "healthy"
+          capture:
+            - as: response_time
+              value: "{{ $processTime }}"
+
+  # Provider Management Performance
+  - name: provider-search-performance
+    weight: 25
+    flow:
+      - get:
+          url: "/api/search"
+          qs:
+            location: "Buenos Aires"
+            service: "corte-cabello"
+            radius: 10
+          headers:
+            Accept-Language: "es-AR"
+          expect:
+            - statusCode: 200
+            - contentType: json
+          capture:
+            - as: search_results
+              json: "$.data"
+      
+      - think: 2
+      
+      # Get provider details
+      - get:
+          url: "/api/providers/{{ search_results[0].id }}"
+          expect:
+            - statusCode: 200
+          capture:
+            - as: provider_id
+              json: "$.id"
+
+  # Booking System Performance
+  - name: booking-flow-performance
+    weight: 30
+    flow:
+      # Search for available slots
+      - get:
+          url: "/api/providers/1/availability"
+          qs:
+            date: "2024-01-15"
+          expect:
+            - statusCode: 200
+          capture:
+            - as: available_slots
+              json: "$.slots"
+      
+      - think: 3
+      
+      # Create booking
+      - post:
+          url: "/api/bookings"
+          headers:
+            Content-Type: "application/json"
+          json:
+            provider_id: 1
+            service_id: 1
+            date: "2024-01-15"
+            time: "10:00"
+            client:
+              name: "Juan Pérez"
+              email: "juan.perez@test.com"
+              phone: "+54 9 11 1234-5678"
+          expect:
+            - statusCode: 201
+          capture:
+            - as: booking_id
+              json: "$.id"
+      
+      - think: 1
+      
+      # Get booking confirmation
+      - get:
+          url: "/api/bookings/{{ booking_id }}"
+          expect:
+            - statusCode: 200
+
+  # Payment Processing Performance
+  - name: payment-processing-performance
+    weight: 20
+    flow:
+      # Create payment session
+      - post:
+          url: "/api/payments/create-session"
+          headers:
+            Content-Type: "application/json"
+          json:
+            booking_id: 1
+            amount: 2500
+            currency: "ARS"
+            payment_method: "mercadopago"
+          expect:
+            - statusCode: 200
+          capture:
+            - as: payment_session
+              json: "$.session_id"
+      
+      - think: 5
+      
+      # Process payment (mock)
+      - post:
+          url: "/api/payments/process"
+          headers:
+            Content-Type: "application/json"
+          json:
+            session_id: "{{ payment_session }}"
+            payment_data:
+              card_number: "4507990000000004"
+              expiry_month: "12"
+              expiry_year: "25"
+              security_code: "123"
+              cardholder_name: "Juan Perez"
+          expect:
+            - statusCode: 200
+
+  # Customer Success API Performance
+  - name: customer-success-performance
+    weight: 10
+    flow:
+      # Get customer health score
+      - get:
+          url: "/api/customer-success/health-score/1"
+          expect:
+            - statusCode: 200
+          capture:
+            - as: health_score
+              json: "$.score"
+      
+      # Get customer analytics
+      - get:
+          url: "/api/analytics/customer/1"
+          expect:
+            - statusCode: 200
+
+  # Business Intelligence Performance
+  - name: business-intelligence-performance
+    weight: 5
+    flow:
+      # Get business performance metrics
+      - get:
+          url: "/api/analytics/business-performance"
+          qs:
+            period: "month"
+            metrics: "revenue,bookings,providers"
+          expect:
+            - statusCode: 200
+      
+      # Generate financial report
+      - get:
+          url: "/api/analytics/financial-reporting"
+          qs:
+            start_date: "2024-01-01"
+            end_date: "2024-01-31"
+          expect:
+            - statusCode: 200
+
+  # Argentina Compliance Performance
+  - name: argentina-compliance-performance
+    weight: 8
+    flow:
+      # AFIP tax compliance check
+      - get:
+          url: "/api/compliance/afip-tax-compliance"
+          expect:
+            - statusCode: 200
+          capture:
+            - as: tax_status
+              json: "$.status"
+      
+      # Data privacy compliance
+      - get:
+          url: "/api/compliance/data-privacy"
+          expect:
+            - statusCode: 200
+
+  # System Health Monitoring Performance
+  - name: system-monitoring-performance
+    weight: 7
+    flow:
+      # System health check
+      - get:
+          url: "/api/operations/system-health"
+          expect:
+            - statusCode: 200
+            - hasProperty: cpu_usage
+            - hasProperty: memory_usage
+            - hasProperty: disk_usage
+      
+      # Performance analytics
+      - get:
+          url: "/api/operations/performance-analytics"
+          expect:
+            - statusCode: 200
+
+  # Database Performance Testing
+  - name: database-intensive-operations
+    weight: 15
+    flow:
+      # Complex search with multiple filters
+      - get:
+          url: "/api/search/advanced"
+          qs:
+            location: "Buenos Aires"
+            services: "corte-cabello,barba,tratamiento"
+            price_min: 1000
+            price_max: 5000
+            rating_min: 4.0
+            distance: 5
+            available_today: true
+          expect:
+            - statusCode: 200
+      
+      # Get provider analytics (database heavy)
+      - get:
+          url: "/api/providers/1/analytics"
+          qs:
+            period: "year"
+            metrics: "all"
+          expect:
+            - statusCode: 200
+      
+      # Generate report (complex query)
+      - get:
+          url: "/api/reports/provider-performance"
+          qs:
+            provider_id: 1
+            start_date: "2023-01-01"
+            end_date: "2024-01-31"
+          expect:
+            - statusCode: 200
+
+  # WebSocket Performance Testing
+  - name: websocket-performance
+    weight: 5
+    flow:
+      - ws:
+          url: "ws://localhost:3000/socket.io/"
+          subprotocols: ["socket.io"]
+      - send:
+          payload: '42["join_room","provider_1"]'
+      - think: 2
+      - send:
+          payload: '42["booking_update",{"booking_id":1,"status":"confirmed"}]'
+      - think: 1
+      - send:
+          payload: '42["leave_room","provider_1"]'
+
+  # Error Handling and Recovery Testing
+  - name: error-handling-performance
+    weight: 5
+    flow:
+      # Test rate limiting
+      - loop:
+          count: 20
+          over:
+            - get:
+                url: "/api/search"
+                qs:
+                  location: "Buenos Aires"
+      
+      # Test invalid requests
+      - post:
+          url: "/api/bookings"
+          headers:
+            Content-Type: "application/json"
+          json:
+            invalid_field: "test"
+          expect:
+            - statusCode: 400
+      
+      # Test non-existent resources
+      - get:
+          url: "/api/providers/999999"
+          expect:
+            - statusCode: 404
+
+# Custom metrics and reporting
+reporting:
+  - type: json
+    output: "performance-results.json"
+  - type: html
+    output: "performance-report.html"
+
+# Performance benchmarks specific to Argentina market
+benchmarks:
+  response_time_p95_ms: 200
+  response_time_p99_ms: 500
+  throughput_rps: 1000
+  error_rate_percentage: 1
+  availability_percentage: 99.9
+  concurrent_users_supported: 5000
+  database_query_time_ms: 100
+  payment_processing_time_ms: 2000
+  search_response_time_ms: 150
+  booking_creation_time_ms: 300

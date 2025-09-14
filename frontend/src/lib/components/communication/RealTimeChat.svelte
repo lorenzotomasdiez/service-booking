@@ -13,8 +13,6 @@
   export let userType = 'client'; // client, provider
   export let argentinaOptimized = true;
   
-  const dispatch = createEventDispatcher();
-  
   // Chat state
   let messages: any[] = [];
   let newMessage = '';

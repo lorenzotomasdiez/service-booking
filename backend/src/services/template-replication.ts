@@ -648,7 +648,6 @@ class TemplateReplicationService {
       vertical.customizations.workflows.length > 0 ? '-- Workflow tables: WorkflowExecution' : ''
     ].filter(Boolean);
   }
-}
 
   // Day 9 Enhancement: Sub-2-hour deployment automation
   async generateRapidDeploymentPackage(verticalId: string, customizations?: Partial<ServiceVertical>) {

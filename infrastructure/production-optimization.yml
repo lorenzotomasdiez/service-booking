@@ -1,0 +1,687 @@
+# ============================================================================
+# BarberPro Production Infrastructure Final Optimization
+# Ticket: O11-001 - Production Launch Infrastructure & Operational Excellence
+# ============================================================================
+
+# AWS Infrastructure Configuration
+aws:
+  region: sa-east-1  # São Paulo - closest to Argentina
+  secondary_region: us-east-1  # For disaster recovery
+  
+  # VPC Configuration
+  vpc:
+    cidr: "10.0.0.0/16"
+    availability_zones: ["sa-east-1a", "sa-east-1b", "sa-east-1c"]
+    
+    # Private subnets for application and database
+    private_subnets:
+      - "10.0.1.0/24"  # sa-east-1a
+      - "10.0.2.0/24"  # sa-east-1b
+      - "10.0.3.0/24"  # sa-east-1c
+    
+    # Public subnets for load balancers
+    public_subnets:
+      - "10.0.101.0/24"  # sa-east-1a
+      - "10.0.102.0/24"  # sa-east-1b
+      - "10.0.103.0/24"  # sa-east-1c
+
+  # ECS Configuration for Production
+  ecs:
+    cluster_name: "barberpro-production"
+    launch_type: "FARGATE"
+    
+    # Backend Service Configuration
+    backend_service:
+      cpu: 2048  # 2 vCPU
+      memory: 4096  # 4 GB
+      desired_count: 3
+      min_capacity: 2
+      max_capacity: 10
+      
+      # Auto Scaling Configuration
+      scaling_policies:
+        cpu_target: 70
+        memory_target: 80
+        scale_out_cooldown: 300
+        scale_in_cooldown: 300
+      
+      # Health Check Configuration
+      health_check:
+        path: "/api/health"
+        interval: 30
+        timeout: 5
+        healthy_threshold: 2
+        unhealthy_threshold: 3
+    
+    # Frontend Service Configuration (if serving from ECS)
+    frontend_service:
+      cpu: 1024  # 1 vCPU
+      memory: 2048  # 2 GB
+      desired_count: 2
+      min_capacity: 2
+      max_capacity: 6
+
+  # RDS Configuration
+  database:
+    engine: "postgres"
+    engine_version: "15.4"
+    instance_class: "db.r6g.xlarge"  # 4 vCPU, 32 GB RAM
+    allocated_storage: 100
+    max_allocated_storage: 1000
+    storage_type: "gp3"
+    iops: 3000
+    
+    # Multi-AZ for high availability
+    multi_az: true
+    backup_retention_period: 30
+    backup_window: "03:00-04:00"
+    maintenance_window: "sun:04:00-sun:05:00"
+    
+    # Performance Insights
+    performance_insights_enabled: true
+    performance_insights_retention_period: 7
+    
+    # Security
+    deletion_protection: true
+    encrypted: true
+    
+    # Connection Pooling
+    parameter_group:
+      max_connections: 500
+      shared_preload_libraries: "pg_stat_statements"
+      log_statement: "all"
+      log_min_duration_statement: 1000
+
+  # ElastiCache Redis Configuration
+  redis:
+    node_type: "cache.r6g.large"  # 2 vCPU, 13.07 GB RAM
+    num_cache_nodes: 3
+    engine_version: "7.0"
+    port: 6379
+    
+    # Cluster Mode
+    cluster_mode_enabled: true
+    num_node_groups: 2
+    replicas_per_node_group: 1
+    
+    # Backup Configuration
+    snapshot_retention_limit: 7
+    snapshot_window: "03:00-05:00"
+    
+    # Security
+    at_rest_encryption_enabled: true
+    transit_encryption_enabled: true
+
+  # Application Load Balancer
+  alb:
+    scheme: "internet-facing"
+    load_balancer_type: "application"
+    
+    # Target Groups
+    target_groups:
+      backend:
+        port: 3000
+        protocol: "HTTP"
+        health_check_path: "/api/health"
+        health_check_interval: 30
+        health_check_timeout: 5
+        healthy_threshold_count: 2
+        unhealthy_threshold_count: 3
+      
+      frontend:
+        port: 3001
+        protocol: "HTTP"
+        health_check_path: "/"
+        health_check_interval: 30
+    
+    # SSL Configuration
+    ssl_policy: "ELBSecurityPolicy-TLS-1-2-2017-01"
+    certificate_arn: "arn:aws:acm:sa-east-1:ACCOUNT:certificate/CERT-ID"
+
+  # CloudFront Distribution
+  cloudfront:
+    price_class: "PriceClass_100"  # US, Canada, Europe, Asia
+    
+    # Origins
+    origins:
+      - domain_name: "alb.barberpro.com.ar"
+        origin_id: "ALB-Origin"
+        custom_origin_config:
+          http_port: 80
+          https_port: 443
+          origin_protocol_policy: "https-only"
+    
+    # Cache Behaviors
+    cache_behaviors:
+      - path_pattern: "/api/*"
+        target_origin_id: "ALB-Origin"
+        viewer_protocol_policy: "redirect-to-https"
+        cached_methods: ["GET", "HEAD"]
+        cache_policy_id: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"  # CachingDisabled
+      
+      - path_pattern: "/static/*"
+        target_origin_id: "ALB-Origin"
+        viewer_protocol_policy: "redirect-to-https"
+        cached_methods: ["GET", "HEAD", "OPTIONS"]
+        cache_policy_id: "658327ea-f89d-4fab-a63d-7e88639e58f6"  # CachingOptimized
+        compress: true
+    
+    # Custom Error Pages
+    custom_error_responses:
+      - error_code: 404
+        response_code: 200
+        response_page_path: "/index.html"
+        error_caching_min_ttl: 300
+
+  # S3 Buckets
+  s3:
+    # Application Assets
+    assets_bucket:
+      name: "barberpro-production-assets"
+      versioning: true
+      encryption: "AES256"
+      lifecycle_rules:
+        - id: "DeleteOldVersions"
+          status: "Enabled"
+          noncurrent_version_expiration_days: 30
+    
+    # User Uploads
+    uploads_bucket:
+      name: "barberpro-production-uploads"
+      versioning: true
+      encryption: "AES256"
+      cors_configuration:
+        - allowed_headers: ["*"]
+          allowed_methods: ["GET", "POST", "PUT"]
+          allowed_origins: ["https://barberpro.com.ar"]
+          max_age_seconds: 3000
+    
+    # Backups
+    backups_bucket:
+      name: "barberpro-production-backups"
+      versioning: true
+      encryption: "AES256"
+      lifecycle_rules:
+        - id: "ArchiveOldBackups"
+          status: "Enabled"
+          transition_days: 30
+          storage_class: "GLACIER"
+        - id: "DeleteOldBackups"
+          status: "Enabled"
+          expiration_days: 2555  # 7 years
+
+# Monitoring Configuration
+monitoring:
+  # CloudWatch Configuration
+  cloudwatch:
+    # Custom Metrics
+    custom_metrics:
+      - metric_name: "UserRegistrations"
+        namespace: "BarberPro/Business"
+        dimensions:
+          - name: "Environment"
+            value: "production"
+      
+      - metric_name: "BookingCompletions"
+        namespace: "BarberPro/Business"
+        dimensions:
+          - name: "Environment"
+            value: "production"
+          - name: "PaymentMethod"
+            value: "MercadoPago"
+    
+    # Alarms Configuration
+    alarms:
+      # Application Performance
+      - alarm_name: "HighResponseTime"
+        metric_name: "TargetResponseTime"
+        threshold: 2.0  # 2 seconds
+        comparison_operator: "GreaterThanThreshold"
+        evaluation_periods: 2
+        period: 300
+        statistic: "Average"
+        alarm_actions:
+          - "arn:aws:sns:sa-east-1:ACCOUNT:barberpro-alerts"
+      
+      # Database Performance
+      - alarm_name: "HighDatabaseCPU"
+        metric_name: "CPUUtilization"
+        threshold: 80
+        comparison_operator: "GreaterThanThreshold"
+        evaluation_periods: 2
+        period: 300
+        statistic: "Average"
+        alarm_actions:
+          - "arn:aws:sns:sa-east-1:ACCOUNT:barberpro-alerts"
+      
+      # Error Rate
+      - alarm_name: "HighErrorRate"
+        metric_name: "HTTPCode_Target_5XX_Count"
+        threshold: 10
+        comparison_operator: "GreaterThanThreshold"
+        evaluation_periods: 2
+        period: 300
+        statistic: "Sum"
+        alarm_actions:
+          - "arn:aws:sns:sa-east-1:ACCOUNT:barberpro-alerts"
+
+  # Application Performance Monitoring
+  apm:
+    # DataDog Configuration
+    datadog:
+      api_key: "${DATADOG_API_KEY}"
+      service_name: "barberpro-production"
+      environment: "production"
+      
+      # Custom Tags
+      tags:
+        - "env:production"
+        - "service:barberpro"
+        - "region:argentina"
+        - "version:1.0.0"
+      
+      # Log Configuration
+      logs:
+        enabled: true
+        level: "warn"
+        format: "json"
+      
+      # APM Configuration
+      apm:
+        enabled: true
+        sample_rate: 1.0  # 100% sampling for production launch
+        profiling_enabled: true
+    
+    # New Relic Configuration
+    newrelic:
+      license_key: "${NEWRELIC_LICENSE_KEY}"
+      app_name: "BarberPro-Production"
+      
+      # Browser Monitoring
+      browser_monitoring:
+        enabled: true
+        script_injection: true
+      
+      # Infrastructure Monitoring
+      infrastructure:
+        enabled: true
+        docker_integration: true
+
+# Security Configuration
+security:
+  # WAF Configuration
+  waf:
+    name: "barberpro-production-waf"
+    scope: "CLOUDFRONT"
+    
+    # Managed Rule Groups
+    managed_rule_groups:
+      - name: "AWSManagedRulesCommonRuleSet"
+        priority: 1
+        override_action: "none"
+      
+      - name: "AWSManagedRulesKnownBadInputsRuleSet"
+        priority: 2
+        override_action: "none"
+      
+      - name: "AWSManagedRulesSQLiRuleSet"
+        priority: 3
+        override_action: "none"
+    
+    # Custom Rules
+    custom_rules:
+      - name: "RateLimitRule"
+        priority: 10
+        action: "block"
+        statement:
+          rate_based_statement:
+            limit: 2000
+            aggregate_key_type: "IP"
+    
+    # Geo Blocking (Allow Argentina and neighboring countries)
+    geo_match_statement:
+      country_codes: ["AR", "BR", "CL", "UY", "PY", "BO"]
+      action: "allow"
+
+  # SSL/TLS Configuration
+  ssl:
+    # Certificate Manager
+    acm:
+      domain_name: "barberpro.com.ar"
+      subject_alternative_names:
+        - "*.barberpro.com.ar"
+        - "api.barberpro.com.ar"
+      validation_method: "DNS"
+    
+    # Security Headers
+    security_headers:
+      - name: "Strict-Transport-Security"
+        value: "max-age=31536000; includeSubDomains; preload"
+      
+      - name: "X-Content-Type-Options"
+        value: "nosniff"
+      
+      - name: "X-Frame-Options"
+        value: "DENY"
+      
+      - name: "X-XSS-Protection"
+        value: "1; mode=block"
+      
+      - name: "Referrer-Policy"
+        value: "strict-origin-when-cross-origin"
+
+# Disaster Recovery Configuration
+disaster_recovery:
+  # RTO (Recovery Time Objective): 1 hour
+  # RPO (Recovery Point Objective): 15 minutes
+  
+  # Database Backup Strategy
+  database_backup:
+    # Automated Backups
+    automated_backups:
+      retention_period: 30
+      backup_window: "03:00-04:00"
+      copy_tags_to_snapshot: true
+    
+    # Cross-Region Backups
+    cross_region_backup:
+      destination_region: "us-east-1"
+      retention_period: 7
+    
+    # Point-in-Time Recovery
+    point_in_time_recovery:
+      enabled: true
+      backup_retention_period: 30
+
+  # Application Backup Strategy
+  application_backup:
+    # ECS Task Definitions
+    task_definitions:
+      backup_frequency: "daily"
+      retention_period: 30
+    
+    # Configuration Backups
+    configuration:
+      backup_frequency: "daily"
+      retention_period: 90
+      
+    # Code Repository
+    code_repository:
+      backup_frequency: "daily"
+      retention_period: 365
+
+  # Disaster Recovery Procedures
+  procedures:
+    # Automated Failover
+    automated_failover:
+      enabled: true
+      health_check_grace_period: 300
+      failover_threshold: 3
+    
+    # Manual Failover
+    manual_failover:
+      estimated_time: "30 minutes"
+      required_approvals: 2
+      notification_channels:
+        - email: "ops@barberpro.com.ar"
+        - slack: "#incidents"
+        - whatsapp: "+54911XXXXXXX"
+
+# Performance Optimization
+performance:
+  # CDN Configuration
+  cdn:
+    # Edge Locations
+    edge_locations:
+      primary: "Buenos Aires"
+      secondary: ["São Paulo", "Santiago", "Lima"]
+    
+    # Cache Strategy
+    cache_strategy:
+      static_assets:
+        ttl: 31536000  # 1 year
+        compress: true
+      
+      api_responses:
+        ttl: 300  # 5 minutes
+        vary_headers: ["Authorization", "Accept-Language"]
+      
+      dynamic_content:
+        ttl: 0  # No cache
+        forward_headers: ["Host", "User-Agent"]
+
+  # Database Optimization
+  database_optimization:
+    # Connection Pooling
+    connection_pooling:
+      max_connections: 500
+      min_connections: 50
+      idle_timeout: 600
+    
+    # Query Optimization
+    query_optimization:
+      slow_query_log: true
+      slow_query_threshold: 1000  # 1 second
+      explain_analyze: true
+    
+    # Indexing Strategy
+    indexing:
+      auto_vacuum: true
+      auto_analyze: true
+      maintenance_work_mem: "512MB"
+
+  # Application Optimization
+  application_optimization:
+    # Memory Management
+    memory:
+      heap_size: "2GB"
+      gc_algorithm: "G1GC"
+    
+    # CPU Optimization
+    cpu:
+      worker_processes: "auto"
+      worker_connections: 1024
+    
+    # I/O Optimization
+    io:
+      async_io: true
+      buffer_size: "64KB"
+
+# Cost Optimization
+cost_optimization:
+  # Reserved Instances
+  reserved_instances:
+    # RDS Reserved Instances
+    rds:
+      instance_type: "db.r6g.xlarge"
+      term: "1 year"
+      payment_option: "no upfront"
+      estimated_savings: "30%"
+    
+    # ElastiCache Reserved Nodes
+    elasticache:
+      node_type: "cache.r6g.large"
+      term: "1 year"
+      payment_option: "no upfront"
+      estimated_savings: "25%"
+
+  # Auto Scaling Policies
+  auto_scaling:
+    # ECS Service Scaling
+    ecs_scaling:
+      scale_out_threshold: 70  # CPU %
+      scale_in_threshold: 30   # CPU %
+      cooldown_period: 300     # 5 minutes
+    
+    # Database Scaling
+    database_scaling:
+      read_replica_threshold: 80  # CPU %
+      max_read_replicas: 3
+
+  # Resource Optimization
+  resource_optimization:
+    # Unused Resources
+    cleanup_policies:
+      - resource: "EBS Snapshots"
+        retention: "30 days"
+      
+      - resource: "CloudWatch Logs"
+        retention: "90 days"
+      
+      - resource: "S3 Incomplete Multipart Uploads"
+        retention: "7 days"
+
+# Compliance Configuration
+compliance:
+  # Argentina Data Protection Law
+  data_protection:
+    # Data Residency
+    data_residency:
+      primary_region: "sa-east-1"  # São Paulo
+      allowed_regions: ["sa-east-1", "us-east-1"]  # For DR only
+    
+    # Encryption
+    encryption:
+      at_rest: "AES-256"
+      in_transit: "TLS 1.2+"
+      key_management: "AWS KMS"
+    
+    # Data Retention
+    data_retention:
+      user_data: "7 years"
+      transaction_data: "10 years"
+      log_data: "2 years"
+
+  # AFIP Compliance
+  afip_compliance:
+    # Electronic Invoicing
+    electronic_invoicing:
+      enabled: true
+      api_endpoint: "https://servicios1.afip.gov.ar/wsfev1/service.asmx"
+      certificate_path: "/etc/ssl/afip/certificate.pem"
+      private_key_path: "/etc/ssl/afip/private_key.pem"
+    
+    # Tax Reporting
+    tax_reporting:
+      monthly_reports: true
+      annual_reports: true
+      retention_period: "10 years"
+
+  # Financial Compliance
+  financial_compliance:
+    # PCI DSS
+    pci_dss:
+      level: "Level 1"
+      assessment_frequency: "annual"
+      requirements:
+        - "Secure network architecture"
+        - "Encrypted data transmission"
+        - "Access control measures"
+        - "Regular security testing"
+
+# Operational Excellence
+operational_excellence:
+  # Runbooks
+  runbooks:
+    - name: "Application Deployment"
+      location: "/docs/runbooks/deployment.md"
+      owner: "DevOps Team"
+    
+    - name: "Incident Response"
+      location: "/docs/runbooks/incident-response.md"
+      owner: "SRE Team"
+    
+    - name: "Database Maintenance"
+      location: "/docs/runbooks/database-maintenance.md"
+      owner: "DBA Team"
+
+  # Alerting Strategy
+  alerting:
+    # Severity Levels
+    severity_levels:
+      critical:
+        response_time: "5 minutes"
+        escalation_time: "15 minutes"
+        notification_channels: ["email", "sms", "slack", "whatsapp"]
+      
+      high:
+        response_time: "15 minutes"
+        escalation_time: "30 minutes"
+        notification_channels: ["email", "slack"]
+      
+      medium:
+        response_time: "1 hour"
+        escalation_time: "4 hours"
+        notification_channels: ["email"]
+      
+      low:
+        response_time: "24 hours"
+        escalation_time: "48 hours"
+        notification_channels: ["email"]
+
+  # Change Management
+  change_management:
+    # Deployment Windows
+    deployment_windows:
+      production:
+        allowed_days: ["Tuesday", "Wednesday", "Thursday"]
+        allowed_hours: "14:00-18:00 ART"  # Argentina Time
+        blackout_periods:
+          - "December 20 - January 10"  # Holiday season
+          - "Easter Week"
+          - "National Holidays"
+    
+    # Approval Process
+    approval_process:
+      - level: "Developer"
+        required: 1
+      - level: "Tech Lead"
+        required: 1
+      - level: "DevOps"
+        required: 1
+      - level: "Product Owner"
+        required_for: ["major releases"]
+
+# Success Metrics
+success_metrics:
+  # Performance KPIs
+  performance_kpis:
+    - metric: "Response Time"
+      target: "<200ms"
+      measurement: "95th percentile"
+    
+    - metric: "Uptime"
+      target: ">99.9%"
+      measurement: "monthly"
+    
+    - metric: "Error Rate"
+      target: "<0.1%"
+      measurement: "daily"
+
+  # Business KPIs
+  business_kpis:
+    - metric: "User Registration Rate"
+      target: "500+ daily"
+      measurement: "Argentina market"
+    
+    - metric: "Booking Completion Rate"
+      target: ">85%"
+      measurement: "end-to-end process"
+    
+    - metric: "Payment Success Rate"
+      target: ">95%"
+      measurement: "MercadoPago transactions"
+
+  # Operational KPIs
+  operational_kpis:
+    - metric: "Mean Time to Recovery (MTTR)"
+      target: "<15 minutes"
+      measurement: "critical incidents"
+    
+    - metric: "Mean Time to Detection (MTTD)"
+      target: "<5 minutes"
+      measurement: "all incidents"
+    
+    - metric: "Deployment Frequency"
+      target: "Multiple per day"
+      measurement: "automated deployments"

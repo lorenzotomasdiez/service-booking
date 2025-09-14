@@ -92,6 +92,20 @@ import { registerAIRoutes } from './services/ai-powered-features';
 import { registerPerformanceRoutes } from './services/enterprise-performance';
 import { registerEnterpriseCoordinationRoutes } from './services/enterprise-coordination';
 
+// T11-001 Day 11 Production Systems Architecture & Launch Readiness Engineering
+import { registerT11CoordinationRoutes } from './services/t11-001-coordination';
+import { registerEnterpriseOnboardingRoutes } from './services/enterprise-client-onboarding';
+import { registerProductionArchitectureRoutes } from './services/production-systems-architecture';
+
+// B11-001 Day 11 Business Operations Backend & Customer Success Platform
+import { registerCustomerSuccessRoutes } from './services/customer-success-platform';
+import { registerBusinessIntelligenceRoutes } from './services/business-intelligence-platform';
+import { registerComplianceRegulatoryRoutes } from './services/compliance-regulatory-platform';
+import { registerProductionOperationsRoutes } from './services/production-operations-monitoring';
+
+// PAY11-001 Day 11 Production Payment Platform & Financial Operations Excellence
+import productionPaymentPlatformRoutes from './routes/production-payment-platform';
+
 
 export function buildServer(): FastifyInstance {
   const server = Fastify({
@@ -334,6 +348,20 @@ export function buildServer(): FastifyInstance {
   registerAIRoutes(server);
   registerPerformanceRoutes(server);
   registerEnterpriseCoordinationRoutes(server);
+
+  // T11-001 Day 11 Production Systems Architecture & Launch Readiness Engineering
+  registerT11CoordinationRoutes(server);
+  registerEnterpriseOnboardingRoutes(server);
+  registerProductionArchitectureRoutes(server);
+
+  // B11-001 Day 11 Business Operations Backend & Customer Success Platform
+  registerCustomerSuccessRoutes(server);
+  registerBusinessIntelligenceRoutes(server);
+  registerComplianceRegulatoryRoutes(server);
+  registerProductionOperationsRoutes(server);
+
+  // PAY11-001 Day 11 Production Payment Platform & Financial Operations Excellence
+  server.register(productionPaymentPlatformRoutes, { prefix: '/api/v1/payment-platform' });
 
   return server;
 }

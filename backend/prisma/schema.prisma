@@ -257,9 +257,17 @@ model Payment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // PAY11-001: Additional payment fields
+  gateway        String  @default("mercadopago") // Gateway tracking
+  customerEmail  String?
+  customerDni    String?
+
   // Relations
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
+  invoice Invoice? // PAY11-001: Invoice relationship
+  
+  @@index([gateway, status]) // PAY11-001: Performance indexes
+  @@index([customerEmail])
   @@map("payments")
 }
 
@@ -602,4 +610,129 @@ enum LoyaltyTransactionType {
   SPENT
   EXPIRED
   BONUS
+}
+
+// PAY11-001: Production Payment Platform & Financial Operations Tables
+
+model PaymentAnalytics {
+  id              String    @id @default(cuid())
+  transactionId   String    @unique
+  gateway         String
+  amount          Float
+  currency        String    @default("ARS")
+  status          String
+  processingTime  Int       // milliseconds
+  region          String    @default("AR")
+  paymentMethod   String
+  userId          String?
+  providerId      String?
+  errorCode       String?
+  fraudScore      Float?
+  complianceFlags String[]
+  timestamp       DateTime  @default(now())
+  
+  @@index([gateway, timestamp])
+  @@index([status, timestamp])
+  @@index([userId, timestamp])
+  @@index([providerId, timestamp])
+  @@map("payment_analytics")
+}
+
+model SecurityAuditLog {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  event     String
+  severity  String
+  details   Json
+  resolved  Boolean  @default(false)
+  resolvedAt DateTime?
+  resolvedBy String?
+  
+  @@index([timestamp])
+  @@index([event, severity])
+  @@index([resolved])
+  @@map("security_audit_logs")
+}
+
+model ComplianceAuditLog {
+  id             String   @id @default(cuid())
+  timestamp      DateTime @default(now())
+  overallStatus  String
+  details        Json
+  recommendations Json
+  
+  @@index([timestamp])
+  @@index([overallStatus])
+  @@map("compliance_audit_logs")
+}
+
+model AuditReport {
+  id              String   @id @default(cuid())
+  timestamp       DateTime @default(now())
+  type            String
+  findings        Json
+  recommendations Json
+  complianceScore Float
+  status          String
+  
+  @@index([timestamp])
+  @@index([type])
+  @@index([status])
+  @@map("audit_reports")
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  transactionId String   @unique
+  customerEmail String
+  amount        Float
+  currency      String   @default("ARS")
+  vatAmount     Float
+  invoiceNumber String   @unique
+  cuitSeller    String?
+  timestamp     DateTime @default(now())
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  payment       Payment? @relation(fields: [transactionId], references: [id])
+  
+  @@index([invoiceNumber])
+  @@index([customerEmail])
+  @@index([timestamp])
+  @@map("invoices")
+}
+
+model AfipTransaction {
+  id           String   @id @default(cuid())
+  transactionId String
+  amount       Float
+  vatAmount    Float?
+  customerCuit String?
+  concept      String
+  timestamp    DateTime @default(now())
+  reported     Boolean  @default(false)
+  reportedAt   DateTime?
+  
+  @@index([transactionId])
+  @@index([timestamp])
+  @@index([reported])
+  @@map("afip_transactions")
+}
+
+model PromotionalCampaign {
+  id           String   @id @default(cuid())
+  name         String
+  type         String
+  target       String
+  parameters   Json
+  expectedRoi  Float
+  startDate    DateTime
+  endDate      DateTime
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@index([type, status])
+  @@index([startDate, endDate])
+  @@map("promotional_campaigns")
 }

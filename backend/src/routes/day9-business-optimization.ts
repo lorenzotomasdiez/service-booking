@@ -1462,4 +1462,3 @@ export default async function day9BusinessOptimizationRoutes(fastify: FastifyIns
     }
   });
 }
-}

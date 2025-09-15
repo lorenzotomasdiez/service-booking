@@ -106,6 +106,12 @@ import { registerProductionOperationsRoutes } from './services/production-operat
 // PAY11-001 Day 11 Production Payment Platform & Financial Operations Excellence
 import productionPaymentPlatformRoutes from './routes/production-payment-platform';
 
+// B14-001 Day 14 Backend Excellence Completion & API Intelligence Platform Mastery
+import { registerBackendExcellenceRoutes } from './services/backend-excellence-platform';
+import { registerAPIDocumentationRoutes } from './services/api-documentation-platform';
+import { registerBackendArchitectureRoutes } from './services/backend-architecture-platform';
+import { registerBackendSuccessValidationRoutes } from './services/backend-success-validation';
+
 
 export function buildServer(): FastifyInstance {
   const server = Fastify({

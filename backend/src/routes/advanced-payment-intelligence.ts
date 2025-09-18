@@ -607,7 +607,7 @@ router.post('/generate-insights',
           timeframe,
           generatedAt: new Date().toISOString(),
           platforms: ['intelligence', 'financial', 'excellence'],
-          dataPoints: 1000+ // Mock number of data points analyzed
+          dataPoints: 1000 // Mock number of data points analyzed
         },
         timestamp: new Date().toISOString()
       });

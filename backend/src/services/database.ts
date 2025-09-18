@@ -43,6 +43,16 @@ class DatabaseService {
       return false;
     }
   }
+
+  public async testConnection(): Promise<void> {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      console.log('✅ Database connection test successful');
+    } catch (error) {
+      console.error('❌ Database connection test failed:', error);
+      throw error;
+    }
+  }
 }
 
 export const database = DatabaseService.getInstance();

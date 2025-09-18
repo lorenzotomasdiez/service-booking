@@ -764,10 +764,15 @@ class TemplateReplicationService {
 
   private generateDeploymentScripts(vertical: ServiceVertical) {
     return {
-      setup: `#!/bin/bash\n# ${vertical.displayName} Deployment Script\necho "Deploying ${vertical.displayName}..."`,
-      database: `# Database setup for ${vertical.id}\nprisma migrate deploy`,
-      services: `# Service configuration\necho "Configuring services for ${vertical.id}"`,
-      verification: `# Deployment verification\necho "Verifying ${vertical.displayName} deployment"`
+      setup: `#!/bin/bash
+# ${vertical.displayName} Deployment Script
+echo "Deploying ${vertical.displayName}..."`,
+      database: `# Database setup for ${vertical.id}
+prisma migrate deploy`,
+      services: `# Service configuration
+echo "Configuring services for ${vertical.id}"`,
+      verification: `# Deployment verification
+echo "Verifying ${vertical.displayName} deployment"`
     };
   }
 
@@ -809,24 +814,35 @@ class TemplateReplicationService {
   // Additional helper methods for automation
   private generateInfrastructureAsCode(vertical: ServiceVertical) {
     return {
-      terraform: `# ${vertical.displayName} Infrastructure\nresource "aws_instance" "${vertical.id}" {}`,
-      kubernetes: `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: ${vertical.id}-app`,
-      docker: `# ${vertical.displayName} Docker Configuration\nFROM node:18-alpine`
+      terraform: `# ${vertical.displayName} Infrastructure
+resource "aws_instance" "${vertical.id}" {}`,
+      kubernetes: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${vertical.id}-app`,
+      docker: `# ${vertical.displayName} Docker Configuration
+FROM node:18-alpine`
     };
   }
 
   private generateDatabaseMigrationScripts(vertical: ServiceVertical) {
     return {
-      up: `-- ${vertical.displayName} Migration Up\n-- Add vertical-specific tables`,
-      down: `-- ${vertical.displayName} Migration Down\n-- Remove vertical-specific tables`,
-      seed: `-- ${vertical.displayName} Seed Data\n-- Insert initial data for ${vertical.id}`
+      up: `-- ${vertical.displayName} Migration Up
+-- Add vertical-specific tables`,
+      down: `-- ${vertical.displayName} Migration Down
+-- Remove vertical-specific tables`,
+      seed: `-- ${vertical.displayName} Seed Data
+-- Insert initial data for ${vertical.id}`
     };
   }
 
   private generateCICDPipeline(vertical: ServiceVertical) {
     return {
       github: {
-        workflow: `name: ${vertical.displayName} Deploy\non: [push]\njobs:\n  deploy:`
+        workflow: `name: ${vertical.displayName} Deploy
+on: [push]
+jobs:
+  deploy:`
       },
       deployment: {
         staging: `Deploy to ${vertical.id}-staging`,

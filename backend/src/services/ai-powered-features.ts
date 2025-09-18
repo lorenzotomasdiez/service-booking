@@ -669,7 +669,7 @@ class AIPoweredFeaturesService {
       });
       
       // Calculate customer metrics
-      const customerMetrics = customers.map(customer => ({
+      const customerMetrics = await Promise.all(customers.map(async (customer) => ({
         id: customer.id,
         bookingFrequency: this.calculateBookingFrequency(customer.bookings),
         averageSpend: this.calculateAverageSpend(customer.bookings),
@@ -677,7 +677,7 @@ class AIPoweredFeaturesService {
         loyaltyScore: this.calculateLoyaltyScore(customer.bookings),
         daysSinceLastBooking: this.calculateDaysSinceLastBooking(customer.bookings),
         churnScore: await this.predictChurnScore(customer.id)
-      }));
+      })));
       
       // Apply segmentation logic
       const segments = this.segmentCache.get(tenantId) || [];

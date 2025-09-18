@@ -2,6 +2,11 @@
 # This is for self-hosted production deployments
 version: '3.8'
 
+# Load environment variables from .env files
+env_file:
+  - .env
+  - .env.production
+
 services:
   # PostgreSQL Database with Production Configuration
   postgres:
@@ -87,18 +92,38 @@ services:
       target: production
     container_name: barberpro-backend-prod
     environment:
-      NODE_ENV: production
-      PORT: 3000
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
       DATABASE_URL: postgresql://${POSTGRES_USER:-barberpro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-barberpro_prod}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
-      LOG_LEVEL: warn
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://barberpro.com.ar}
-      RATE_LIMIT_MAX_REQUESTS: 200
-      RATE_LIMIT_WINDOW_MS: 900000
+      API_BASE_URL: ${API_BASE_URL:-https://api.barberpro.com.ar}
+      APP_URL: ${APP_URL:-https://barberpro.com.ar}
+      FRONTEND_URL: ${FRONTEND_URL:-https://barberpro.com.ar}
+      # Argentina specific
+      TIMEZONE: ${TIMEZONE:-America/Argentina/Buenos_Aires}
+      LOCALE: ${LOCALE:-es-AR}
+      CURRENCY: ${CURRENCY:-ARS}
+      # Payment configuration
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
+      MERCADOPAGO_PUBLIC_KEY: ${MERCADOPAGO_PUBLIC_KEY}
+      MERCADOPAGO_ENVIRONMENT: ${MERCADOPAGO_ENVIRONMENT:-production}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET}
+      # Rate limiting
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-200}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      # Monitoring
       SENTRY_DSN: ${SENTRY_DSN}
       NEWRELIC_LICENSE_KEY: ${NEWRELIC_LICENSE_KEY}
       DATADOG_API_KEY: ${DATADOG_API_KEY}
+      # Security
+      BCRYPT_SALT_ROUNDS: ${BCRYPT_SALT_ROUNDS:-12}
+      # Production flags
+      APP_DEBUG: ${APP_DEBUG:-false}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     ports:
       - "3000:3000"
     depends_on:

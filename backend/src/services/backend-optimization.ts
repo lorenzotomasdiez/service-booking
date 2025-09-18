@@ -393,7 +393,10 @@ class BackendOptimizationService {
   }
 
   private async sendAlertNotification(channel: string, alert: MonitoringAlert, value: number): Promise<void> {
-    const message = `🚨 ALERTA ${alert.severity.toUpperCase()}\n${alert.type}: ${alert.metric}\nValor: ${value}\nUmbral: ${alert.threshold}`;
+    const message = `🚨 ALERTA ${alert.severity.toUpperCase()}
+${alert.type}: ${alert.metric}
+Valor: ${value}
+Umbral: ${alert.threshold}`;
     
     switch (channel) {
       case 'whatsapp':

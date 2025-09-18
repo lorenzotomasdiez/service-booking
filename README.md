@@ -1,0 +1,223 @@
+# BarberPro - Premium Service Booking Platform
+
+A premium service booking platform designed for Argentina, starting with barber services and architected for easy replication across service verticals (psychologists, doctors, etc.). Built with superior UX, enterprise features, and Argentina-specific optimizations.
+
+## 🚀 Quick Start
+
+```bash
+# Setup development environment
+npm run setup:dev
+
+# Start development servers
+npm run dev
+```
+
+**Access Points:**
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3000
+- API Documentation: http://localhost:3000/docs
+- Database Studio: `npm run db:studio`
+
+## 🏗️ Architecture
+
+### Full-Stack Monorepo
+- **Frontend**: SvelteKit + TypeScript + TailwindCSS (mobile-first PWA)
+- **Backend**: Node.js + Fastify + TypeScript + Prisma ORM
+- **Database**: PostgreSQL (primary) + Redis (caching/sessions)
+- **Infrastructure**: Docker + Railway/AWS deployment
+
+### Key Directories
+```
+/frontend/          - SvelteKit frontend application
+  /src/lib/components/  - 121+ Svelte components
+  /src/routes/      - SvelteKit file-based routing
+/backend/           - Fastify backend API
+  /src/services/    - Business logic services (126+ files)
+  /src/routes/      - API route handlers
+  /prisma/          - Database schema and migrations
+/docs/              - Project documentation
+```
+
+## 📋 Development Commands
+
+### Root Level (Workspace Management)
+```bash
+npm run dev           # Development (runs both frontend and backend)
+npm run build         # Build entire project
+npm test              # Run tests across all projects
+
+# Database operations
+npm run db:generate   # Generate Prisma client
+npm run db:migrate    # Run database migrations
+npm run db:studio     # Open Prisma Studio
+npm run db:seed       # Seed database with test data
+
+# Docker operations
+npm run docker:up     # Start postgres and redis containers
+npm run docker:dev    # Start dev dependencies only
+```
+
+### Frontend (SvelteKit)
+```bash
+cd frontend
+
+npm run dev           # Start development server (port 5173)
+npm run build         # Build for production
+npm run preview       # Preview production build
+npm run check         # Svelte type checking
+npm run lint          # ESLint
+npm test              # Run Vitest tests
+```
+
+### Backend (Fastify)
+```bash
+cd backend
+
+npm run dev           # Start with tsx watch (port 3000)
+npm run build         # Compile TypeScript
+npm start             # Run compiled JavaScript
+npm run lint          # ESLint
+npm run typecheck     # TypeScript type checking
+npm test              # Run Jest tests
+npm run seed          # Seed database
+```
+
+## 🇦🇷 Argentina-Specific Features
+
+### Localization
+- **Phone formatting**: +54 9 11 1234-5678 pattern
+- **DNI formatting**: 12.345.678 pattern
+- **Currency**: Peso argentino (ARS) with inflation handling
+- **Timezone**: America/Argentina/Buenos_Aires
+- **Language**: Spanish (es-AR) locale
+
+### Payment Integration
+- **MercadoPago**: Primary payment gateway
+- **AFIP Integration**: Tax compliance system
+- **Multiple payment methods**: Cards, digital wallets, BNPL
+
+### Cultural Adaptations
+- **WhatsApp Business**: Primary communication channel
+- **Regional expansion**: Buenos Aires, Córdoba, Rosario, La Plata
+- **Local holidays**: Argentina calendar integration
+
+## 🧩 Component Architecture
+
+The frontend features **121+ components** organized into:
+- **Core**: Button, Input, Modal, Card, Loading (8 components)
+- **Booking**: Calendar, Forms, Service selection (8 components)
+- **Provider**: Analytics, Service management (9 components)
+- **Argentina-specific**: Payment, WhatsApp, Location services
+- **Enterprise**: Multi-tenant, White-label customization
+- **AI/Intelligence**: Smart recommendations, Predictive analytics
+
+## 🔧 Service Architecture
+
+The backend contains **126+ service files** organized by domain:
+- **Core Services**: Database, Authentication, Socket.io
+- **Booking Logic**: Advanced scheduling, Availability management
+- **Payment Processing**: Argentina payment gateways, AFIP integration
+- **Analytics**: Business intelligence, Performance monitoring
+- **Enterprise**: Multi-tenant, AI-powered features
+
+## 🔄 Template Replication Strategy
+
+Architected for easy vertical replication:
+- **85% code reuse target** across service verticals
+- **Template-based configuration** for niche customization
+- **2-4 week replication timeline** for new verticals
+- **Multi-tenant architecture** for vertical isolation
+
+### Replication Process
+1. Copy base repository
+2. Update niche-specific configs in `/niche-configs/`
+3. Customize branding and themes
+4. Adjust service types and scheduling rules
+5. Deploy with minimal code changes
+
+## 🧪 Testing
+
+### Frontend Testing
+- **Vitest**: Unit and integration tests
+- **Component testing**: Svelte component isolation
+- **E2E testing**: Playwright for user workflows
+
+### Backend Testing
+- **Jest**: Unit testing framework
+- **Supertest**: API endpoint testing
+- **Integration tests**: Database and service integration
+- **Performance tests**: Artillery load testing
+
+## 🔒 Security & Compliance
+
+### Authentication
+- **JWT-based authentication** with @fastify/jwt
+- **Rate limiting** via @fastify/rate-limit
+- **CORS configuration** for frontend integration
+
+### Argentina Compliance
+- **AFIP integration** for tax reporting
+- **Data protection** compliance
+- **PCI DSS** payment security standards
+
+## ⚡ Performance Optimization
+
+### Frontend
+- **Code splitting**: Route-based and component-based
+- **Lazy loading**: Images and components
+- **PWA optimization**: Service worker, offline capabilities
+- **Mobile-first**: Touch-optimized interfaces
+
+### Backend
+- **Redis caching**: Session and data caching
+- **Database optimization**: Prisma query optimization
+- **Auto-scaling**: Infrastructure scaling patterns
+- **CDN integration**: Argentina-optimized content delivery
+
+## 📁 Key File Locations
+
+- **Database schema**: `backend/prisma/schema.prisma`
+- **Component library**: `frontend/src/lib/components/`
+- **Service definitions**: `backend/src/services/`
+- **Configuration**: `frontend/vite.config.ts`, `backend/src/config/`
+
+## 🚀 Deployment
+
+### Development Environment
+- **Docker Compose**: Local postgres and redis containers
+- **Hot reloading**: Frontend and backend auto-restart
+- **Type checking**: Real-time TypeScript validation
+
+### Production Deployment
+- **Railway/AWS**: Cloud deployment platforms
+- **Docker containers**: Consistent deployment environments
+- **Environment variables**: Configuration management
+- **Monitoring**: Performance and error tracking
+
+## 🤝 Contributing
+
+1. **Setup development environment**:
+   ```bash
+   npm run setup:dev
+   ```
+
+2. **Run quality checks before committing**:
+   ```bash
+   npm run lint
+   npm run typecheck  # Backend only
+   npm test
+   ```
+
+3. **Follow development guidelines**:
+   - TypeScript everywhere for full type safety
+   - Component-driven development
+   - API-first design with OpenAPI docs
+   - Argentina-specific optimizations
+
+## 📄 License
+
+[License information to be added]
+
+---
+
+Built with ❤️ for the Argentina market, designed for global expansion across service verticals.

@@ -21,7 +21,7 @@ class ApiClient {
 	private baseUrl: string;
 
 	constructor() {
-		this.baseUrl = env.PUBLIC_VITE_API_URL || 'http://localhost:3000/api';
+		this.baseUrl = env.PUBLIC_API_URL || 'http://localhost:3000/api';
 	}
 
 	private getAuthToken(): string | null {

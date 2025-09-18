@@ -1,6 +1,4 @@
-# BarberPro Production-Ready Environment
-# Uses production Dockerfiles with optimized settings
-# For development, use: docker-compose -f docker-compose.dev.yml up
+# BarberPro Local Development Environment
 version: '3.8'
 
 services:
@@ -9,9 +7,9 @@ services:
     image: postgres:15-alpine
     container_name: barberpro-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-barberpro_dev}
-      POSTGRES_USER: ${POSTGRES_USER:-barberpro}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-barberpro_dev_password}
+      POSTGRES_DB: barberpro_dev
+      POSTGRES_USER: barberpro
+      POSTGRES_PASSWORD: barberpro_dev_password
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
@@ -46,21 +44,27 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # Backend API (Production Build)
+  # Backend API (Fastify)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
       target: production
     container_name: barberpro-backend
-    env_file:
-      - ./backend/.env  # Backend-specific environment variables
     environment:
-      # Override database URL for Docker network
-      DATABASE_URL: postgresql://${POSTGRES_USER:-barberpro}:${POSTGRES_PASSWORD:-barberpro_dev_password}@postgres:5432/${POSTGRES_DB:-barberpro_dev}
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://barberpro:barberpro_dev_password@postgres:5432/barberpro_dev
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-jwt-secret-key-not-for-production
+      LOG_LEVEL: debug
+      CORS_ORIGIN: http://localhost:5173
     ports:
       - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - /app/dist
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,30 +74,35 @@ services:
       - barberpro-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
 
-  # Frontend (Production Build)
+  # Frontend (SvelteKit)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
     container_name: barberpro-frontend
-    env_file:
-      - ./frontend/.env  # Frontend-specific environment variables
+    environment:
+      VITE_API_URL: http://localhost:3000/api
+      VITE_APP_URL: http://localhost:5173
     ports:
       - "5173:80"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/build
     depends_on:
       - backend
     networks:
       - barberpro-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -104,8 +113,8 @@ services:
     image: dpage/pgadmin4:7
     container_name: barberpro-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_DEFAULT_EMAIL: admin@barberpro.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
       - "8080:80"
@@ -123,8 +132,8 @@ services:
     container_name: barberpro-redis-commander
     environment:
       REDIS_HOSTS: local:redis:6379
-      HTTP_USER: ${REDIS_COMMANDER_USER}
-      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD}
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin123
     ports:
       - "8081:8081"
     depends_on:

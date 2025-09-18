@@ -326,10 +326,20 @@ class WhatsAppIntegrationService {
 
   private async sendWhatsAppDashboardUpdate(phone: string, updateType: string, data: any): Promise<void> {
     const messages = {
-      new_booking: `🆕 Nueva reserva confirmada\n📅 ${data.date}\n⏰ ${data.time}\n👤 ${data.clientName}`,
-      cancellation: `❌ Reserva cancelada\n📅 ${data.date}\n⏰ ${data.time}\n👤 ${data.clientName}`,
-      payment: `💳 Pago recibido\n💰 $${data.amount}\n👤 ${data.clientName}`,
-      review: `⭐ Nueva reseña recibida\n⭐ ${data.rating}/5 estrellas\n👤 ${data.clientName}`
+      new_booking: `🆕 Nueva reserva confirmada
+📅 ${data.date}
+⏰ ${data.time}
+👤 ${data.clientName}`,
+      cancellation: `❌ Reserva cancelada
+📅 ${data.date}
+⏰ ${data.time}
+👤 ${data.clientName}`,
+      payment: `💳 Pago recibido
+💰 $${data.amount}
+👤 ${data.clientName}`,
+      review: `⭐ Nueva reseña recibida
+⭐ ${data.rating}/5 estrellas
+👤 ${data.clientName}`
     };
 
     await this.sendWhatsAppMessage({
@@ -635,7 +645,11 @@ class WhatsAppIntegrationService {
     await this.sendWhatsAppMessage({
       to: user.phone,
       type: 'text',
-      content: `🎧 Ticket de soporte creado\n📝 ID: ${ticket.id}\n⏱️ Te responderemos pronto\n\n¿Necesitas ayuda urgente? Responde "URGENTE"`
+      content: `🎧 Ticket de soporte creado
+📝 ID: ${ticket.id}
+⏱️ Te responderemos pronto
+
+¿Necesitas ayuda urgente? Responde "URGENTE"`
     });
 
     // Send email acknowledgment

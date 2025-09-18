@@ -52,7 +52,7 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
   }, async (request: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
     try {
       const result = await authService.register(request.body);
-      
+
       return reply.code(201).send({
         user: result.user,
         accessToken: result.accessToken,
@@ -61,7 +61,7 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
       });
     } catch (error: any) {
       const message = error.message;
-      
+
       // All validation errors are now handled by preHandler middleware
       // This catch block only handles business logic errors
       return reply.code(409).send({
@@ -88,8 +88,8 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
   }, async (request: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
     try {
       const result = await authService.login(request.body);
-      
-      reply.send({
+
+      return reply.send({
         user: result.user,
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
@@ -97,15 +97,15 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
       });
     } catch (error: any) {
       const message = error.message;
-      
+
       if (message.includes('desactivada')) {
-        reply.code(403).send({
+        return reply.code(403).send({
           error: 'Account Disabled',
           message,
           statusCode: 403
         });
       } else {
-        reply.code(401).send({
+        return reply.code(401).send({
           error: 'Authentication Failed',
           message: message || 'Credenciales inválidas',
           statusCode: 401
@@ -129,14 +129,14 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
   }, async (request: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
     try {
       const result = await authService.refreshToken(request.body.refreshToken);
-      
-      reply.send({
+
+      return reply.send({
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
         expiresIn: result.expiresIn
       });
     } catch (error: any) {
-      reply.code(401).send({
+      return reply.code(401).send({
         error: 'Token Refresh Failed',
         message: error.message || 'Token de actualización inválido',
         statusCode: 401
@@ -160,9 +160,9 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
   }, async (request: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
     try {
       await authService.logout(request.body.refreshToken);
-      reply.send({ message: 'Sesión cerrada exitosamente' });
+      return reply.send({ message: 'Sesión cerrada exitosamente' });
     } catch (error) {
-      reply.send({ message: 'Sesión cerrada exitosamente' });
+      return reply.send({ message: 'Sesión cerrada exitosamente' });
     }
   });
 
@@ -206,22 +206,21 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
       });
 
       if (!user) {
-        reply.code(404).send({
+        return reply.code(404).send({
           error: 'User Not Found',
           message: 'Usuario no encontrado',
           statusCode: 404
         });
-        return;
       }
 
-      reply.send({
+      return reply.send({
         ...user,
         birthDate: user.birthDate?.toISOString() || null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString()
       });
     } catch (error) {
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Error al obtener perfil de usuario',
         statusCode: 500
@@ -249,9 +248,9 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
     
     try {
       const user = await authService.updateProfile(userId, request.body);
-      reply.send(user);
+      return reply.send(user);
     } catch (error: any) {
-      reply.code(400).send({
+      return reply.code(400).send({
         error: 'Update Failed',
         message: error.message || 'Error al actualizar perfil',
         statusCode: 400
@@ -287,23 +286,21 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
       });
 
       if (!user) {
-        reply.code(404).send({
+        return reply.code(404).send({
           error: 'User Not Found',
           message: 'Usuario no encontrado',
           statusCode: 404
         });
-        return;
       }
 
       // Verify current password
       const isValidPassword = await authService.comparePassword(currentPassword, user.password);
       if (!isValidPassword) {
-        reply.code(400).send({
+        return reply.code(400).send({
           error: 'Invalid Password',
           message: 'Contraseña actual incorrecta',
           statusCode: 400
         });
-        return;
       }
 
       // Hash new password
@@ -318,11 +315,11 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
       // Revoke all refresh tokens to force re-login
       await authService.logoutAll(userId);
 
-      reply.send({ 
-        message: 'Contraseña actualizada exitosamente. Por favor, inicie sesión nuevamente.' 
+      return reply.send({
+        message: 'Contraseña actualizada exitosamente. Por favor, inicie sesión nuevamente.'
       });
     } catch (error) {
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Error al cambiar contraseña',
         statusCode: 500
@@ -349,11 +346,11 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
     
     try {
       await authService.logoutAll(userId);
-      reply.send({ 
-        message: 'Sesión cerrada en todos los dispositivos' 
+      return reply.send({
+        message: 'Sesión cerrada en todos los dispositivos'
       });
     } catch (error) {
-      reply.code(500).send({
+      return reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Error al cerrar sesiones',
         statusCode: 500

@@ -1,7 +1,9 @@
 // Frontend Monitoring Store - Real-time monitoring and analytics for BarberPro
 import { writable, derived } from 'svelte/store';
 import { browser } from '$app/environment';
+import { dev } from '$app/environment';
 import { performanceStore } from './performance';
+import { apiClient } from '../api/client';
 
 interface FrontendMetrics {
   // User interaction metrics
@@ -150,10 +152,10 @@ const initialState: FrontendMonitoringState = {
     enableRealTimeTracking: true,
     enablePerformanceMonitoring: true,
     enableErrorTracking: true,
-    enableUserAnalytics: true,
-    sampleRate: 1.0, // 100% for critical launch period
-    batchSize: 10,
-    reportingInterval: 30000 // 30 seconds
+    enableUserAnalytics: !dev, // Disable in development, enable in production
+    sampleRate: dev ? 0.1 : 1.0, // 10% in dev, 100% in production
+    batchSize: dev ? 5 : 10, // Smaller batches in dev
+    reportingInterval: dev ? 60000 : 30000 // 1 minute in dev, 30 seconds in production
   }
 };
 
@@ -553,28 +555,39 @@ function createFrontendMonitoringStore() {
   async function flushEventQueue() {
     if (eventQueue.length === 0) return;
 
+    // Skip sending in development if user analytics is disabled
+    if (dev && !initialState.configuration.enableUserAnalytics) {
+      console.log(`[FrontendMonitoring] Skipping ${eventQueue.length} events in development mode`);
+      eventQueue = [];
+      return;
+    }
+
     const events = [...eventQueue];
     eventQueue = [];
 
     try {
-      // Send events to backend
-      await fetch('/api/analytics/events', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          events,
-          timestamp: new Date().toISOString(),
-          sessionId: initialState.currentSession?.sessionId
-        })
+      // Send events to backend using centralized API client
+      await apiClient.post('/analytics/frontend-events', {
+        events,
+        timestamp: new Date().toISOString(),
+        sessionId: initialState.currentSession?.sessionId,
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        referrer: document.referrer,
+        environment: dev ? 'development' : 'production'
       });
 
       console.log(`[FrontendMonitoring] Sent ${events.length} events to backend`);
 
     } catch (error) {
       console.error('[FrontendMonitoring] Failed to send events:', error);
-      
+
+      // In development, log the error but don't retry to avoid spam
+      if (dev) {
+        console.warn('[FrontendMonitoring] Skipping retry in development mode');
+        return;
+      }
+
       // Re-queue events for retry (with limit to prevent memory issues)
       if (eventQueue.length < 100) {
         eventQueue = [...events.slice(-50), ...eventQueue];

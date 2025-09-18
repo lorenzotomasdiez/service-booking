@@ -1,13 +1,16 @@
-# BarberPro Production-Ready Environment
-# Uses production Dockerfiles with optimized settings
-# For development, use: docker-compose -f docker-compose.dev.yml up
+# BarberPro Development Environment
+# Uses Dockerfile.dev files for fast development with hot reloading
 version: '3.8'
+
+# Load environment variables from .env files
+env_file:
+  - .env  # Services configuration only
 
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: barberpro-postgres
+    container_name: barberpro-postgres-dev
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-barberpro_dev}
       POSTGRES_USER: ${POSTGRES_USER:-barberpro}
@@ -16,10 +19,10 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_dev_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
-      - barberpro-network
+      - barberpro-dev-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U barberpro -d barberpro_dev"]
       interval: 10s
@@ -30,15 +33,15 @@ services:
   # Redis Cache
   redis:
     image: redis:7-alpine
-    container_name: barberpro-redis
+    container_name: barberpro-redis-dev
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
-      - ./config/redis.conf:/usr/local/etc/redis/redis.conf
+      - redis_dev_data:/data
+      - ./docker/configs/redis.conf:/usr/local/etc/redis/redis.conf
     command: redis-server /usr/local/etc/redis/redis.conf
     networks:
-      - barberpro-network
+      - barberpro-dev-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -46,13 +49,12 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # Backend API (Production Build)
+  # Backend API (Development)
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-      target: production
-    container_name: barberpro-backend
+      dockerfile: Dockerfile.dev
+    container_name: barberpro-backend-dev
     env_file:
       - ./backend/.env  # Backend-specific environment variables
     environment:
@@ -61,39 +63,46 @@ services:
       REDIS_URL: redis://redis:6379
     ports:
       - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - /app/dist
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
-      - barberpro-network
+      - barberpro-dev-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
 
-  # Frontend (Production Build)
+  # Frontend (Development)
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-      target: production
-    container_name: barberpro-frontend
+      dockerfile: Dockerfile.dev
+    container_name: barberpro-frontend-dev
     env_file:
       - ./frontend/.env  # Frontend-specific environment variables
     ports:
-      - "5173:80"
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/build
     depends_on:
       - backend
     networks:
-      - barberpro-network
+      - barberpro-dev-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5173"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -102,7 +111,7 @@ services:
   # Database Administration (pgAdmin)
   pgadmin:
     image: dpage/pgadmin4:7
-    container_name: barberpro-pgadmin
+    container_name: barberpro-pgadmin-dev
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
@@ -110,17 +119,17 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - pgadmin_data:/var/lib/pgadmin
+      - pgadmin_dev_data:/var/lib/pgadmin
     depends_on:
       - postgres
     networks:
-      - barberpro-network
+      - barberpro-dev-network
     restart: unless-stopped
 
   # Redis Admin Interface
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: barberpro-redis-commander
+    container_name: barberpro-redis-commander-dev
     environment:
       REDIS_HOSTS: local:redis:6379
       HTTP_USER: ${REDIS_COMMANDER_USER}
@@ -130,17 +139,17 @@ services:
     depends_on:
       - redis
     networks:
-      - barberpro-network
+      - barberpro-dev-network
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  postgres_dev_data:
     driver: local
-  redis_data:
+  redis_dev_data:
     driver: local
-  pgadmin_data:
+  pgadmin_dev_data:
     driver: local
 
 networks:
-  barberpro-network:
+  barberpro-dev-network:
     driver: bridge

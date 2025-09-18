@@ -166,7 +166,7 @@ class ProviderOperationsIntelligence {
 
     // Track service optimization patterns
     if (action === 'price_change') {
-      await this.analyzepricing Strategy(providerId, serviceData);
+      await this.analyzePricingStrategy(providerId, serviceData);
     }
 
     if (action === 'availability_update') {

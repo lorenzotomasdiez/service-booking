@@ -6,13 +6,8 @@ declare module 'fastify' {
     prisma: PrismaClient;
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
-  
+
   interface FastifyRequest {
     startTime?: number;
-    user?: {
-      id: string;
-      email: string;
-      role: string;
-    };
   }
 }

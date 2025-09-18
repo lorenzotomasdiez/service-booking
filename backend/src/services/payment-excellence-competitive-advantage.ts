@@ -208,7 +208,7 @@ export interface CompetitiveAdvantageReport {
       innovationIndex: number;
       technologyAdvantage: string[];
       futureInnovations: string[];
-      r&dInvestment: number;
+      rdInvestment: number;
     };
     customerExcellence: {
       satisfactionLeadership: boolean;
@@ -1045,7 +1045,7 @@ class CompetitiveIntelligenceEngine {
           innovationIndex: 0.85,
           technologyAdvantage: ['AI_fraud_detection', 'real_time_analytics'],
           futureInnovations: ['blockchain_integration', 'cryptocurrency_support'],
-          r&dInvestment: 0.15
+          rdInvestment: 0.15
         },
         customerExcellence: {
           satisfactionLeadership: true,

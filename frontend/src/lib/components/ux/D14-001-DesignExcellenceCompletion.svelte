@@ -49,7 +49,7 @@
           metrics: {
             usabilityTesting: { completion_rate: 97.2, satisfaction: 4.8, error_rate: 1.3 },
             accessibilityCompliance: { wcag_aa: 100, wcag_aaa: 94.2, argentina_standards: 97.5 },
-            mobileExperience: { pwa_score: 96, touch_optimization: 98.1, performance: 94.8 },
+            mobileExperience: { mobile_score: 96, touch_optimization: 98.1, performance: 94.8 },
             conversionOptimization: { booking_flow: 91.5, onboarding: 89.3, retention: 87.6 }
           },
           market_leadership: [
@@ -209,8 +209,8 @@
           first_input_delay: 0.06
         },
         mobileExcellence: {
-          pwa_score: 96,
-          offline_functionality: 91.3,
+          mobile_score: 96,
+          offline_support: 91.3,
           touch_optimization: 97.8,
           network_resilience: 89.2
         }

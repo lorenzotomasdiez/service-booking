@@ -152,6 +152,8 @@
 		<div
 			class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300 {backdropClassName}"
 			on:click={handleBackdropClick}
+			on:keydown={handleKeydown}
+			role="presentation"
 		></div>
 
 		<!-- Modal Container -->
@@ -160,6 +162,11 @@
 			<div
 				class="relative bg-white rounded-2xl shadow-strong w-full {sizeClasses[size]} {className} animate-scale-in"
 				on:click|stopPropagation
+				on:keydown={handleKeydown}
+				role="dialog"
+				aria-modal="true"
+				tabindex="0"
+				aria-labelledby={title ? 'modal-title' : undefined}
 			>
 				<!-- Header -->
 				{#if title || closable || $$slots.header}
@@ -167,7 +174,7 @@
 						{#if $$slots.header}
 							<slot name="header" />
 						{:else if title}
-							<h2 class="text-xl font-semibold text-neutral-800">
+							<h2 id="modal-title" class="text-xl font-semibold text-neutral-800">
 								{title}
 							</h2>
 						{:else}

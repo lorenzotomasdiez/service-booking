@@ -59,6 +59,10 @@
 		lg: 'shadow-medium'
 	};
 
+	// Determine if element is truly interactive
+	$: isInteractive = clickable || variant === 'interactive';
+
+
 	$: classes = [
 		baseClasses,
 		variantClasses[variant],
@@ -71,13 +75,13 @@
 	].filter(Boolean).join(' ');
 
 	function handleClick(event: MouseEvent) {
-		if (clickable) {
+		if (isInteractive) {
 			dispatch('click', event);
 		}
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
-		if (clickable && (event.key === 'Enter' || event.key === ' ')) {
+		if (isInteractive && (event.key === 'Enter' || event.key === ' ')) {
 			event.preventDefault();
 			dispatch('click', event);
 		}
@@ -200,14 +204,108 @@
 			<slot />
 		</div>
 	</a>
-{:else}
+{:else if isInteractive}
 	<div
 		class={classes}
 		on:click={handleClick}
 		on:keydown={handleKeydown}
-		role={clickable ? 'button' : undefined}
-		tabindex={clickable ? 0 : undefined}
+		role="button"
+		tabindex="0"
 	>
+		{#if imageUrl}
+			<!-- Image Header -->
+			<div class="relative overflow-hidden rounded-t-{rounded} -m-6 mb-4">
+				<img
+					src={imageUrl}
+					alt={imageAlt}
+					class="w-full h-48 sm:h-56 object-cover"
+					loading="lazy"
+				/>
+				{#if rating}
+					<div class="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1">
+						<div class="flex items-center gap-1 text-sm font-semibold">
+							<svg class="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 24 24">
+								<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+							</svg>
+							<span class="text-neutral-800">{rating.toFixed(1)}</span>
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
+
+		<!-- Content -->
+		<div class="space-y-3">
+			{#if title}
+				<div>
+					<h3 class="text-lg font-semibold text-neutral-800 line-clamp-2">
+						{title}
+					</h3>
+					{#if subtitle}
+						<p class="text-sm text-neutral-600 mt-1">
+							{subtitle}
+						</p>
+					{/if}
+				</div>
+			{/if}
+
+			{#if rating && reviewCount !== undefined}
+				<div class="flex items-center gap-2">
+					<div class="flex items-center">
+						{#each { length: generateStars(rating).filled } as _}
+							<svg class="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 24 24">
+								<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+							</svg>
+						{/each}
+						{#if generateStars(rating).half}
+							<svg class="w-4 h-4 text-yellow-400" viewBox="0 0 24 24">
+								<defs>
+									<linearGradient id="half">
+										<stop offset="50%" stop-color="currentColor"/>
+										<stop offset="50%" stop-color="transparent"/>
+									</linearGradient>
+								</defs>
+								<path fill="url(#half)" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+							</svg>
+						{/if}
+						{#each { length: generateStars(rating).empty } as _}
+							<svg class="w-4 h-4 text-neutral-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+							</svg>
+						{/each}
+					</div>
+					<span class="text-sm text-neutral-600">
+						{rating.toFixed(1)} ({reviewCount} reseñas)
+					</span>
+				</div>
+			{/if}
+
+			{#if location}
+				<div class="flex items-center gap-2 text-sm text-neutral-600">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+					</svg>
+					{location}
+				</div>
+			{/if}
+
+			{#if price !== undefined}
+				<div class="flex items-center justify-between">
+					<span class="text-lg font-bold text-primary-600 font-mono">
+						Desde {formatCurrency(price)}
+					</span>
+					<div class="text-sm text-neutral-500">
+						<slot name="price-suffix" />
+					</div>
+				</div>
+			{/if}
+
+			<slot />
+		</div>
+	</div>
+{:else}
+	<div class={classes}>
 		{#if imageUrl}
 			<!-- Image Header -->
 			<div class="relative overflow-hidden rounded-t-{rounded} -m-6 mb-4">

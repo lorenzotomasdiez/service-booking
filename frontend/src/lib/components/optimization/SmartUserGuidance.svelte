@@ -207,9 +207,8 @@
       steps: [
         {
           step: 1,
-          title: 'Agregar a Inicio',
-          description: 'Instala BarberPro como app en tu teléfono',
-          visual: 'install-pwa.gif'
+          title: 'Navegación Rápida',
+          description: 'Usa el menú inferior para acceso directo a tus secciones favoritas'
         },
         {
           step: 2,
@@ -219,17 +218,17 @@
         },
         {
           step: 3,
-          title: 'Modo Offline',
-          description: 'Consulta tus reservas sin conexión'
+          title: 'Modo Oscuro',
+          description: 'Ahorra batería activando el modo oscuro en configuración'
         }
       ],
       actions: [
         {
           type: 'button',
-          label: 'Instalar App',
-          action: 'install-pwa',
+          label: 'Configurar',
+          action: 'mobile-settings',
           primary: true,
-          icon: 'download'
+          icon: 'settings'
         }
       ],
       priority: 'low',
@@ -533,8 +532,8 @@
       case 'retry-booking':
         retryBooking();
         break;
-      case 'install-pwa':
-        installPWA();
+      case 'mobile-settings':
+        openMobileSettings();
         break;
       case 'enable-data-saver':
         enableDataSaver();
@@ -567,10 +566,13 @@
     window.location.reload();
   }
 
-  function installPWA(): void {
-    // PWA installation logic would be handled by the app
-    localStorage.setItem('pwa-install-requested', 'true');
+  function openMobileSettings(): void {
+    // Open mobile settings or configuration panel
     hideGuidance();
+    // Navigate to settings if available
+    if (typeof window !== 'undefined') {
+      window.location.href = '/settings';
+    }
   }
 
   function enableDataSaver(): void {

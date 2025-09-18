@@ -235,8 +235,8 @@
 					localStorage.removeItem('barberpro-cache');
 					sessionStorage.clear();
 					
-					// Clear service worker cache if available
-					if ('serviceWorker' in navigator && 'caches' in window) {
+					// Clear browser cache if available
+					if ('caches' in window) {
 						const cacheNames = await caches.keys();
 						await Promise.all(
 							cacheNames.map(name => caches.delete(name))

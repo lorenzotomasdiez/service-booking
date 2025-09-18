@@ -64,7 +64,6 @@ export default defineConfig({
 	// Define global constants for optimization flags
 	define: {
 		__ARGENTINA_MOBILE_OPTIMIZED__: true,
-		__PWA_ENABLED__: true,
 		__REAL_TIME_FEATURES__: true
 	}
 });

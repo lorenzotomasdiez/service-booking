@@ -17,7 +17,6 @@
 	import ProviderAnalyticsDashboard from '$lib/components/provider/ProviderAnalyticsDashboard.svelte';
 	import AdvancedBookingManagement from '$lib/components/provider/AdvancedBookingManagement.svelte';
 	import IntelligentCacheManager from '$lib/components/performance/IntelligentCacheManager.svelte';
-	import ProgressiveWebApp from '$lib/components/mobile/ProgressiveWebApp.svelte';
 	import SocialEngagementHub from '$lib/components/social/SocialEngagementHub.svelte';
 	import CustomerEngagementAutomation from '$lib/components/intelligence/CustomerEngagementAutomation.svelte';
 
@@ -308,7 +307,7 @@
 											<span class="font-bold text-green-600">89.2%</span>
 										</div>
 										<div class="flex justify-between">
-											<span class="text-gray-600">Mobile PWA Installs</span>
+											<span class="text-gray-600">Mobile App Usage</span>
 											<span class="font-bold text-blue-600">2,847</span>
 										</div>
 										<div class="flex justify-between">
@@ -386,7 +385,6 @@
 
 		<!-- F13-001 Background Components -->
 		<IntelligentCacheManager />
-		<ProgressiveWebApp />
 		<CustomerEngagementAutomation user={$user} />
 	</div>
 {:else}

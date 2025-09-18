@@ -1,4 +1,0 @@
-read @ServiceBooking_PRD.md . Understand it, then go and read
-   @docs/project-management/day_three_tasks.md and follow instructions, you must use
-   agents for any task, all the roles and members have its own agents. Always wait for
-   each agent to finish and make sure that before every agent you are in the root folder

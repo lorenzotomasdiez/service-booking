@@ -243,7 +243,7 @@
               implementationEffort: "medium"
             },
             {
-              technique: "Service worker caching for booking data",
+              technique: "Browser caching for booking data",
               expectedImprovement: 1.6,
               implementationEffort: "high"
             }
@@ -355,7 +355,7 @@
       ],
       optimizationOpportunities: [
         "Mobile page speed to 95+ score",
-        "Service worker implementation",
+        "Advanced browser caching",
         "Advanced caching strategies"
       ],
       blockers: [] // No blocking issues

@@ -147,28 +147,31 @@
 	}
 
 	async function setupPushNotifications() {
-		if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+		if (!('Notification' in window)) {
 			console.warn('Push notifications not supported');
 			return;
 		}
 
 		try {
-			const registration = await navigator.serviceWorker.ready;
-			const subscription = await registration.pushManager.subscribe({
-				userVisibleOnly: true,
-				applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY)
-			});
+			// Request permission for browser notifications
+			const permission = await Notification.requestPermission();
 
-			pushSubscription = subscription;
+			if (permission !== 'granted') {
+				console.warn('Notification permission denied');
+				return;
+			}
 
-			// Send subscription to server
-			await fetch('/api/notifications/push-subscription', {
+			// Use browser notification API directly
+			console.log('Browser notifications enabled');
+
+			// Register for browser notifications
+			await fetch('/api/notifications/browser-enable', {
 				method: 'POST',
 				headers: {
 					'Authorization': `Bearer ${localStorage.getItem('token')}`,
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify(subscription)
+				body: JSON.stringify({ enabled: true })
 			});
 
 		} catch (error) {

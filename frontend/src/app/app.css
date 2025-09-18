@@ -16,6 +16,11 @@
 /* CSS Custom Properties for theming */
 :root {
 	--font-mono: 'Fira Mono', monospace;
+	/* Argentina-specific design tokens */
+	--navbar-height: 4rem;
+	--mobile-navbar-height: 3.5rem;
+	--trust-bar-height: 2.5rem;
+	--touch-target-min: 44px;
 	/* TailwindCSS theme colors are handled via the config */
 }
 
@@ -106,6 +111,45 @@
 	.container-responsive {
 		@apply mx-auto px-4 sm:px-6 lg:px-8;
 		max-width: 100%;
+	}
+
+	/* Enhanced navbar components for mobile-first Argentina market */
+	.navbar-mobile-optimized {
+		min-height: var(--mobile-navbar-height);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+	}
+
+	.trust-bar-argentina {
+		height: var(--trust-bar-height);
+		background: linear-gradient(90deg, theme('colors.primary.500'), theme('colors.primary.600'));
+	}
+
+	.mobile-nav-item {
+		min-height: var(--touch-target-min);
+		-webkit-tap-highlight-color: transparent;
+		touch-action: manipulation;
+	}
+
+	.argentina-gradient-primary {
+		background: linear-gradient(135deg, theme('colors.primary.500') 0%, theme('colors.primary.700') 100%);
+	}
+
+	.argentina-gradient-secondary {
+		background: linear-gradient(135deg, theme('colors.secondary.400') 0%, theme('colors.secondary.600') 100%);
+	}
+
+	/* Enhanced mobile menu animation */
+	.mobile-menu-slide {
+		animation: slideDown 0.3s ease-out;
+	}
+
+	/* Argentina flag colors for trust indicators */
+	.argentina-trust-indicator {
+		background: linear-gradient(90deg, theme('colors.argentina.sky'), theme('colors.argentina.flag'));
+		background-clip: text;
+		-webkit-background-clip: text;
+		color: transparent;
 	}
 
 	/* Button styles */

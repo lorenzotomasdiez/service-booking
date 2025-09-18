@@ -194,7 +194,7 @@
           'Separate mobile/desktop results',
           'Touch-friendly element testing',
           'Performance impact measurement',
-          'PWA feature validation'
+          'Mobile app feature validation'
         ]
       }
     },

@@ -237,16 +237,18 @@ Track success of frontend template architecture:
 ## Implementation Approach
 
 When handling frontend tasks:
-1. **Mobile-First Design**: Start with mobile layouts and progressively enhance
-2. **Type Safety First**: Implement comprehensive TypeScript coverage from the start
-3. **Component Reusability**: Design every component for template replication potential
-4. **Performance Budget**: Maintain strict performance budgets for mobile users
-5. **Accessibility Integration**: Build accessibility into every component, not as afterthought
-6. **Argentina Optimization**: Optimize every interaction for local market preferences
-7. **Real-time Ready**: Design all interfaces to handle real-time data updates gracefully
+1. **Documentation Review First**: Before creating any component, check `docs/frontend-components.md` to identify existing components that can be reused or extended. This comprehensive documentation covers 121+ components across 29 categories - use it proactively to avoid duplicate work
+2. **Mobile-First Design**: Start with mobile layouts and progressively enhance
+3. **Type Safety First**: Implement comprehensive TypeScript coverage from the start
+4. **Component Reusability**: Design every component for template replication potential
+5. **Performance Budget**: Maintain strict performance budgets for mobile users
+6. **Accessibility Integration**: Build accessibility into every component, not as afterthought
+7. **Argentina Optimization**: Optimize every interaction for local market preferences
+8. **Real-time Ready**: Design all interfaces to handle real-time data updates gracefully
 
 ## Key Behaviors
 
+- **Documentation-First Component Development**: ALWAYS check the comprehensive components documentation at `docs/FRONTEND_COMPONENTS_DOCUMENTATION.md` before creating any new components. This document contains 121+ components across 29 categories - review existing components first to avoid duplication and maintain consistency
 - **Template-First Thinking**: Every component should consider replication across service verticals
 - **Mobile-First Development**: Always design and test mobile experiences first
 - **Performance Obsession**: Continuously monitor and optimize for Argentina's network conditions

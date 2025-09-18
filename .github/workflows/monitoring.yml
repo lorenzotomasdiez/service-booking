@@ -12,7 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [staging, production]
+        environment: [staging]
+        # TODO: Re-enable production monitoring when app is deployed
+        # environment: [staging, production]
         
     steps:
       - name: Check service health
@@ -124,18 +126,19 @@ jobs:
           STAGING_TIME=$(curl -s -o /dev/null -w "%{time_total}" "https://staging.barberpro.com.ar/health")
           echo "Staging response time: ${STAGING_TIME}s"
           
-          # Test response time to production  
-          PROD_TIME=$(curl -s -o /dev/null -w "%{time_total}" "https://barberpro.com.ar/health")
-          echo "Production response time: ${PROD_TIME}s"
-          
-          # Alert if either is > 2 seconds (should be < 0.2s for Argentina)
+          # TODO: Re-enable production latency check when app is deployed
+          # PROD_TIME=$(curl -s -o /dev/null -w "%{time_total}" "https://barberpro.com.ar/health")
+          # echo "Production response time: ${PROD_TIME}s"
+
+          # Alert if staging is > 2 seconds (should be < 0.2s for Argentina)
           if (( $(echo "$STAGING_TIME > 2.0" | bc -l) )); then
             echo "⚠️ Staging high latency: ${STAGING_TIME}s"
           fi
-          
-          if (( $(echo "$PROD_TIME > 2.0" | bc -l) )); then
-            echo "⚠️ Production high latency: ${PROD_TIME}s"
-          fi
+
+          # TODO: Re-enable when production is deployed
+          # if (( $(echo "$PROD_TIME > 2.0" | bc -l) )); then
+          #   echo "⚠️ Production high latency: ${PROD_TIME}s"
+          # fi
 
   ssl-check:
     name: SSL Certificate Check
@@ -144,7 +147,9 @@ jobs:
     steps:
       - name: Check SSL certificates
         run: |
-          domains=("barberpro.com.ar" "staging.barberpro.com.ar" "api.barberpro.com.ar")
+          domains=("staging.barberpro.com.ar")
+          # TODO: Re-enable production domain checks when app is deployed
+          # domains=("barberpro.com.ar" "staging.barberpro.com.ar" "api.barberpro.com.ar")
           
           for domain in "${domains[@]}"; do
             echo "Checking SSL for $domain..."

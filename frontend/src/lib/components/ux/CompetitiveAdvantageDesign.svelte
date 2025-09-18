@@ -78,7 +78,7 @@
           market_validation: 87,
           differentiator_strength: 'moderate',
           implementation_areas: [
-            'App PWA optimizada',
+            'App móvil optimizada',
             'WhatsApp como canal principal',
             'Pagos híbridos (digital + efectivo)',
             'Soporte en horarios argentinos',

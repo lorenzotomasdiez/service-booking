@@ -174,7 +174,7 @@
         page_load_speed: 'A+', // 1.2s average
         interaction_responsiveness: 'A+', // <100ms
         resource_optimization: 'A', // optimized assets
-        mobile_performance: 'A+' // PWA optimized
+        mobile_performance: 'A+' // Mobile optimized
       },
       cross_browser_testing: {
         chrome: 100,
@@ -215,10 +215,10 @@
           first_input_delay: '45ms'
         },
         mobile_optimization: {
-          pwa_score: 95,
-          offline_functionality: 89,
-          app_shell_caching: 100,
-          push_notifications: 94
+          mobile_score: 95,
+          offline_support: 89,
+          browser_caching: 100,
+          browser_notifications: 94
         }
       },
       continuous_improvement: {

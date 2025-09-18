@@ -22,7 +22,6 @@ class PerformanceOptimizationService {
   constructor() {
     this.initializePerformanceTracking();
     this.setupLazyLoading();
-    this.initializeServiceWorker();
     this.setupErrorBoundaries();
   }
   
@@ -180,61 +179,19 @@ class PerformanceOptimizationService {
   }
   
   private checkWebPSupport(): boolean {
+    if (typeof document === 'undefined') return false;
+
     const canvas = document.createElement('canvas');
     canvas.width = 1;
     canvas.height = 1;
     return canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
   }
   
-  // Service Worker Management
-  private async initializeServiceWorker() {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
-    
-    try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        if (newWorker) {
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New version available
-              this.showUpdateAvailable();
-            }
-          });
-        }
-      });
-      
-      // Handle service worker messages
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data.type === 'CACHE_UPDATED') {
-          console.log('Cache updated for:', event.data.url);
-        }
-      });
-      
-    } catch (error) {
-      console.error('Service Worker registration failed:', error);
-    }
-  }
-  
-  private showUpdateAvailable() {
-    const updateBanner = document.createElement('div');
-    updateBanner.innerHTML = `
-      <div class="fixed top-0 left-0 right-0 bg-blue-600 text-white p-3 z-50 text-center">
-        <span>Nueva versión disponible. </span>
-        <button onclick="window.location.reload()" class="underline font-semibold">
-          Actualizar ahora
-        </button>
-        <button onclick="this.parentElement.remove()" class="ml-4 text-blue-200">
-          ✕
-        </button>
-      </div>
-    `;
-    document.body.prepend(updateBanner);
-  }
   
   // Error Boundaries and Fallbacks
   private setupErrorBoundaries() {
+    if (typeof window === 'undefined') return;
+
     // Global error handler
     window.addEventListener('error', (event) => {
       this.handleError({
@@ -334,6 +291,8 @@ class PerformanceOptimizationService {
   }
   
   private showOfflineMessage() {
+    if (typeof document === 'undefined') return;
+
     const offlineElement = document.createElement('div');
     offlineElement.id = 'offline-message';
     offlineElement.innerHTML = `
@@ -352,6 +311,8 @@ class PerformanceOptimizationService {
   }
   
   private hideOfflineMessage() {
+    if (typeof document === 'undefined') return;
+
     const offlineElement = document.getElementById('offline-message');
     if (offlineElement) {
       offlineElement.remove();
@@ -398,6 +359,8 @@ class PerformanceOptimizationService {
   }
   
   public optimizeForMobile() {
+    if (typeof window === 'undefined') return;
+
     // Reduce animations on slower devices
     if (this.isSlowDevice()) {
       document.documentElement.classList.add('reduce-motion');
@@ -411,6 +374,8 @@ class PerformanceOptimizationService {
   }
   
   private isSlowDevice(): boolean {
+    if (typeof navigator === 'undefined') return false;
+
     const connection = (navigator as any).connection;
     const slowConnection = connection && 
       (connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g');
@@ -425,6 +390,8 @@ class PerformanceOptimizationService {
   }
   
   private optimizeTouchPerformance() {
+    if (typeof document === 'undefined') return;
+
     // Add passive event listeners for better scroll performance
     document.addEventListener('touchstart', () => {}, { passive: true });
     document.addEventListener('touchmove', () => {}, { passive: true });
@@ -446,6 +413,8 @@ class PerformanceOptimizationService {
   }
   
   private adaptToDeviceCapabilities() {
+    if (typeof document === 'undefined') return;
+
     if (this.isSlowDevice()) {
       // Disable heavy features
       document.documentElement.classList.add('low-performance');

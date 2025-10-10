@@ -3,7 +3,6 @@
 # Use with environment-specific overrides:
 #   Development: docker-compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
 #   Production: docker-compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up
-version: '3.8'
 
 services:
   # PostgreSQL Database - Version 16

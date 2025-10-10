@@ -1,7 +1,6 @@
 # BarberPro Development Environment Overrides
 # Extends docker-compose.yml with development-specific configurations
 # Usage: docker-compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
-version: '3.8'
 
 services:
   # PostgreSQL - Development Overrides

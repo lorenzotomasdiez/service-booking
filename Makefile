@@ -45,8 +45,9 @@ endif
 # Docker Compose command
 DOCKER_COMPOSE := docker-compose
 COMPOSE_BASE := -f docker/docker-compose.yml
-COMPOSE_MONITORING := $(COMPOSE_BASE) -f docker/docker-compose.monitoring.yml
-COMPOSE_MOCKS := $(COMPOSE_BASE) -f docker/docker-compose.mocks.yml
+COMPOSE_DEV := $(COMPOSE_BASE) -f docker/docker-compose.dev.yml
+COMPOSE_MONITORING := $(COMPOSE_DEV) -f docker/docker-compose.monitoring.yml
+COMPOSE_MOCKS := $(COMPOSE_DEV) -f docker/docker-compose.mocks.yml
 COMPOSE_TEST := -f docker/docker-compose.test.yml
 COMPOSE_FULL := $(COMPOSE_MOCKS) -f docker/docker-compose.monitoring.yml
 
@@ -439,43 +440,137 @@ test: check-docker ## Start test environment
 
 ##@ Database Operations
 
-db-migrate: ## Run Prisma migrations (Stream C will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream C: Database commands not yet implemented"
+db-migrate: ## Run Prisma migrations
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running Prisma migrations..."
+	@if ! $(DOCKER_COMPOSE) $(COMPOSE_DEV) ps backend | grep -q "Up"; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Backend container is not running"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Backend service is not available. Database commands need backend container."; \
+		exit 1; \
+	fi
+	@$(DOCKER_COMPOSE) $(COMPOSE_DEV) exec backend npm run db:migrate || \
+		(echo "$(RED)[$(CROSS)]$(RESET) Migration failed" && exit 1)
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Migrations applied successfully"
 
-db-seed: ## Seed database with test data (Stream C will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream C: Database commands not yet implemented"
+db-seed: ## Seed database with test data
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Seeding database with test data..."
+	@if ! $(DOCKER_COMPOSE) $(COMPOSE_DEV) ps backend | grep -q "Up"; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Backend container is not running"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Backend service is not available. Database commands need backend container."; \
+		exit 1; \
+	fi
+	@$(DOCKER_COMPOSE) $(COMPOSE_DEV) exec backend npm run seed || \
+		(echo "$(RED)[$(CROSS)]$(RESET) Seeding failed" && exit 1)
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Database seeded successfully"
 
-db-reset: ## Drop, migrate, seed (Stream C will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream C: Database commands not yet implemented"
+db-reset: ## Drop, migrate, seed (complete reset)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Resetting database (drop, migrate, seed)..."
+	@echo "$(YELLOW)[$(WARN)]$(RESET) This will DELETE ALL DATA in the database!"
+	@if ! $(DOCKER_COMPOSE) $(COMPOSE_DEV) ps backend | grep -q "Up"; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Backend container is not running"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Backend service is not available. Database commands need backend container."; \
+		exit 1; \
+	fi
+	@$(DOCKER_COMPOSE) $(COMPOSE_DEV) exec backend npm run db:reset || \
+		(echo "$(RED)[$(CROSS)]$(RESET) Database reset failed" && exit 1)
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Database reset completed successfully"
 
-db-backup: ## Backup database to file (Stream C will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream C: Database commands not yet implemented"
+db-backup: ## Backup database to file
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Backing up database..."
+	@if ! $(DOCKER_COMPOSE) $(COMPOSE_BASE) ps postgres | grep -q "Up"; then \
+		echo "$(RED)[$(CROSS)]$(RESET) PostgreSQL container is not running"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Start the database with: make up"; \
+		exit 1; \
+	fi
+	@mkdir -p docker/backup
+	@BACKUP_FILE="docker/backup/barberpro_$$(date +%Y%m%d_%H%M%S).sql" && \
+	$(DOCKER_COMPOSE) $(COMPOSE_BASE) exec -T postgres pg_dump -U $${POSTGRES_USER:-barberpro} $${POSTGRES_DB:-barberpro_dev} > $$BACKUP_FILE && \
+	echo "$(GREEN)[$(CHECK)]$(RESET) Database backed up to: $$BACKUP_FILE" || \
+	(echo "$(RED)[$(CROSS)]$(RESET) Backup failed" && exit 1)
 
-db-restore: ## Restore database from backup (Stream C will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream C: Database commands not yet implemented"
+db-restore: ## Restore database from backup (usage: make db-restore FILE=docker/backup/file.sql)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Restoring database from backup..."
+	@if [ -z "$(FILE)" ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) No backup file specified"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Usage: make db-restore FILE=docker/backup/barberpro_YYYYMMDD_HHMMSS.sql"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Available backups:"; \
+		ls -1t docker/backup/*.sql 2>/dev/null | head -5 || echo "  No backups found"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(FILE)" ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Backup file not found: $(FILE)"; \
+		exit 1; \
+	fi
+	@if ! $(DOCKER_COMPOSE) $(COMPOSE_BASE) ps postgres | grep -q "Up"; then \
+		echo "$(RED)[$(CROSS)]$(RESET) PostgreSQL container is not running"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Start the database with: make up"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)[$(WARN)]$(RESET) This will REPLACE ALL DATA in the database!"
+	@cat $(FILE) | $(DOCKER_COMPOSE) $(COMPOSE_BASE) exec -T postgres psql -U $${POSTGRES_USER:-barberpro} $${POSTGRES_DB:-barberpro_dev} && \
+	echo "$(GREEN)[$(CHECK)]$(RESET) Database restored from: $(FILE)" || \
+	(echo "$(RED)[$(CROSS)]$(RESET) Restore failed" && exit 1)
 
-db-shell: ## Open PostgreSQL shell (Stream C will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream C: Database commands not yet implemented"
+db-shell: ## Open PostgreSQL shell
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Opening PostgreSQL shell..."
+	@if ! $(DOCKER_COMPOSE) $(COMPOSE_BASE) ps postgres | grep -q "Up"; then \
+		echo "$(RED)[$(CROSS)]$(RESET) PostgreSQL container is not running"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Start the database with: make up"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Connected to database. Type '\q' to quit."
+	@$(DOCKER_COMPOSE) $(COMPOSE_BASE) exec postgres psql -U $${POSTGRES_USER:-barberpro} $${POSTGRES_DB:-barberpro_dev}
 
 # ============================================================
 # DEVELOPMENT TOOLS
 # ============================================================
-# Stream C will add code here:
-# - make shell-backend
-# - make shell-frontend
-# - make exec
+# Stream C: Development shell access and command execution
+# Commands for interactive access to service containers
 
 ##@ Development Tools
 
-shell-backend: ## Open shell in backend container (Stream C will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream C: Development tool commands not yet implemented"
+shell-backend: ## Open shell in backend container
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Opening shell in backend container..."
+	@if ! $(DOCKER_COMPOSE) $(COMPOSE_DEV) ps backend | grep -q "Up"; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Backend container is not running"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Start services with: make up"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Connected. Type 'exit' to quit."
+	@$(DOCKER_COMPOSE) $(COMPOSE_DEV) exec backend /bin/sh
 
-shell-frontend: ## Open shell in frontend container (Stream C will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream C: Development tool commands not yet implemented"
+shell-frontend: ## Open shell in frontend container
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Opening shell in frontend container..."
+	@if ! $(DOCKER_COMPOSE) $(COMPOSE_DEV) ps frontend | grep -q "Up"; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Frontend container is not running"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Start services with: make up"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Connected. Type 'exit' to quit."
+	@$(DOCKER_COMPOSE) $(COMPOSE_DEV) exec frontend /bin/sh
 
-exec: ## Execute command in service container (Stream C will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream C: Development tool commands not yet implemented"
-	@echo "$(CYAN)[$(INFO)]$(RESET) Usage will be: make exec SERVICE='backend' CMD='npm run test'"
+exec: ## Execute command in service container (usage: make exec SERVICE=backend CMD='npm test')
+	@if [ -z "$(SERVICE)" ] || [ -z "$(CMD)" ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Both SERVICE and CMD parameters are required"; \
+		echo ""; \
+		echo "$(YELLOW)Usage:$(RESET) make exec SERVICE=<service> CMD='<command>'"; \
+		echo ""; \
+		echo "$(YELLOW)Examples:$(RESET)"; \
+		echo "  make exec SERVICE=backend CMD='npm run test'"; \
+		echo "  make exec SERVICE=frontend CMD='npm run lint'"; \
+		echo "  make exec SERVICE=postgres CMD='psql -U barberpro'"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Executing command in $(SERVICE) container..."
+	@if ! $(DOCKER_COMPOSE) $(COMPOSE_DEV) ps $(SERVICE) | grep -q "Up"; then \
+		echo "$(RED)[$(CROSS)]$(RESET) $(SERVICE) container is not running"; \
+		echo "$(YELLOW)[$(INFO)]$(RESET) Start services with: make up"; \
+		exit 1; \
+	fi
+	@$(DOCKER_COMPOSE) $(COMPOSE_DEV) exec $(SERVICE) sh -c "$(CMD)" || \
+		(echo "$(RED)[$(CROSS)]$(RESET) Command execution failed" && exit 1)
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Command completed successfully"
+
 
 # ============================================================
 # MONITORING & DEBUGGING

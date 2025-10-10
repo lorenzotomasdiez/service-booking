@@ -1,69 +1,56 @@
-# ============================================================================
-# Docker Compose - Monitoring Stack (Phase 3 Placeholder)
-# ============================================================================
+# =============================================================================
+# MONITORING STACK - PHASE 3 PLACEHOLDER
+# =============================================================================
 #
-# This file contains placeholder configurations for the monitoring stack
-# to be implemented in Phase 3 of the BarberPro infrastructure roadmap.
+# This file is a placeholder for the Phase 3 monitoring infrastructure.
+# It will provide comprehensive observability for the BarberPro platform.
 #
-# IMPLEMENTATION STATUS: PLACEHOLDER
-# PLANNED FOR: Phase 3 (Q2 2025)
+# IMPLEMENTATION TIMELINE: Phase 3 (After core functionality is stable)
 #
-# PURPOSE:
-# - Centralized monitoring and observability for BarberPro services
-# - Metrics collection, visualization, and alerting
-# - Log aggregation and analysis
-# - Performance monitoring and troubleshooting
+# MONITORING COMPONENTS:
+# - Prometheus: Metrics collection and storage
+# - Grafana: Visualization dashboards and alerting
+# - Loki: Log aggregation and querying
 #
-# USAGE:
-#   # When implemented in Phase 3, run with:
+# USAGE (once implemented):
 #   docker-compose -f docker/docker-compose.yml \
-#                  -f docker/docker-compose.dev.yml \
 #                  -f docker/docker-compose.monitoring.yml up -d
 #
-# WHAT THIS STACK WILL MONITOR:
-# - Backend API performance (request rates, latency, error rates)
-# - Database performance (query times, connection pool, slow queries)
-# - Redis cache hit rates and memory usage
-# - Frontend performance metrics (page load times, user interactions)
-# - Infrastructure health (CPU, memory, disk, network)
-# - Business metrics (bookings, revenue, user activity)
-# - Argentina-specific metrics (MercadoPago transactions, AFIP reporting)
-#
-# ============================================================================
+# =============================================================================
 
 version: '3.9'
 
+# SERVICES PLACEHOLDER
+# Uncomment and configure when implementing Phase 3 monitoring
+
 services:
-  # ==========================================================================
-  # Prometheus - Metrics Collection and Storage
-  # ==========================================================================
-  # Collects time-series metrics from all services and stores them for
-  # querying and alerting. Scrapes /metrics endpoints from backend services.
-  #
+  # ---------------------------------------------------------------------------
+  # PROMETHEUS - Metrics Collection & Storage
+  # ---------------------------------------------------------------------------
   # prometheus:
-  #   image: prom/prometheus:v2.48.0
-  #   container_name: barberpro-prometheus-monitoring
+  #   image: prom/prometheus:v2.47.0
+  #   container_name: barberpro-prometheus
   #   restart: unless-stopped
   #   command:
   #     - '--config.file=/etc/prometheus/prometheus.yml'
   #     - '--storage.tsdb.path=/prometheus'
-  #     - '--storage.tsdb.retention.time=30d'
   #     - '--web.console.libraries=/usr/share/prometheus/console_libraries'
   #     - '--web.console.templates=/usr/share/prometheus/consoles'
-  #   volumes:
-  #     - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-  #     - ./configs/prometheus-alerts.yml:/etc/prometheus/alerts.yml:ro
-  #     - prometheus-data:/prometheus
+  #     - '--storage.tsdb.retention.time=30d'
+  #     - '--web.enable-lifecycle'
   #   ports:
   #     - "9090:9090"
+  #   volumes:
+  #     - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #     - ./configs/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+  #     - prometheus_data:/prometheus
   #   networks:
-  #     - barberpro-monitoring
+  #     - barberpro-network
   #   healthcheck:
   #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
   #     interval: 30s
   #     timeout: 10s
   #     retries: 3
-  #     start_period: 40s
   #   deploy:
   #     resources:
   #       limits:
@@ -72,49 +59,36 @@ services:
   #       reservations:
   #         cpus: '0.25'
   #         memory: 256M
-  #
-  # METRICS TO COLLECT:
-  # - Backend: HTTP request duration, error rates, active connections
-  # - Database: Query execution time, connection pool status
-  # - Redis: Cache hit/miss rates, memory usage
-  # - Node.js: Event loop lag, memory heap usage
-  # - Business: Bookings per hour, revenue metrics
 
-  # ==========================================================================
-  # Grafana - Metrics Visualization and Dashboards
-  # ==========================================================================
-  # Provides beautiful dashboards for visualizing Prometheus metrics and
-  # creating custom views for different stakeholders (devs, ops, business).
-  #
+  # ---------------------------------------------------------------------------
+  # GRAFANA - Visualization & Dashboards
+  # ---------------------------------------------------------------------------
   # grafana:
-  #   image: grafana/grafana:10.2.2
-  #   container_name: barberpro-grafana-monitoring
+  #   image: grafana/grafana:10.1.5
+  #   container_name: barberpro-grafana
   #   restart: unless-stopped
+  #   ports:
+  #     - "3001:3000"  # Using 3001 to avoid conflict with backend
   #   environment:
   #     - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-  #     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
+  #     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+  #     - GF_USERS_ALLOW_SIGN_UP=false
   #     - GF_SERVER_ROOT_URL=http://localhost:3001
-  #     - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+  #     - GF_INSTALL_PLUGINS=redis-datasource
   #   volumes:
-  #     - ./configs/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
-  #     - ./configs/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
-  #     - ./configs/dashboards:/etc/grafana/dashboards:ro
-  #     - grafana-data:/var/lib/grafana
-  #   ports:
-  #     - "3001:3000"
-  #   networks:
-  #     - barberpro-monitoring
+  #     - grafana_data:/var/lib/grafana
+  #     - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
+  #     - ./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro
   #   depends_on:
-  #     prometheus:
-  #       condition: service_healthy
-  #     loki:
-  #       condition: service_healthy
+  #     - prometheus
+  #     - loki
+  #   networks:
+  #     - barberpro-network
   #   healthcheck:
-  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+  #     test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
   #     interval: 30s
   #     timeout: 10s
   #     retries: 3
-  #     start_period: 40s
   #   deploy:
   #     resources:
   #       limits:
@@ -123,223 +97,131 @@ services:
   #       reservations:
   #         cpus: '0.25'
   #         memory: 256M
-  #
-  # PLANNED DASHBOARDS:
-  # - API Performance: Request rates, latencies, error rates by endpoint
-  # - Database Health: Query performance, connection pool, slow queries
-  # - Business Metrics: Bookings, revenue, user activity, conversion rates
-  # - Infrastructure: CPU, memory, disk, network across all services
-  # - Argentina Payments: MercadoPago transaction success rates, AFIP status
 
-  # ==========================================================================
-  # Loki - Log Aggregation and Analysis
-  # ==========================================================================
-  # Collects logs from all services using Promtail agents, stores them
-  # efficiently, and makes them queryable through Grafana with LogQL.
-  #
+  # ---------------------------------------------------------------------------
+  # LOKI - Log Aggregation
+  # ---------------------------------------------------------------------------
   # loki:
-  #   image: grafana/loki:2.9.3
-  #   container_name: barberpro-loki-monitoring
+  #   image: grafana/loki:2.9.2
+  #   container_name: barberpro-loki
   #   restart: unless-stopped
-  #   command: -config.file=/etc/loki/loki-config.yml
-  #   volumes:
-  #     - ./configs/loki-config.yml:/etc/loki/loki-config.yml:ro
-  #     - loki-data:/loki
   #   ports:
   #     - "3100:3100"
+  #   command: -config.file=/etc/loki/local-config.yaml
+  #   volumes:
+  #     - ./configs/loki-config.yml:/etc/loki/local-config.yaml:ro
+  #     - loki_data:/loki
   #   networks:
-  #     - barberpro-monitoring
+  #     - barberpro-network
   #   healthcheck:
-  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready"]
+  #     test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
   #     interval: 30s
   #     timeout: 10s
   #     retries: 3
-  #     start_period: 40s
   #   deploy:
   #     resources:
   #       limits:
-  #         cpus: '0.5'
-  #         memory: 512M
-  #       reservations:
   #         cpus: '0.25'
   #         memory: 256M
-  #
-  # LOG SOURCES TO COLLECT:
-  # - Backend API logs (access logs, error logs, business events)
-  # - Database logs (slow queries, errors, connection issues)
-  # - Redis logs (cache operations, connection events)
-  # - Frontend logs (user errors, performance issues)
-  # - Payment gateway logs (MercadoPago transactions, failures)
-  # - AFIP integration logs (tax reporting, validation errors)
+  #       reservations:
+  #         cpus: '0.1'
+  #         memory: 128M
 
-  # ==========================================================================
-  # Promtail - Log Shipping Agent
-  # ==========================================================================
-  # Scrapes logs from Docker containers and ships them to Loki.
-  # Runs on each host that generates logs.
-  #
+  # ---------------------------------------------------------------------------
+  # PROMTAIL - Log Shipping (Optional)
+  # ---------------------------------------------------------------------------
   # promtail:
-  #   image: grafana/promtail:2.9.3
-  #   container_name: barberpro-promtail-monitoring
+  #   image: grafana/promtail:2.9.2
+  #   container_name: barberpro-promtail
   #   restart: unless-stopped
-  #   command: -config.file=/etc/promtail/promtail-config.yml
   #   volumes:
-  #     - ./configs/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+  #     - ./configs/promtail-config.yml:/etc/promtail/config.yml:ro
   #     - /var/log:/var/log:ro
   #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
-  #   networks:
-  #     - barberpro-monitoring
+  #   command: -config.file=/etc/promtail/config.yml
   #   depends_on:
-  #     loki:
-  #       condition: service_healthy
+  #     - loki
+  #   networks:
+  #     - barberpro-network
   #   deploy:
   #     resources:
   #       limits:
   #         cpus: '0.25'
-  #         memory: 256M
-  #       reservations:
-  #         cpus: '0.1'
   #         memory: 128M
 
-  # ==========================================================================
-  # Node Exporter - Host Metrics Collector (Optional)
-  # ==========================================================================
-  # Exports hardware and OS metrics from the host machine for Prometheus.
-  # Useful for monitoring infrastructure health.
-  #
+  # ---------------------------------------------------------------------------
+  # NODE EXPORTER - System Metrics (Optional)
+  # ---------------------------------------------------------------------------
   # node-exporter:
-  #   image: prom/node-exporter:v1.7.0
-  #   container_name: barberpro-node-exporter-monitoring
+  #   image: prom/node-exporter:v1.6.1
+  #   container_name: barberpro-node-exporter
   #   restart: unless-stopped
   #   command:
-  #     - '--path.procfs=/host/proc'
-  #     - '--path.sysfs=/host/sys'
-  #     - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+  #     - '--path.rootfs=/host'
+  #   pid: host
   #   volumes:
-  #     - /proc:/host/proc:ro
-  #     - /sys:/host/sys:ro
-  #     - /:/rootfs:ro
-  #   ports:
-  #     - "9100:9100"
+  #     - /:/host:ro,rslave
   #   networks:
-  #     - barberpro-monitoring
+  #     - barberpro-network
   #   deploy:
   #     resources:
   #       limits:
   #         cpus: '0.1'
-  #         memory: 128M
-  #       reservations:
-  #         cpus: '0.05'
   #         memory: 64M
 
-  # ==========================================================================
-  # cAdvisor - Container Metrics Collector (Optional)
-  # ==========================================================================
-  # Provides container-level resource usage and performance characteristics.
-  # Helps monitor Docker container health and resource consumption.
-  #
-  # cadvisor:
-  #   image: gcr.io/cadvisor/cadvisor:v0.47.2
-  #   container_name: barberpro-cadvisor-monitoring
-  #   restart: unless-stopped
-  #   privileged: true
-  #   volumes:
-  #     - /:/rootfs:ro
-  #     - /var/run:/var/run:ro
-  #     - /sys:/sys:ro
-  #     - /var/lib/docker/:/var/lib/docker:ro
-  #     - /dev/disk/:/dev/disk:ro
-  #   ports:
-  #     - "8080:8080"
-  #   networks:
-  #     - barberpro-monitoring
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '0.25'
-  #         memory: 256M
-  #       reservations:
-  #         cpus: '0.1'
-  #         memory: 128M
+  # Placeholder service to prevent empty services section
+  monitoring-placeholder:
+    image: alpine:3.18
+    container_name: barberpro-monitoring-placeholder
+    command: echo "Monitoring stack placeholder - Implement in Phase 3"
 
-# ==========================================================================
-# Networks
-# ==========================================================================
-# networks:
-#   barberpro-monitoring:
-#     driver: bridge
-#     name: barberpro-monitoring
+# NETWORKS
+networks:
+  barberpro-network:
+    external: true
+    name: barberpro-network
 
-# ==========================================================================
-# Volumes
-# ==========================================================================
+# VOLUMES PLACEHOLDER
 # volumes:
-#   prometheus-data:
+#   prometheus_data:
 #     name: barberpro-prometheus-data
-#   grafana-data:
+#   grafana_data:
 #     name: barberpro-grafana-data
-#   loki-data:
+#   loki_data:
 #     name: barberpro-loki-data
 
-# ============================================================================
-# Phase 3 Implementation Checklist
-# ============================================================================
+# =============================================================================
+# PHASE 3 IMPLEMENTATION CHECKLIST
+# =============================================================================
 #
-# Before implementing this monitoring stack, complete the following:
+# Configuration Files to Create:
+# [ ] docker/configs/prometheus.yml - Scrape configs for all services
+# [ ] docker/configs/alert.rules.yml - Alert rules for critical metrics
+# [ ] docker/configs/loki-config.yml - Loki storage and retention config
+# [ ] docker/configs/promtail-config.yml - Log collection configuration
+# [ ] docker/configs/grafana/provisioning/datasources/datasources.yml
+# [ ] docker/configs/grafana/dashboards/ - Pre-built dashboard JSONs
 #
-# [ ] Backend Services:
-#     - Add /metrics endpoint for Prometheus (using prom-client npm package)
-#     - Add structured logging with correlation IDs
-#     - Implement health check endpoints
-#     - Add custom business metrics (bookings, payments, etc.)
+# Metrics to Collect:
+# [ ] Backend API: Request rate, latency, error rate, active connections
+# [ ] Database: Connection pool usage, query performance, replication lag
+# [ ] Redis: Hit/miss rate, memory usage, eviction rate
+# [ ] System: CPU, memory, disk I/O, network I/O
+# [ ] Business: Bookings created, payment success rate, user signups
 #
-# [ ] Configuration Files (create in docker/configs/):
-#     - prometheus.yml (Prometheus configuration with scrape targets)
-#     - prometheus-alerts.yml (Alert rules for critical events)
-#     - grafana-datasources.yml (Grafana datasource configuration)
-#     - grafana-dashboards.yml (Dashboard provisioning config)
-#     - loki-config.yml (Loki storage and retention configuration)
-#     - promtail-config.yml (Log scraping configuration)
-#     - dashboards/*.json (Pre-built Grafana dashboards)
+# Dashboards to Create:
+# [ ] Application Overview - High-level health and performance
+# [ ] API Performance - Endpoint latency and error rates
+# [ ] Database Performance - Query stats and connection pools
+# [ ] Infrastructure - System resource utilization
+# [ ] Business Metrics - Booking trends and user activity
 #
-# [ ] Environment Variables:
-#     - GRAFANA_ADMIN_USER (default: admin)
-#     - GRAFANA_ADMIN_PASSWORD (secure password)
-#     - PROMETHEUS_RETENTION_DAYS (default: 30)
-#     - LOKI_RETENTION_DAYS (default: 30)
+# Alerting Rules:
+# [ ] High error rate (>5% for 5 minutes)
+# [ ] API latency P95 >500ms for 5 minutes
+# [ ] Database connection pool >80% for 10 minutes
+# [ ] Redis memory usage >80%
+# [ ] Disk space <10% remaining
+# [ ] Service down/unhealthy for >1 minute
 #
-# [ ] Security:
-#     - Configure authentication for Grafana
-#     - Restrict Prometheus access (reverse proxy or VPN)
-#     - Set up alerting channels (email, Slack, PagerDuty)
-#     - Implement log sanitization (remove sensitive data)
-#
-# [ ] Testing:
-#     - Verify metrics collection from all services
-#     - Test alerting rules with simulated failures
-#     - Validate dashboard functionality
-#     - Load test to ensure monitoring doesn't impact performance
-#
-# [ ] Documentation:
-#     - Document available dashboards and their use cases
-#     - Create runbook for common alerts
-#     - Document metric naming conventions
-#     - Create guide for adding new metrics to services
-#
-# ============================================================================
-# Additional Resources
-# ============================================================================
-#
-# Prometheus best practices:
-#   https://prometheus.io/docs/practices/naming/
-#
-# Grafana dashboard examples:
-#   https://grafana.com/grafana/dashboards/
-#
-# Loki log querying (LogQL):
-#   https://grafana.com/docs/loki/latest/logql/
-#
-# Node.js Prometheus client:
-#   https://github.com/siimon/prom-client
-#
-# ============================================================================
+# =============================================================================

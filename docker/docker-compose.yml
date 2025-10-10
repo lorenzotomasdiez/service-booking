@@ -1,23 +1,24 @@
 # BarberPro Base Docker Compose Configuration
-# Base services: PostgreSQL, Redis, Nginx
-# Use with environment-specific overrides:
+# This file contains common infrastructure services shared across all environments
+# Use with environment-specific override files:
 #   Development: docker-compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
-#   Production: docker-compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up
+#   Production:  docker-compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up
 
 services:
-  # PostgreSQL Database - Version 16
+  # PostgreSQL Database - Upgraded to version 16
   postgres:
     image: postgres:16-alpine
-    container_name: barberpro-postgres-base
+    container_name: barberpro-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-barberpro_dev}
       POSTGRES_USER: ${POSTGRES_USER:-barberpro}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-barberpro_dev_password}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - barberpro-network
     healthcheck:
@@ -36,12 +37,12 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # Redis Cache - Version 7
+  # Redis Cache & Session Store
   redis:
-    image: redis:7-alpine
-    container_name: barberpro-redis-base
+    image: redis:7.2-alpine
+    container_name: barberpro-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
       - ./configs/redis.conf:/usr/local/etc/redis/redis.conf:ro
@@ -53,7 +54,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     restart: unless-stopped
     deploy:
       resources:
@@ -64,46 +65,17 @@ services:
           cpus: '0.25'
           memory: 256M
 
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: barberpro-nginx-base
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./configs/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./configs/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
-      - nginx_logs:/var/log/nginx
-    networks:
-      - barberpro-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          cpus: '0.25'
-          memory: 128M
-
-  # Database Administration (pgAdmin)
+  # Database Administration Tool (pgAdmin)
   pgadmin:
-    image: dpage/pgadmin4:8.12
-    container_name: barberpro-pgadmin-base
+    image: dpage/pgadmin4:8.11
+    container_name: barberpro-pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@barberpro.local}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
     ports:
-      - "8080:80"
+      - "${PGADMIN_PORT:-8080}:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     depends_on:
@@ -127,17 +99,16 @@ services:
           cpus: '0.25'
           memory: 256M
 
-  # Redis Admin Interface
+  # Redis Administration Tool
   redis-commander:
-    image: ghcr.io/joeferner/redis-commander:0.8.1
-    container_name: barberpro-redis-commander-base
+    image: rediscommander/redis-commander:latest
+    container_name: barberpro-redis-commander
     environment:
       REDIS_HOSTS: local:redis:6379
       HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
       HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin}
-      PORT: 8081
     ports:
-      - "8081:8081"
+      - "${REDIS_COMMANDER_PORT:-8081}:8081"
     depends_on:
       redis:
         condition: service_healthy
@@ -159,6 +130,7 @@ services:
           cpus: '0.1'
           memory: 128M
 
+# Persistent Data Volumes
 volumes:
   postgres_data:
     driver: local
@@ -169,10 +141,8 @@ volumes:
   pgadmin_data:
     driver: local
     name: barberpro-pgadmin-data
-  nginx_logs:
-    driver: local
-    name: barberpro-nginx-logs
 
+# Network Configuration
 networks:
   barberpro-network:
     driver: bridge

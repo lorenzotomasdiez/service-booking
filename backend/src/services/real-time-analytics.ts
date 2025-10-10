@@ -170,7 +170,7 @@ class RealTimeAnalyticsService {
 
     // Store in Redis
     if (this.redisClient) {
-      await this.redisClient.setex(
+      await this.redisClient.setEx(
         `session:${sessionId}`,
         3600, // 1 hour TTL
         JSON.stringify(sessionData)
@@ -200,7 +200,7 @@ class RealTimeAnalyticsService {
 
     // Store updated session
     if (this.redisClient) {
-      await this.redisClient.setex(
+      await this.redisClient.setEx(
         `session:${sessionId}`,
         3600,
         JSON.stringify(session)
@@ -223,14 +223,14 @@ class RealTimeAnalyticsService {
 
     // Store in Redis for real-time funnel analysis
     if (this.redisClient) {
-      await this.redisClient.zadd(
+      await this.redisClient.zAdd(
         `booking_funnel:${userId}`,
         Date.now(),
         JSON.stringify(funnelStep)
       );
       
       // Also store aggregate funnel data
-      await this.redisClient.zincrby('funnel_steps', 1, step);
+      await this.redisClient.zIncrBy('funnel_steps', 1, step);
     }
 
     // Track funnel progression
@@ -304,7 +304,7 @@ class RealTimeAnalyticsService {
 
     // Store in Redis
     if (this.redisClient) {
-      await this.redisClient.hset(
+      await this.redisClient.hSet(
         'provider_metrics',
         providerId,
         JSON.stringify(provider)
@@ -354,7 +354,7 @@ class RealTimeAnalyticsService {
 
     // Store in Redis
     if (this.redisClient) {
-      await this.redisClient.hset(
+      await this.redisClient.hSet(
         'client_retention',
         userId,
         JSON.stringify(retention)
@@ -821,7 +821,7 @@ class RealTimeAnalyticsService {
     // Update aggregated metrics in Redis
     if (this.redisClient) {
       const dashboard = await this.getAnalyticsDashboard();
-      await this.redisClient.setex(
+      await this.redisClient.setEx(
         'analytics_dashboard',
         300, // 5 minutes TTL
         JSON.stringify(dashboard)

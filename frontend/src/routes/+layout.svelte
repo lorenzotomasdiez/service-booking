@@ -153,6 +153,7 @@
 </script>
 
 <ErrorBoundary config={{ argentina: true, enableRetry: true, enableReporting: true }} name="MainLayout">
+{#if mounted}
 <div class="min-h-screen bg-neutral-50 flex flex-col">
 	<!-- Enhanced mobile-first header with trust indicators -->
 	<header class="bg-white/95 backdrop-blur-sm shadow-soft border-b border-neutral-200 sticky top-0 z-40">
@@ -375,18 +376,18 @@
 							>
 								<div class="flex items-center space-x-2">
 									{#if $user.avatar}
-										<img src={$user.avatar} alt="Avatar de {$user.firstName}" class="w-10 h-10 rounded-full object-cover ring-2 ring-primary-100 group-hover:ring-primary-200 transition-all duration-200" />
+										<img src={$user.avatar} alt="Avatar de {$user?.name || 'Usuario'}" class="w-10 h-10 rounded-full object-cover ring-2 ring-primary-100 group-hover:ring-primary-200 transition-all duration-200" />
 									{:else}
 										<div class="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center text-white text-sm font-bold ring-2 ring-primary-100 group-hover:ring-primary-200 group-hover:scale-105 transition-all duration-200">
-											{$user.firstName[0]}{$user.lastName[0]}
+											{(($user?.name || '')?.split(' ') || [])?.map(n => n?.[0])?.filter(Boolean)?.slice(0, 2)?.join('') || 'U'}
 										</div>
 									{/if}
 									<div class="hidden xl:flex flex-col items-start">
 										<div class="flex items-center space-x-2">
-											<span class="text-neutral-700 font-semibold leading-none">{$user.firstName}</span>
+											<span class="text-neutral-700 font-semibold leading-none">{(($user?.name || '')?.split(' ') || [])?.[0] || 'Usuario'}</span>
 											<!-- Role badge -->
-											<span class="px-2 py-0.5 text-xs font-medium rounded-full capitalize" class:bg-primary-100={$user.role === 'customer'} class:text-primary-700={$user.role === 'customer'} class:bg-secondary-100={$user.role === 'provider'} class:text-secondary-700={$user.role === 'provider'}>
-												{$user.role === 'customer' ? 'Cliente' : 'Profesional'}
+											<span class="px-2 py-0.5 text-xs font-medium rounded-full capitalize" class:bg-primary-100={$user.role === 'CLIENT'} class:text-primary-700={$user.role === 'CLIENT'} class:bg-secondary-100={$user.role === 'PROVIDER'} class:text-secondary-700={$user.role === 'PROVIDER'} class:bg-amber-100={$user.role === 'ADMIN'} class:text-amber-700={$user.role === 'ADMIN'}>
+												{$user.role === 'CLIENT' ? 'Cliente' : $user.role === 'PROVIDER' ? 'Profesional' : 'Admin'}
 											</span>
 										</div>
 										<span class="text-xs text-neutral-500 leading-none">Ver perfil</span>
@@ -406,11 +407,11 @@
 											<img src={$user.avatar} alt="Avatar" class="w-12 h-12 rounded-full object-cover ring-2 ring-white shadow-sm" />
 										{:else}
 											<div class="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center text-white font-bold ring-2 ring-white shadow-sm">
-												{$user.firstName[0]}{$user.lastName[0]}
+												{(($user?.name || '')?.split(' ') || [])?.map(n => n?.[0])?.filter(Boolean)?.slice(0, 2)?.join('') || 'U'}
 											</div>
 										{/if}
 										<div class="flex-1">
-											<div class="font-semibold text-neutral-900">{$user.firstName} {$user.lastName}</div>
+											<div class="font-semibold text-neutral-900">{$user?.name || 'Usuario'}</div>
 											<div class="text-sm text-neutral-600">{$user.email}</div>
 											<div class="flex items-center space-x-2 mt-1">
 												<span class="px-2 py-0.5 text-xs font-medium rounded-full capitalize bg-white bg-opacity-70"
@@ -595,11 +596,11 @@
 								<img src={$user.avatar} alt="Avatar" class="w-12 h-12 rounded-full object-cover ring-2 ring-primary-200" />
 							{:else}
 								<div class="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center text-white font-semibold">
-									{$user.firstName[0]}{$user.lastName[0]}
+									{(($user?.name || '')?.split(' ') || [])?.map(n => n?.[0])?.filter(Boolean)?.slice(0, 2)?.join('') || 'U'}
 								</div>
 							{/if}
 							<div class="flex-1">
-								<div class="font-semibold text-neutral-900">{$user.firstName} {$user.lastName}</div>
+								<div class="font-semibold text-neutral-900">{$user?.name || 'Usuario'}</div>
 								<div class="text-sm text-neutral-600 capitalize">{$user.role}</div>
 							</div>
 							<a href="/dashboard" class="btn btn-sm bg-primary-600 text-white rounded-lg px-3 py-1.5">
@@ -867,6 +868,15 @@
 		</div>
 	</footer>
 </div>
+{:else}
+<!-- Loading state while component initializes -->
+<div class="min-h-screen bg-neutral-50 flex items-center justify-center">
+	<div class="text-center">
+		<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+		<p class="mt-2 text-neutral-600">Cargando...</p>
+	</div>
+</div>
+{/if}
 </ErrorBoundary>
 
 <!-- Mobile menu overlay -->

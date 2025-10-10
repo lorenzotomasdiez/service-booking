@@ -244,6 +244,12 @@ export function setupSQLInjectionProtection(server: FastifyInstance): void {
   ];
 
   server.addHook('preValidation', async (request, reply) => {
+    // Skip SQL injection validation for analytics endpoints
+    // Analytics data can legitimately contain patterns that match SQL injection signatures
+    if (request.url?.includes('/api/analytics/')) {
+      return;
+    }
+
     const checkValue = (value: any): boolean => {
       if (typeof value === 'string') {
         return sqlInjectionPatterns.some(pattern => pattern.test(value));

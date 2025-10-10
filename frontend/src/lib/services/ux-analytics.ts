@@ -1,9 +1,11 @@
 // UX Analytics Service - Real-time User Experience Monitoring
 // Comprehensive tracking for Argentina market user behavior analysis
 
+import { apiClient } from '$lib/api/client';
+
 interface UXEvent {
-  type: 'page_view' | 'interaction' | 'form_action' | 'booking_flow' | 'error' | 'performance';
-  timestamp: number;
+  type: 'click' | 'form' | 'search' | 'booking' | 'error' | 'navigation';
+  timestamp: string; // ISO date-time string
   sessionId: string;
   userId?: string;
   deviceInfo: DeviceInfo;
@@ -160,7 +162,7 @@ class UXAnalyticsService {
 
     // Page visibility changes
     document.addEventListener('visibilitychange', () => {
-      this.trackEvent('page_view', {
+      this.trackEvent('navigation', {
         action: document.hidden ? 'hidden' : 'visible',
         route: window.location.pathname
       });
@@ -202,11 +204,9 @@ class UXAnalyticsService {
       const target = event.target as HTMLElement;
       const elementInfo = this.getElementInfo(target);
       
-      this.trackEvent('interaction', {
-        type: 'click',
+      this.trackEvent('click', {
         element: elementInfo,
-        coordinates: { x: event.clientX, y: event.clientY },
-        timestamp: Date.now()
+        coordinates: { x: event.clientX, y: event.clientY }
       });
     });
 
@@ -214,7 +214,7 @@ class UXAnalyticsService {
     document.addEventListener('focusin', (event) => {
       const target = event.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-        this.trackEvent('form_action', {
+        this.trackEvent('form', {
           action: 'focus',
           element: this.getElementInfo(target)
         });
@@ -226,8 +226,8 @@ class UXAnalyticsService {
     window.addEventListener('scroll', () => {
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => {
-        this.trackEvent('interaction', {
-          type: 'scroll',
+        this.trackEvent('navigation', {
+          action: 'scroll',
           scrollPosition: {
             x: window.scrollX,
             y: window.scrollY
@@ -273,7 +273,7 @@ class UXAnalyticsService {
           timestamp: Date.now()
         });
 
-        this.trackEvent('performance', {
+        this.trackEvent('error', {
           loadTime: navigation.loadEventEnd - navigation.loadEventStart,
           route: window.location.pathname,
           connectionType: (navigator as any).connection?.effectiveType
@@ -285,7 +285,7 @@ class UXAnalyticsService {
     setInterval(() => {
       const memory = (performance as any).memory;
       if (memory) {
-        this.trackEvent('performance', {
+        this.trackEvent('error', {
           type: 'memory',
           usedJSHeapSize: memory.usedJSHeapSize,
           totalJSHeapSize: memory.totalJSHeapSize,
@@ -308,7 +308,7 @@ class UXAnalyticsService {
       startTime: Date.now()
     };
 
-    this.trackEvent('booking_flow', {
+    this.trackEvent('booking', {
       action: 'started',
       providerId,
       preselectedService: serviceId || null,
@@ -328,7 +328,7 @@ class UXAnalyticsService {
         startTime: Date.now()
       };
 
-      this.trackEvent('booking_flow', {
+      this.trackEvent('booking', {
         action: 'step_completed',
         step,
         timeSpent: this.bookingFlowState.endTime - this.bookingFlowState.startTime,
@@ -342,7 +342,7 @@ class UXAnalyticsService {
       this.bookingFlowState.dropped = true;
       this.bookingFlowState.endTime = Date.now();
       
-      this.trackEvent('booking_flow', {
+      this.trackEvent('booking', {
         action: 'abandoned',
         step: this.bookingFlowState.step,
         reason: reason || 'user_navigation',
@@ -363,7 +363,7 @@ class UXAnalyticsService {
         (sum, step) => sum + (step.endTime! - step.startTime), 0
       );
 
-      this.trackEvent('booking_flow', {
+      this.trackEvent('booking', {
         action: 'completed',
         bookingId,
         paymentMethod,
@@ -378,7 +378,7 @@ class UXAnalyticsService {
 
   // Payment method selection tracking (critical for Argentina market)
   trackPaymentMethodSelection(method: 'mercadopago' | 'cash' | 'other'): void {
-    this.trackEvent('booking_flow', {
+    this.trackEvent('booking', {
       action: 'payment_method_selected',
       method,
       device: this.currentSession.deviceInfo.type,
@@ -432,7 +432,7 @@ class UXAnalyticsService {
   private trackEvent(type: UXEvent['type'], data: any): void {
     const event: UXEvent = {
       type,
-      timestamp: Date.now(),
+      timestamp: new Date().toISOString(),
       sessionId: this.sessionId,
       userId: this.currentSession.userId,
       deviceInfo: this.currentSession.deviceInfo,
@@ -451,17 +451,48 @@ class UXAnalyticsService {
 
   private async sendEvent(event: UXEvent): Promise<void> {
     try {
-      await fetch('/api/analytics/ux-events', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(event)
-      });
-    } catch (error) {
+      // Format event to match backend schema
+      const formattedEvent = {
+        type: event.type,
+        target: event.data?.target || event.data?.action || 'unknown',
+        value: event.data?.query || event.data?.value,
+        timestamp: event.timestamp,
+        duration: event.data?.timeSpent || event.data?.duration,
+        success: event.data?.successful,
+        metadata: {
+          ...event.data,
+          sessionId: event.sessionId,
+          deviceInfo: event.deviceInfo,
+          location: event.location
+        }
+      };
+
+      const payload = {
+        events: [formattedEvent],
+        timestamp: new Date().toISOString(),
+        sessionId: this.currentSession.sessionId,
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        referrer: document.referrer,
+        environment: process.env.NODE_ENV === 'production' ? 'production' : 'development'
+      };
+
+      const response = await apiClient.post('/analytics/frontend-events', payload);
+      console.log('[UXAnalytics] Event sent successfully:', response?.success ? 'success' : 'unknown');
+    } catch (error: any) {
       // Queue for retry if send fails
       this.interactionQueue.push(event);
-      console.warn('Failed to send UX event:', error);
+
+      // Enhanced error logging to debug the 400/200 discrepancy
+      console.warn('[UXAnalytics] Failed to send event:', {
+        error: error.message,
+        status: error.status,
+        eventType: event.type,
+        timestamp: new Date().toISOString()
+      });
+
+      // Don't show user-facing error for analytics failures
+      // Analytics should be invisible to user experience
     }
   }
 
@@ -469,8 +500,53 @@ class UXAnalyticsService {
     if (this.interactionQueue.length > 0 && this.isOnline) {
       const events = [...this.interactionQueue];
       this.interactionQueue = [];
-      
-      events.forEach(event => this.sendEvent(event));
+
+      // Send events in batches
+      this.sendEventBatch(events);
+    }
+  }
+
+  private async sendEventBatch(events: UXEvent[]): Promise<void> {
+    try {
+      // Format events to match backend schema
+      const formattedEvents = events.map(event => ({
+        type: event.type,
+        target: event.data?.target || event.data?.action || 'unknown',
+        value: event.data?.query || event.data?.value,
+        timestamp: event.timestamp,
+        duration: event.data?.timeSpent || event.data?.duration,
+        success: event.data?.successful,
+        metadata: {
+          ...event.data,
+          sessionId: event.sessionId,
+          deviceInfo: event.deviceInfo,
+          location: event.location
+        }
+      }));
+
+      const payload = {
+        events: formattedEvents,
+        timestamp: new Date().toISOString(),
+        sessionId: this.currentSession.sessionId,
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        referrer: document.referrer,
+        environment: process.env.NODE_ENV === 'production' ? 'production' : 'development'
+      };
+
+      const response = await apiClient.post('/analytics/frontend-events', payload);
+      console.log(`[UXAnalytics] Batch of ${events.length} events sent successfully:`, response?.success ? 'success' : 'unknown');
+    } catch (error: any) {
+      // Re-queue events on failure
+      this.interactionQueue.push(...events);
+
+      // Enhanced error logging for debugging
+      console.warn('[UXAnalytics] Failed to send event batch:', {
+        error: error.message,
+        status: error.status,
+        eventCount: events.length,
+        timestamp: new Date().toISOString()
+      });
     }
   }
 
@@ -524,7 +600,7 @@ class UXAnalyticsService {
 
   private getPaymentMethodPreferences(): any {
     const paymentEvents = this.currentSession.interactions.filter(
-      e => e.type === 'booking_flow' && e.data.action === 'payment_method_selected'
+      e => e.type === 'booking' && e.data.action === 'payment_method_selected'
     );
     
     return paymentEvents.reduce((acc, event) => {

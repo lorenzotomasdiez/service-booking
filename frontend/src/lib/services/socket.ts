@@ -2,7 +2,7 @@
 // Handles all real-time communication for booking updates
 import { io, type Socket } from 'socket.io-client';
 import { writable, type Writable } from 'svelte/store';
-import { browser } from '$app/environment';
+import { browser, dev } from '$app/environment';
 import { env } from '$env/dynamic/public';
 import type { SocketBookingEvents, TimeSlot, Booking, BookingStatus } from '$lib/types/booking';
 
@@ -34,9 +34,7 @@ class SocketService {
   public waitlistNotifications: Writable<SocketBookingEvents['waitlist:notification'] | null> = writable(null);
 
   constructor() {
-    if (browser) {
-      this.initializeSocket();
-    }
+    // Don't auto-connect - wait for explicit connect() call after authentication
   }
 
   // =============================================================================
@@ -49,8 +47,8 @@ class SocketService {
     const socketUrl = env.PUBLIC_SOCKET_URL || 'http://localhost:3000';
     this.authToken = this.getAuthToken();
 
-    if (!this.authToken) {
-      console.warn('No auth token found, Socket.io connection not established');
+    if (!this.authToken || !this.isValidTokenFormat(this.authToken)) {
+      console.warn('No valid auth token found, Socket.io connection not established');
       return;
     }
 
@@ -208,6 +206,25 @@ class SocketService {
   /**
    * Manually reconnect to the socket server
    */
+  public connect() {
+    // Only connect if we have a valid token
+    const token = this.getAuthToken();
+    if (!token || token.length < 5) { // Reduced minimum length requirement
+      console.warn('No valid auth token found, skipping Socket.io connection');
+      return;
+    }
+
+    // Validate token format (basic JWT structure check)
+    if (!this.isValidTokenFormat(token)) {
+      console.warn('Invalid auth token format, skipping Socket.io connection');
+      return;
+    }
+
+    if (!this.socket || this.socket.disconnected) {
+      this.initializeSocket();
+    }
+  }
+
   public reconnect() {
     if (this.socket) {
       this.socket.disconnect();
@@ -386,18 +403,63 @@ class SocketService {
 
   private getAuthToken(): string | null {
     if (!browser) return null;
-    
-    // Try localStorage first
-    const localToken = localStorage.getItem('auth_token');
-    if (localToken) return localToken;
 
-    // Try cookies as fallback
-    const cookieToken = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('auth_token='))
-      ?.split('=')[1];
-    
-    return cookieToken || null;
+    try {
+      // Try localStorage first
+      const localToken = localStorage.getItem('auth_token');
+      if (localToken && localToken.trim()) {
+        if (dev) {
+          console.log('Found token in localStorage, length:', localToken.length);
+        }
+        return localToken.trim();
+      }
+
+      // Try cookies as fallback
+      const cookieToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('auth_token='))
+        ?.split('=')[1];
+
+      if (cookieToken?.trim()) {
+        if (dev) {
+          console.log('Found token in cookies, length:', cookieToken.length);
+        }
+        return cookieToken.trim();
+      }
+
+      if (dev) {
+        console.log('No auth token found in localStorage or cookies');
+      }
+      return null;
+    } catch (error) {
+      console.error('Error retrieving auth token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Basic JWT token format validation
+   */
+  private isValidTokenFormat(token: string): boolean {
+    if (!token || typeof token !== 'string') {
+      console.warn('Token validation failed: token is empty or not a string');
+      return false;
+    }
+
+    // Basic JWT format check (3 parts separated by dots)
+    const parts = token.split('.');
+
+    // Log for debugging in development
+    if (dev) {
+      console.log('Token validation - parts count:', parts.length, 'token preview:', token.substring(0, 20) + '...');
+    }
+
+    // In development, be more lenient
+    if (dev) {
+      return token.length > 10; // Just check for minimum length in dev
+    }
+
+    return parts.length === 3 && parts.every(part => part.length > 0);
   }
 
   /**

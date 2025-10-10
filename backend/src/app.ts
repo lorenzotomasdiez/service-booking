@@ -5,9 +5,13 @@ import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import { createServer } from 'http';
 
 // Database connection
 import { database, prisma } from './services/database';
+
+// Socket.IO service
+import { initializeSocketService } from './services/socket';
 
 // Monitoring service
 import { createMetricsMiddleware } from './services/monitoring';
@@ -20,6 +24,7 @@ import { setupValidationMiddleware } from './middleware/validation';
 import healthRoutes from './routes/health';
 import authRoutes from './routes/auth';
 import usersRoutes from './routes/users';
+import frontendAnalyticsRoutes from './routes/frontend-analytics';
 
 export function buildServer(): FastifyInstance {
   const server = Fastify({
@@ -131,6 +136,7 @@ export function buildServer(): FastifyInstance {
   server.register(healthRoutes, { prefix: '/api' });
   server.register(authRoutes, { prefix: '/api/auth' });
   server.register(usersRoutes, { prefix: '/api/users' });
+  server.register(frontendAnalyticsRoutes, { prefix: '/api/analytics' });
 
   // Global error handler
   server.setErrorHandler((error, request, reply) => {
@@ -156,22 +162,31 @@ export function buildServer(): FastifyInstance {
 
 // Start server function
 export async function startServer(): Promise<void> {
-  const server = buildServer();
+  const fastify = buildServer();
 
   try {
     // Test database connection
     await database.testConnection();
     console.log('✅ Database connection established');
 
-    // Start server
-    const port = parseInt(process.env.PORT || '3001');
-    const host = process.env.HOST || 'localhost';
+    // Get server configuration
+    const port = parseInt(process.env.PORT || '3000');
+    const host = process.env.HOST || '0.0.0.0';
 
-    await server.listen({ port, host });
+    // Listen on the server to get the HTTP server instance
+    await fastify.listen({ port, host });
+
+    // After Fastify starts, we can access the HTTP server
+    const httpServer = fastify.server;
+
+    // Initialize Socket.IO with the Fastify HTTP server
+    const socketService = initializeSocketService(httpServer);
+    console.log('✅ Socket.IO service initialized');
 
     console.log(`🚀 Server running on http://${host}:${port}`);
     console.log(`📚 API Documentation: http://${host}:${port}/docs`);
     console.log(`❤️  Health Check: http://${host}:${port}/api/health`);
+    console.log(`🔌 WebSocket: ws://${host}:${port}/socket.io/`);
 
   } catch (error) {
     console.error('❌ Error starting server:', error);

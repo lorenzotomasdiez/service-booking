@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 
 interface FrontendAnalyticsEvent {
-  type: 'click' | 'form' | 'search' | 'booking' | 'error' | 'navigation';
+  type: 'click' | 'form' | 'search' | 'booking' | 'error' | 'navigation' | 'interaction';
   target?: string;
   value?: string;
   timestamp: string;
@@ -43,7 +43,7 @@ export default async function frontendAnalyticsRoutes(server: FastifyInstance) {
               properties: {
                 type: {
                   type: 'string',
-                  enum: ['click', 'form', 'search', 'booking', 'error', 'navigation']
+                  enum: ['click', 'form', 'search', 'booking', 'error', 'navigation', 'interaction']
                 },
                 target: { type: 'string' },
                 value: { type: 'string' },

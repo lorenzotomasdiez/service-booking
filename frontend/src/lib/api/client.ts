@@ -2,6 +2,7 @@
 // Handles all HTTP communication with the backend
 import { env } from '$env/dynamic/public';
 import { browser } from '$app/environment';
+import { dev } from '$app/environment';
 import Cookies from 'js-cookie';
 
 export interface ApiError {
@@ -22,6 +23,11 @@ class ApiClient {
 
 	constructor() {
 		this.baseUrl = env.PUBLIC_API_URL || 'http://localhost:3000/api';
+
+		// Log API base URL in development for debugging
+		if (dev && browser) {
+			console.log('[ApiClient] Initialized with base URL:', this.baseUrl);
+		}
 	}
 
 	private getAuthToken(): string | null {
@@ -48,10 +54,15 @@ class ApiClient {
 		const isJson = contentType?.includes('application/json');
 
 		let data: any;
-		if (isJson) {
-			data = await response.json();
-		} else {
-			data = await response.text();
+		try {
+			if (isJson) {
+				data = await response.json();
+			} else {
+				data = await response.text();
+			}
+		} catch (parseError) {
+			console.error('[ApiClient] Failed to parse response:', parseError);
+			data = { message: 'Error de respuesta del servidor' };
 		}
 
 		if (!response.ok) {
@@ -61,6 +72,18 @@ class ApiClient {
 				status: response.status,
 				errors: data.errors || {}
 			};
+
+			// Log API errors in development for debugging
+			if (dev) {
+				console.error('[ApiClient] API Error:', {
+					url: response.url,
+					status: response.status,
+					statusText: response.statusText,
+					error: data,
+					timestamp: new Date().toISOString()
+				});
+			}
+
 			throw error;
 		}
 
@@ -77,13 +100,25 @@ class ApiClient {
 	}
 
 	async post<T>(endpoint: string, data?: any): Promise<T> {
-		const response = await fetch(`${this.baseUrl}${endpoint}`, {
-			method: 'POST',
-			headers: this.getHeaders(),
-			body: data ? JSON.stringify(data) : undefined
-		});
+		try {
+			const response = await fetch(`${this.baseUrl}${endpoint}`, {
+				method: 'POST',
+				headers: this.getHeaders(),
+				body: data ? JSON.stringify(data) : undefined
+			});
 
-		return this.handleResponse<T>(response);
+			return this.handleResponse<T>(response);
+		} catch (networkError: any) {
+			// Handle network errors (connection issues, CORS, etc.)
+			if (networkError.name === 'TypeError' && networkError.message.includes('fetch')) {
+				throw {
+					message: 'Error de conexión. Verifica tu conexión a internet.',
+					code: 'NETWORK_ERROR',
+					status: 0
+				} as ApiError;
+			}
+			throw networkError;
+		}
 	}
 
 	async put<T>(endpoint: string, data?: any): Promise<T> {

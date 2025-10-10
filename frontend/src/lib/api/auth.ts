@@ -45,17 +45,19 @@ export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
 export interface User {
 	id: string;
 	email: string;
-	firstName: string;
-	lastName: string;
+	name: string;
 	phone: string;
-	role: 'client' | 'provider';
+	role: 'CLIENT' | 'PROVIDER' | 'ADMIN';
+	isActive: boolean;
+	isVerified: boolean;
+	dni?: string;
+	cuit?: string;
+	timezone: string;
+	locale: string;
 	avatar?: string;
-	isEmailVerified: boolean;
-	isPhoneVerified: boolean;
-	isProfileComplete: boolean;
+	birthDate?: string;
 	createdAt: string;
 	updatedAt: string;
-	profile?: UserProfile;
 }
 
 export interface UserProfile {
@@ -98,7 +100,25 @@ export interface AuthResponse {
 // API functions
 export const authApi = {
 	async login(data: LoginData): Promise<ApiResponse<AuthResponse>> {
-		return apiClient.post<ApiResponse<AuthResponse>>('/auth/login', data);
+		try {
+			console.log('[AuthAPI] Attempting login for:', data.email);
+			const response = await apiClient.post<ApiResponse<AuthResponse>>('/auth/login', data);
+			console.log('[AuthAPI] Login response received:', response?.success ? 'success' : 'failure');
+			return response;
+		} catch (error: any) {
+			console.error('[AuthAPI] Login failed:', error);
+			// Enhance error message for better user experience
+			if (error.status === 404) {
+				throw new Error('Servicio de autenticación no disponible. Intenta más tarde.');
+			} else if (error.status === 401) {
+				throw new Error('Email o contraseña incorrectos.');
+			} else if (error.status >= 500) {
+				throw new Error('Error del servidor. Intenta más tarde.');
+			} else if (!navigator.onLine) {
+				throw new Error('Sin conexión a internet. Verifica tu conexión.');
+			}
+			throw error;
+		}
 	},
 
 	async register(data: RegisterData): Promise<ApiResponse<AuthResponse>> {

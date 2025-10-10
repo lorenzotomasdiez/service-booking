@@ -4,6 +4,7 @@ import { browser } from '$app/environment';
 import { dev } from '$app/environment';
 import { performanceStore } from './performance';
 import { apiClient } from '../api/client';
+import { runAnalyticsTests } from '../utils/analytics-test';
 
 interface FrontendMetrics {
   // User interaction metrics
@@ -418,8 +419,16 @@ function createFrontendMonitoringStore() {
       return;
     }
 
+    // Ensure timestamp is properly formatted as ISO string
+    const formattedInteraction = {
+      ...interaction,
+      timestamp: interaction.timestamp instanceof Date
+        ? interaction.timestamp.toISOString()
+        : new Date(interaction.timestamp).toISOString()
+    };
+
     // Add to queue
-    eventQueue.push(interaction);
+    eventQueue.push(formattedInteraction as any);
 
     // Update current session
     update(state => {
@@ -479,8 +488,21 @@ function createFrontendMonitoringStore() {
 
   // Get element identifier for tracking
   function getElementIdentifier(element: Element): string {
+    if (!element) return 'unknown';
+
     if (element.id) return `#${element.id}`;
-    if (element.className) return `.${element.className.split(' ')[0]}`;
+
+    // Handle className safely - could be string or SVGAnimatedString
+    if (element.className) {
+      const className = typeof element.className === 'string'
+        ? element.className
+        : element.className.baseVal || '';
+
+      if (className && className.trim()) {
+        return `.${className.split(' ')[0]}`;
+      }
+    }
+
     return element.tagName.toLowerCase();
   }
 
@@ -566,9 +588,22 @@ function createFrontendMonitoringStore() {
     eventQueue = [];
 
     try {
+      // Format events to match backend schema
+      const formattedEvents = events.map(event => ({
+        type: event.type,
+        target: event.target,
+        value: event.value,
+        timestamp: typeof event.timestamp === 'string'
+          ? event.timestamp
+          : new Date(event.timestamp).toISOString(),
+        duration: event.duration,
+        success: event.success,
+        metadata: event.metadata
+      }));
+
       // Send events to backend using centralized API client
-      await apiClient.post('/analytics/frontend-events', {
-        events,
+      const response = await apiClient.post('/analytics/frontend-events', {
+        events: formattedEvents,
         timestamp: new Date().toISOString(),
         sessionId: initialState.currentSession?.sessionId,
         userAgent: navigator.userAgent,
@@ -577,15 +612,26 @@ function createFrontendMonitoringStore() {
         environment: dev ? 'development' : 'production'
       });
 
-      console.log(`[FrontendMonitoring] Sent ${events.length} events to backend`);
+      console.log(`[FrontendMonitoring] Sent ${events.length} events to backend:`, response?.success ? 'success' : 'unknown');
 
-    } catch (error) {
-      console.error('[FrontendMonitoring] Failed to send events:', error);
+    } catch (error: any) {
+      console.error('[FrontendMonitoring] Failed to send events:', {
+        error: error.message,
+        status: error.status,
+        eventCount: events.length,
+        timestamp: new Date().toISOString()
+      });
 
-      // In development, log the error but don't retry to avoid spam
+      // In development, log the error details for debugging
       if (dev) {
-        console.warn('[FrontendMonitoring] Skipping retry in development mode');
-        return;
+        console.warn('[FrontendMonitoring] Failed payload sample:', {
+          events: events.slice(0, 2), // Log first 2 events for debugging
+          errorDetails: {
+            message: error.message,
+            status: error.status,
+            code: error.code
+          }
+        });
       }
 
       // Re-queue events for retry (with limit to prevent memory issues)
@@ -821,7 +867,14 @@ export const argentinaMobileMetrics = derived(
 // Auto-start monitoring in browser
 if (browser) {
   frontendMonitoringStore.startMonitoring();
-  
+
   // Log initial state
   console.log('[FrontendMonitoring] Initialized for BarberPro Argentina mobile users');
+
+  // Run analytics endpoint tests in development
+  if (dev) {
+    setTimeout(() => {
+      runAnalyticsTests();
+    }, 2000); // Wait 2 seconds for app to initialize
+  }
 }

@@ -45,10 +45,9 @@ endif
 # Docker Compose command
 DOCKER_COMPOSE := docker-compose
 COMPOSE_BASE := -f docker/docker-compose.yml
-COMPOSE_DEV := $(COMPOSE_BASE) -f docker/docker-compose.dev.yml
-COMPOSE_MONITORING := $(COMPOSE_DEV) -f docker/docker-compose.monitoring.yml
-COMPOSE_MOCKS := $(COMPOSE_DEV) -f docker/docker-compose.mocks.yml
-COMPOSE_TEST := $(COMPOSE_BASE) -f docker/docker-compose.test.yml
+COMPOSE_MONITORING := $(COMPOSE_BASE) -f docker/docker-compose.monitoring.yml
+COMPOSE_MOCKS := $(COMPOSE_BASE) -f docker/docker-compose.mocks.yml
+COMPOSE_TEST := -f docker/docker-compose.test.yml
 COMPOSE_FULL := $(COMPOSE_MOCKS) -f docker/docker-compose.monitoring.yml
 
 # Default goal
@@ -206,58 +205,226 @@ check-ports:
 # ============================================================
 # LIFECYCLE MANAGEMENT
 # ============================================================
-# Stream B will add code here:
-# - make up
-# - make down
-# - make restart
-# - make rebuild
-# - make clean
+# Stream B: Lifecycle management commands
+# Commands for starting, stopping, and managing the Docker environment
 
 ##@ Lifecycle Management
 
-# Placeholder - Stream B will implement
-up: check-docker check-ports ## Start all services (Stream B will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream B: Lifecycle commands not yet implemented"
-	@echo "$(CYAN)[$(INFO)]$(RESET) This command will start all services when Stream B completes"
+up: check-docker check-ports ## Start all services (base + dev + mocks)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting BarberPro Development Environment..."
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting services with:"
+	@echo "  - Base infrastructure (PostgreSQL, Redis, Admin tools)"
+	@echo "  - Argentina service mocks"
+	@echo ""
+	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) up -d || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start services" && \
+	     echo "$(YELLOW)[$(INFO)]$(RESET) Try running 'make doctor' to diagnose issues" && exit 1)
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."
+	@sleep 3
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Services started successfully!"
+	@echo ""
+	@echo "$(BLUE)Services available at:$(RESET)"
+	@echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"
+	@echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"
+	@echo "  $(CYAN)Redis:$(RESET)          localhost:6379"
+	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
+	@echo ""
+	@echo "$(YELLOW)Next steps:$(RESET)"
+	@echo "  - Start backend:  $(CYAN)cd backend && npm run dev$(RESET)"
+	@echo "  - Start frontend: $(CYAN)cd frontend && npm run dev$(RESET)"
+	@echo "  - View logs:      $(CYAN)make logs$(RESET)"
+	@echo "  - Check status:   $(CYAN)make status$(RESET)"
+	@echo ""
 
-down: ## Stop all services (Stream B will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream B: Lifecycle commands not yet implemented"
+down: ## Stop all services gracefully
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Stopping all services..."
+	@$(DOCKER_COMPOSE) $(COMPOSE_FULL) down || \
+	    (echo "$(YELLOW)[$(WARN)]$(RESET) Some services may not be running" && exit 0)
+	@echo "$(GREEN)[$(CHECK)]$(RESET) All services stopped"
+	@echo ""
+	@echo "$(BLUE)To start again:$(RESET) $(CYAN)make up$(RESET)"
 
-restart: ## Restart all services (Stream B will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream B: Lifecycle commands not yet implemented"
+restart: ## Restart all services
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Restarting all services..."
+	@echo ""
+	@$(MAKE) down
+	@echo ""
+	@sleep 1
+	@$(MAKE) up
 
-rebuild: ## Rebuild and restart all services (Stream B will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream B: Lifecycle commands not yet implemented"
+rebuild: check-docker ## Rebuild and restart all services
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Rebuilding all services..."
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Stopping existing services..."
+	@$(DOCKER_COMPOSE) $(COMPOSE_FULL) down
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Pulling latest images..."
+	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) pull || \
+	    (echo "$(YELLOW)[$(WARN)]$(RESET) Some images could not be pulled, continuing..." && exit 0)
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Building custom images (if any)..."
+	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) build || \
+	    (echo "$(YELLOW)[$(WARN)]$(RESET) No custom images to build" && exit 0)
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Rebuild complete!"
+	@echo ""
+	@$(MAKE) up
 
-clean: ## Remove all containers, volumes, networks (Stream B will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream B: Lifecycle commands not yet implemented"
+clean: ## Remove all containers, volumes, and networks
+	@echo "$(YELLOW)[$(WARN)]$(RESET) This will remove all containers, volumes, and networks"
+	@echo "$(YELLOW)[$(WARN)]$(RESET) All data will be lost!"
+	@echo ""
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo ""; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+	    echo "$(CYAN)[$(ARROW)]$(RESET) Stopping all services..."; \
+	    $(DOCKER_COMPOSE) $(COMPOSE_FULL) down -v --remove-orphans || exit 0; \
+	    echo ""; \
+	    echo "$(CYAN)[$(ARROW)]$(RESET) Removing volumes..."; \
+	    docker volume rm barberpro-postgres-data barberpro-redis-data barberpro-pgadmin-data 2>/dev/null || echo "$(YELLOW)[$(INFO)]$(RESET) Some volumes were already removed"; \
+	    echo ""; \
+	    echo "$(CYAN)[$(ARROW)]$(RESET) Removing networks..."; \
+	    docker network rm barberpro-network 2>/dev/null || echo "$(YELLOW)[$(INFO)]$(RESET) Network was already removed"; \
+	    echo ""; \
+	    echo "$(GREEN)[$(CHECK)]$(RESET) Clean complete! All containers, volumes, and networks removed."; \
+	    echo ""; \
+	    echo "$(BLUE)To start fresh:$(RESET) $(CYAN)make up$(RESET)"; \
+	else \
+	    echo "$(YELLOW)[$(INFO)]$(RESET) Clean cancelled"; \
+	fi
 
 # ============================================================
 # ENVIRONMENT VARIANTS
 # ============================================================
-# Stream B will add code here:
-# - make dev
-# - make full
-# - make monitoring
-# - make mocks
-# - make test
+# Stream B: Environment-specific startup commands
+# Choose which services to run based on your development needs
 
 ##@ Environment Variants
 
-dev: ## Start development environment only (Stream B will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream B: Environment variant commands not yet implemented"
+dev: check-docker check-ports ## Start development environment only (postgres, redis, admin tools)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Development Environment..."
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting services:"
+	@echo "  - PostgreSQL (database)"
+	@echo "  - Redis (cache)"
+	@echo "  - pgAdmin (database management)"
+	@echo "  - Redis Commander (cache management)"
+	@echo ""
+	@$(DOCKER_COMPOSE) $(COMPOSE_BASE) up -d || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start development services" && exit 1)
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."
+	@sleep 3
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Development environment ready!"
+	@echo ""
+	@echo "$(BLUE)Services available at:$(RESET)"
+	@echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"
+	@echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"
+	@echo "  $(CYAN)Redis:$(RESET)          localhost:6379"
+	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
+	@echo ""
+	@echo "$(YELLOW)This is a minimal setup. For full environment, use:$(RESET) $(CYAN)make full$(RESET)"
+	@echo ""
 
-full: ## Start everything (Stream B will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream B: Environment variant commands not yet implemented"
+full: check-docker check-ports ## Start everything (dev + monitoring + mocks)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Full Environment..."
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting all services:"
+	@echo "  - Base infrastructure (PostgreSQL, Redis, Admin tools)"
+	@echo "  - Monitoring stack (Prometheus, Grafana, Loki)"
+	@echo "  - Argentina service mocks (MercadoPago, AFIP, WhatsApp)"
+	@echo ""
+	@$(DOCKER_COMPOSE) $(COMPOSE_FULL) up -d || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start full environment" && exit 1)
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."
+	@sleep 5
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Full environment ready!"
+	@echo ""
+	@echo "$(BLUE)Core Services:$(RESET)"
+	@echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"
+	@echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"
+	@echo "  $(CYAN)Redis:$(RESET)          localhost:6379"
+	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
+	@echo ""
+	@echo "$(BLUE)Monitoring (when implemented):$(RESET)"
+	@echo "  $(CYAN)Prometheus:$(RESET)     http://localhost:9090"
+	@echo "  $(CYAN)Grafana:$(RESET)        http://localhost:3001"
+	@echo "  $(CYAN)Loki:$(RESET)           http://localhost:3100"
+	@echo ""
+	@echo "$(BLUE)Argentina Mocks (when implemented):$(RESET)"
+	@echo "  $(CYAN)MercadoPago:$(RESET)    http://localhost:8081"
+	@echo "  $(CYAN)AFIP:$(RESET)           http://localhost:8082"
+	@echo "  $(CYAN)WhatsApp:$(RESET)       http://localhost:8083"
+	@echo ""
 
-monitoring: ## Start monitoring stack only (Stream B will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream B: Environment variant commands not yet implemented"
+monitoring: check-docker ## Start monitoring stack only
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Monitoring Stack..."
+	@echo ""
+	@echo "$(YELLOW)[$(INFO)]$(RESET) Note: Monitoring stack is currently a placeholder (Phase 3)"
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting base services + monitoring..."
+	@$(DOCKER_COMPOSE) $(COMPOSE_MONITORING) up -d || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start monitoring stack" && exit 1)
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Monitoring stack started!"
+	@echo ""
+	@echo "$(BLUE)When fully implemented, monitoring will be available at:$(RESET)"
+	@echo "  $(CYAN)Prometheus:$(RESET)     http://localhost:9090"
+	@echo "  $(CYAN)Grafana:$(RESET)        http://localhost:3001"
+	@echo "  $(CYAN)Loki:$(RESET)           http://localhost:3100"
+	@echo ""
 
-mocks: ## Start Argentina mocks only (Stream B will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream B: Environment variant commands not yet implemented"
+mocks: check-docker check-ports ## Start Argentina mocks only
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Argentina Service Mocks..."
+	@echo ""
+	@echo "$(YELLOW)[$(INFO)]$(RESET) Note: Argentina mocks are currently placeholders (Phase 2)"
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting base services + mocks..."
+	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) up -d || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start mocks" && exit 1)
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Service mocks started!"
+	@echo ""
+	@echo "$(BLUE)When fully implemented, mocks will be available at:$(RESET)"
+	@echo "  $(CYAN)MercadoPago Mock:$(RESET) http://localhost:8081"
+	@echo "  $(CYAN)AFIP Mock:$(RESET)        http://localhost:8082"
+	@echo "  $(CYAN)WhatsApp Mock:$(RESET)    http://localhost:8083"
+	@echo ""
 
-test: ## Start test environment (Stream B will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream B: Environment variant commands not yet implemented"
+test: check-docker ## Start test environment
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Test Environment..."
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting test infrastructure:"
+	@echo "  - PostgreSQL Test (port 5433)"
+	@echo "  - Redis Test (port 6380)"
+	@echo ""
+	@$(DOCKER_COMPOSE) $(COMPOSE_TEST) up -d || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start test environment" && exit 1)
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for test services to be healthy..."
+	@sleep 3
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Test environment ready!"
+	@echo ""
+	@echo "$(BLUE)Test Services:$(RESET)"
+	@echo "  $(CYAN)PostgreSQL Test:$(RESET) localhost:5433"
+	@echo "  $(CYAN)Redis Test:$(RESET)      localhost:6380"
+	@echo ""
+	@echo "$(YELLOW)Environment Variables for Tests:$(RESET)"
+	@echo "  DATABASE_URL=postgresql://barberpro_test:test_password_change_in_ci@localhost:5433/barberpro_test"
+	@echo "  REDIS_URL=redis://localhost:6380"
+	@echo ""
+	@echo "$(YELLOW)Next steps:$(RESET)"
+	@echo "  - Run migrations: $(CYAN)cd backend && npm run db:migrate$(RESET)"
+	@echo "  - Run tests:      $(CYAN)npm test$(RESET)"
+	@echo "  - Stop test env:  $(CYAN)docker-compose -f docker/docker-compose.test.yml down -v$(RESET)"
+	@echo ""
 
 # ============================================================
 # DATABASE OPERATIONS
@@ -313,60 +480,210 @@ exec: ## Execute command in service container (Stream C will implement)
 # ============================================================
 # MONITORING & DEBUGGING
 # ============================================================
-# Stream D will add code here:
-# - make logs
-# - make status
-# - make ps
-# - make stats
-# - make health
-# - make logs-backend
-# - make logs-frontend
+# Stream D: Monitoring commands for logs, status, and health checks
+# Commands: logs, status, ps, stats, health, logs-backend, logs-frontend
 
 ##@ Monitoring & Debugging
 
-logs: ## Tail logs from all services (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Monitoring commands not yet implemented"
+logs: ## Tail logs from all services
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Tailing logs from all services..."
+	@echo "$(CYAN)[$(INFO)]$(RESET) Press Ctrl+C to stop"
+	@echo ""
+	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) logs -f --tail=100 --timestamps || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to tail logs. Are services running? Try 'make up' first." && exit 1)
 
-status: ## Show health status of all services (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Monitoring commands not yet implemented"
+status: ## Show health status of all services (table format)
+	@echo "$(CYAN)╔════════════════════════════════════════════════════════════════╗$(RESET)"
+	@echo "$(CYAN)║                       Service Status                          ║$(RESET)"
+	@echo "$(CYAN)╚════════════════════════════════════════════════════════════════╝$(RESET)"
+	@echo ""
+	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) ps --format "table {{.Name}}	{{.Status}}	{{.Ports}}" 2>/dev/null || \
+	    (echo "$(YELLOW)[$(WARN)]$(RESET) No services running. Start with 'make up'" && exit 0)
+	@echo ""
+	@echo "$(CYAN)[$(INFO)]$(RESET) Use 'make health' for detailed health checks"
 
-ps: ## List running containers (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Monitoring commands not yet implemented"
+ps: ## List running containers
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Listing BarberPro containers..."
+	@echo ""
+	@docker ps --filter "name=barberpro" --format "table {{.Names}}	{{.Status}}	{{.Ports}}" 2>/dev/null || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to list containers. Is Docker running?" && exit 1)
+	@echo ""
+	@CONTAINER_COUNT=$$(docker ps --filter "name=barberpro" -q | wc -l | tr -d ' '); \
+	if [ "$$CONTAINER_COUNT" -eq 0 ]; then \
+	    echo "$(YELLOW)[$(WARN)]$(RESET) No BarberPro containers running"; \
+	else \
+	    echo "$(GREEN)[$(CHECK)]$(RESET) $$CONTAINER_COUNT container(s) running"; \
+	fi
 
-stats: ## Show resource usage (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Monitoring commands not yet implemented"
+stats: ## Show resource usage (CPU, memory)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Showing resource usage for BarberPro services..."
+	@echo "$(CYAN)[$(INFO)]$(RESET) Press Ctrl+C to stop"
+	@echo ""
+	@CONTAINERS=$$(docker ps --filter "name=barberpro" -q); \
+	if [ -z "$$CONTAINERS" ]; then \
+	    echo "$(YELLOW)[$(WARN)]$(RESET) No BarberPro containers running. Start with 'make up'"; \
+	    exit 0; \
+	fi; \
+	docker stats $$CONTAINERS
 
-health: ## Run health checks on all services (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Monitoring commands not yet implemented"
+health: ## Run health checks on all services
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running health checks on all services..."
+	@echo ""
+	@SERVICES="postgres redis pgadmin redis-commander backend frontend"; \
+	HEALTHY_COUNT=0; \
+	TOTAL_COUNT=0; \
+	for service in $$SERVICES; do \
+	    TOTAL_COUNT=$$((TOTAL_COUNT + 1)); \
+	    CONTAINER_NAME="barberpro-$$service"; \
+	    if [ "$$service" = "backend" ]; then \
+	        CONTAINER_NAME="barberpro-backend-dev"; \
+	    elif [ "$$service" = "frontend" ]; then \
+	        CONTAINER_NAME="barberpro-frontend-dev"; \
+	    fi; \
+	    printf "  %-20s " "$$service:"; \
+	    if docker ps --filter "name=$$CONTAINER_NAME" --format "{{.Status}}" 2>/dev/null | grep -q "Up"; then \
+	        HEALTH=$$(docker inspect --format='{{.State.Health.Status}}' $$CONTAINER_NAME 2>/dev/null || echo "no-healthcheck"); \
+	        if [ "$$HEALTH" = "healthy" ]; then \
+	            echo "$(GREEN)[$(CHECK)] Healthy$(RESET)"; \
+	            HEALTHY_COUNT=$$((HEALTHY_COUNT + 1)); \
+	        elif [ "$$HEALTH" = "no-healthcheck" ]; then \
+	            echo "$(BLUE)[$(INFO)] Running (no health check)$(RESET)"; \
+	            HEALTHY_COUNT=$$((HEALTHY_COUNT + 1)); \
+	        elif [ "$$HEALTH" = "starting" ]; then \
+	            echo "$(YELLOW)[$(ARROW)] Starting...$(RESET)"; \
+	        else \
+	            echo "$(RED)[$(CROSS)] Unhealthy$(RESET)"; \
+	        fi; \
+	    else \
+	        echo "$(RED)[$(CROSS)] Not running$(RESET)"; \
+	    fi; \
+	done; \
+	echo ""; \
+	if [ $$HEALTHY_COUNT -eq $$TOTAL_COUNT ]; then \
+	    echo "$(GREEN)[$(CHECK)]$(RESET) All services are healthy ($$HEALTHY_COUNT/$$TOTAL_COUNT)"; \
+	elif [ $$HEALTHY_COUNT -gt 0 ]; then \
+	    echo "$(YELLOW)[$(WARN)]$(RESET) Some services are not healthy ($$HEALTHY_COUNT/$$TOTAL_COUNT healthy)"; \
+	else \
+	    echo "$(RED)[$(CROSS)]$(RESET) No services are healthy. Try 'make up'"; \
+	fi
 
-logs-backend: ## Show backend logs (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Monitoring commands not yet implemented"
+logs-backend: ## Show backend logs
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Tailing backend logs..."
+	@echo "$(CYAN)[$(INFO)]$(RESET) Press Ctrl+C to stop"
+	@echo ""
+	@docker logs -f --tail=100 --timestamps barberpro-backend-dev 2>/dev/null || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Backend container not running. Start with 'make up'" && exit 1)
 
-logs-frontend: ## Show frontend logs (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Monitoring commands not yet implemented"
+logs-frontend: ## Show frontend logs
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Tailing frontend logs..."
+	@echo "$(CYAN)[$(INFO)]$(RESET) Press Ctrl+C to stop"
+	@echo ""
+	@docker logs -f --tail=100 --timestamps barberpro-frontend-dev 2>/dev/null || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Frontend container not running. Start with 'make up'" && exit 1)
 
 # ============================================================
 # MAINTENANCE
 # ============================================================
-# Stream D will add code here:
-# - make reset
-# - make prune
-# - make update
-# - make validate
+# Stream D: Maintenance commands for environment resets and cleanup
+# Commands: reset, prune, update, validate
 
 ##@ Maintenance
 
-reset: ## Complete environment reset (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Maintenance commands not yet implemented"
+reset: ## Complete environment reset (down + clean + up + seed)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Performing complete environment reset..."
+	@echo ""
+	@echo "$(YELLOW)[$(WARN)]$(RESET) This will stop all services, remove volumes, and restart fresh"
+	@echo ""
+	@read -p "Are you sure you want to reset the environment? [y/N] " -n 1 -r; \
+	echo ""; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+	    echo "$(CYAN)[$(ARROW)]$(RESET) Step 1/4: Stopping services..."; \
+	    $(MAKE) down; \
+	    echo ""; \
+	    echo "$(CYAN)[$(ARROW)]$(RESET) Step 2/4: Cleaning up resources..."; \
+	    $(DOCKER_COMPOSE) $(COMPOSE_FULL) down -v --remove-orphans 2>/dev/null || exit 0; \
+	    docker volume rm barberpro-postgres-data barberpro-redis-data barberpro-pgadmin-data 2>/dev/null || exit 0; \
+	    echo ""; \
+	    echo "$(CYAN)[$(ARROW)]$(RESET) Step 3/4: Starting fresh environment..."; \
+	    $(MAKE) up; \
+	    echo ""; \
+	    echo "$(CYAN)[$(ARROW)]$(RESET) Step 4/4: Environment ready for database seeding"; \
+	    echo ""; \
+	    echo "$(GREEN)[$(CHECK)]$(RESET) Reset complete! Environment is ready."; \
+	    echo ""; \
+	    echo "$(YELLOW)Next steps:$(RESET)"; \
+	    echo "  - Run migrations: $(CYAN)make db-migrate$(RESET)"; \
+	    echo "  - Seed database:  $(CYAN)make db-seed$(RESET)"; \
+	else \
+	    echo "$(YELLOW)[$(INFO)]$(RESET) Reset cancelled"; \
+	fi
 
-prune: ## Remove unused Docker resources (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Maintenance commands not yet implemented"
+prune: ## Remove unused Docker resources
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Cleaning up unused Docker resources..."
+	@echo ""
+	@echo "$(YELLOW)[$(INFO)]$(RESET) This will remove:"
+	@echo "  - Stopped containers"
+	@echo "  - Unused networks"
+	@echo "  - Dangling images"
+	@echo "  - Build cache"
+	@echo ""
+	@read -p "Continue with cleanup? [y/N] " -n 1 -r; \
+	echo ""; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+	    echo "$(CYAN)[$(ARROW)]$(RESET) Pruning Docker resources..."; \
+	    echo ""; \
+	    docker system prune -f --volumes || \
+	        (echo "$(RED)[$(CROSS)]$(RESET) Failed to prune resources" && exit 1); \
+	    echo ""; \
+	    echo "$(GREEN)[$(CHECK)]$(RESET) Cleanup complete!"; \
+	    echo ""; \
+	    docker system df; \
+	else \
+	    echo "$(YELLOW)[$(INFO)]$(RESET) Cleanup cancelled"; \
+	fi
 
-update: ## Pull latest images and rebuild (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Maintenance commands not yet implemented"
+update: ## Pull latest images and rebuild
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Updating Docker images and rebuilding services..."
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Pulling latest base images..."
+	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) pull || \
+	    (echo "$(YELLOW)[$(WARN)]$(RESET) Some images could not be pulled, continuing..." && exit 0)
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Rebuilding custom images..."
+	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) build --no-cache || \
+	    (echo "$(YELLOW)[$(WARN)]$(RESET) No custom images to build" && exit 0)
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Update complete!"
+	@echo ""
+	@echo "$(YELLOW)To apply updates:$(RESET) $(CYAN)make restart$(RESET)"
 
-validate: ## Validate all docker-compose files (Stream D will implement)
-	@echo "$(YELLOW)[$(WARN)]$(RESET) Stream D: Maintenance commands not yet implemented"
+validate: ## Validate all docker-compose files
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Validating docker-compose files..."
+	@echo ""
+	@VALID_COUNT=0; \
+	TOTAL_COUNT=0; \
+	echo "Checking compose files:"; \
+	echo ""; \
+	for file in docker/docker-compose.yml docker/docker-compose.monitoring.yml docker/docker-compose.mocks.yml docker/docker-compose.test.yml; do \
+	    TOTAL_COUNT=$$((TOTAL_COUNT + 1)); \
+	    printf "  %-35s " "$$file:"; \
+	    if [ -f "$$file" ]; then \
+	        if docker-compose -f "$$file" config > /dev/null 2>&1; then \
+	            echo "$(GREEN)[$(CHECK)] Valid$(RESET)"; \
+	            VALID_COUNT=$$((VALID_COUNT + 1)); \
+	        else \
+	            echo "$(RED)[$(CROSS)] Invalid syntax$(RESET)"; \
+	        fi; \
+	    else \
+	        echo "$(YELLOW)[$(WARN)] Not found$(RESET)"; \
+	    fi; \
+	done; \
+	echo ""; \
+	if [ $$VALID_COUNT -eq $$TOTAL_COUNT ]; then \
+	    echo "$(GREEN)[$(CHECK)]$(RESET) All compose files are valid ($$VALID_COUNT/$$TOTAL_COUNT)"; \
+	else \
+	    echo "$(YELLOW)[$(WARN)]$(RESET) Some files have issues ($$VALID_COUNT/$$TOTAL_COUNT valid)"; \
+	fi
 
 # ============================================================
 # END OF MAKEFILE

@@ -1,0 +1,276 @@
+# =============================================================================
+# ARGENTINA SERVICE MOCKS - PHASE 2 PLACEHOLDER
+# =============================================================================
+#
+# This file is a placeholder for Phase 2 Argentina-specific service mocks.
+# These mocks enable local development and testing without requiring
+# connections to real external services.
+#
+# IMPLEMENTATION TIMELINE: Phase 2 (After core Docker setup is stable)
+#
+# MOCK SERVICES:
+# - MercadoPago Mock: Argentina's primary payment gateway
+# - AFIP Mock: Tax authority integration for invoicing
+# - WhatsApp Business Mock: Customer communication channel
+#
+# USAGE (once implemented):
+#   docker-compose -f docker/docker-compose.yml \
+#                  -f docker/docker-compose.dev.yml \
+#                  -f docker/docker-compose.mocks.yml up -d
+#
+# =============================================================================
+
+version: '3.9'
+
+# SERVICES PLACEHOLDER
+# Uncomment and configure when implementing Phase 2 Argentina mocks
+
+services:
+  # ---------------------------------------------------------------------------
+  # MERCADOPAGO MOCK - Payment Gateway
+  # ---------------------------------------------------------------------------
+  # mercadopago-mock:
+  #   image: node:20-alpine
+  #   container_name: barberpro-mercadopago-mock
+  #   restart: unless-stopped
+  #   working_dir: /app
+  #   command: node server.js
+  #   ports:
+  #     - "8081:8081"
+  #   environment:
+  #     - NODE_ENV=development
+  #     - PORT=8081
+  #     - LOG_LEVEL=debug
+  #     # Mock configuration
+  #     - MOCK_SUCCESS_RATE=0.95  # 95% payment success rate
+  #     - MOCK_RESPONSE_DELAY=500  # Simulate 500ms API latency
+  #     - MOCK_WEBHOOK_ENABLED=true
+  #     - MOCK_WEBHOOK_URL=http://backend:3000/webhooks/mercadopago
+  #   volumes:
+  #     - ./mocks/mercadopago:/app:ro
+  #     - mercadopago_mock_data:/app/data
+  #   networks:
+  #     - barberpro-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '0.25'
+  #         memory: 256M
+  #
+  # # Mock API Endpoints to Implement:
+  # # POST /v1/payments - Create payment
+  # # GET /v1/payments/:id - Get payment status
+  # # POST /v1/payments/:id/refund - Refund payment
+  # # POST /v1/subscriptions - Create subscription
+  # # GET /v1/subscriptions/:id - Get subscription
+  # # POST /oauth/token - OAuth authentication
+  # # POST /webhooks/test - Trigger test webhook
+  # #
+  # # Supported Payment Methods:
+  # # - Credit cards (Visa, Mastercard, Amex)
+  # # - Debit cards
+  # # - Rapipago/Pago Fácil (cash payment codes)
+  # # - MercadoPago wallet
+  # # - Bank transfers (PSE)
+
+  # ---------------------------------------------------------------------------
+  # AFIP MOCK - Tax Authority Integration
+  # ---------------------------------------------------------------------------
+  # afip-mock:
+  #   image: node:20-alpine
+  #   container_name: barberpro-afip-mock
+  #   restart: unless-stopped
+  #   working_dir: /app
+  #   command: node server.js
+  #   ports:
+  #     - "8082:8082"
+  #   environment:
+  #     - NODE_ENV=development
+  #     - PORT=8082
+  #     - LOG_LEVEL=debug
+  #     # Mock configuration
+  #     - MOCK_CAE_APPROVAL_RATE=0.98  # 98% CAE approval rate
+  #     - MOCK_RESPONSE_DELAY=300
+  #     - MOCK_VALIDATE_CUIT=true
+  #   volumes:
+  #     - ./mocks/afip:/app:ro
+  #     - afip_mock_data:/app/data
+  #     - ./mocks/afip/certificates:/app/certificates:ro
+  #   networks:
+  #     - barberpro-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '0.25'
+  #         memory: 256M
+  #
+  # # Mock WSFE (Factura Electrónica) Endpoints:
+  # # POST /ws/services/FEv1 - Electronic invoice service
+  # # GET /ws/services/FEv1/FEParamGetTiposCbte - Get invoice types
+  # # GET /ws/services/FEv1/FEParamGetTiposDoc - Get document types
+  # # POST /ws/services/FEv1/FECAESolicitar - Request CAE
+  # # POST /ws/services/FEv1/FECompConsultar - Query invoice
+  # #
+  # # Mock WSAA (Authentication) Endpoints:
+  # # POST /ws/services/LoginCms - Login and get ticket
+  # #
+  # # Supported Document Types:
+  # # - Factura A/B/C (Invoices)
+  # # - Nota de Crédito (Credit notes)
+  # # - Nota de Débito (Debit notes)
+  # # - Recibo (Receipts)
+
+  # ---------------------------------------------------------------------------
+  # WHATSAPP BUSINESS MOCK - Customer Communication
+  # ---------------------------------------------------------------------------
+  # whatsapp-mock:
+  #   image: node:20-alpine
+  #   container_name: barberpro-whatsapp-mock
+  #   restart: unless-stopped
+  #   working_dir: /app
+  #   command: node server.js
+  #   ports:
+  #     - "8083:8083"
+  #     - "8084:8084"  # WebSocket for real-time message simulation
+  #   environment:
+  #     - NODE_ENV=development
+  #     - PORT=8083
+  #     - WS_PORT=8084
+  #     - LOG_LEVEL=debug
+  #     # Mock configuration
+  #     - MOCK_DELIVERY_RATE=0.99  # 99% message delivery rate
+  #     - MOCK_RESPONSE_DELAY=200
+  #     - MOCK_SIMULATE_REPLIES=true  # Auto-reply for testing
+  #     - MOCK_SIMULATE_STATUS_UPDATES=true
+  #   volumes:
+  #     - ./mocks/whatsapp:/app:ro
+  #     - whatsapp_mock_data:/app/data
+  #   networks:
+  #     - barberpro-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '0.25'
+  #         memory: 256M
+  #
+  # # Mock WhatsApp Business API Endpoints:
+  # # POST /v1/messages - Send message
+  # # POST /v1/messages/template - Send template message
+  # # GET /v1/messages/:id - Get message status
+  # # POST /v1/media - Upload media
+  # # GET /v1/media/:id - Download media
+  # # POST /webhooks/incoming - Receive incoming messages (webhook)
+  # #
+  # # Supported Message Types:
+  # # - Text messages
+  # # - Template messages (booking confirmations, reminders)
+  # # - Media messages (images for service gallery)
+  # # - Location messages
+  # # - Interactive buttons
+  # #
+  # # Message Status Transitions:
+  # # - sent → delivered → read
+  # # - Auto-generate status webhooks
+
+  # Placeholder service to prevent empty services section
+  mocks-placeholder:
+    image: alpine:3.18
+    container_name: barberpro-mocks-placeholder
+    command: echo "Argentina service mocks placeholder - Implement in Phase 2"
+
+# NETWORKS
+networks:
+  barberpro-network:
+    external: true
+    name: barberpro-network
+
+# VOLUMES PLACEHOLDER
+# volumes:
+#   mercadopago_mock_data:
+#     name: barberpro-mercadopago-mock-data
+#   afip_mock_data:
+#     name: barberpro-afip-mock-data
+#   whatsapp_mock_data:
+#     name: barberpro-whatsapp-mock-data
+
+# =============================================================================
+# PHASE 2 IMPLEMENTATION CHECKLIST
+# =============================================================================
+#
+# Mock Service Implementation:
+# [ ] Create docker/mocks/mercadopago/ directory and mock server
+# [ ] Create docker/mocks/afip/ directory and mock server
+# [ ] Create docker/mocks/whatsapp/ directory and mock server
+# [ ] Implement basic Node.js/Express mock servers
+# [ ] Add swagger/OpenAPI docs for each mock service
+#
+# MercadoPago Mock Features:
+# [ ] Payment creation with multiple payment methods
+# [ ] Payment status simulation (approved, rejected, pending)
+# [ ] Refund processing
+# [ ] Subscription management
+# [ ] Webhook delivery simulation
+# [ ] Test card numbers (4509 9535 6623 3704 for approved)
+#
+# AFIP Mock Features:
+# [ ] CAE (Código de Autorización Electrónico) generation
+# [ ] Invoice validation
+# [ ] CUIT/CUIL validation
+# [ ] Mock certificate handling
+# [ ] Simulated WSAA authentication tickets
+# [ ] Various invoice types (A, B, C)
+#
+# WhatsApp Mock Features:
+# [ ] Message sending with delivery confirmation
+# [ ] Template message rendering
+# [ ] Media upload/download simulation
+# [ ] Incoming message webhooks
+# [ ] Read receipts and status updates
+# [ ] Auto-reply for testing conversation flows
+#
+# Testing Integration:
+# [ ] Update backend service URLs to point to mocks in dev
+# [ ] Add environment variable toggles (USE_MOCK_SERVICES=true)
+# [ ] Create test scenarios for each Argentina service
+# [ ] Add mock data generators for realistic testing
+# [ ] Document how to trigger different mock responses
+#
+# Documentation:
+# [ ] Create README for each mock service
+# [ ] Document test scenarios and example requests
+# [ ] Add troubleshooting guide
+# [ ] Document differences from real services
+# [ ] Create Postman/Insomnia collections for testing
+#
+# =============================================================================
+# ARGENTINA SERVICE REFERENCES
+# =============================================================================
+#
+# MercadoPago Documentation:
+# - API Reference: https://www.mercadopago.com.ar/developers/en/reference
+# - Test Cards: https://www.mercadopago.com.ar/developers/en/guides/testing
+#
+# AFIP Documentation:
+# - WSFE: http://www.afip.gob.ar/ws/documentacion/ws-factura-electronica.asp
+# - WSAA: http://www.afip.gob.ar/ws/WSAA/Especificacion_Tecnica_WSAA_1.2.pdf
+#
+# WhatsApp Business API:
+# - API Reference: https://developers.facebook.com/docs/whatsapp/cloud-api
+# - Argentina Phone Format: +54 9 11 1234-5678
+#
+# =============================================================================

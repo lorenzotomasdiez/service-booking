@@ -1,0 +1,421 @@
+# ============================================================================
+# Docker Compose - Testing Environment
+# ============================================================================
+#
+# This file provides a complete isolated testing environment for running
+# automated tests (unit, integration, e2e) in CI/CD pipelines or locally.
+#
+# IMPLEMENTATION STATUS: COMPLETE
+#
+# PURPOSE:
+# - Isolated test database (separate from development)
+# - Isolated test Redis instance
+# - Optimized for fast startup and teardown
+# - Lower resource limits for CI/CD environments
+# - Deterministic test data and state
+#
+# USAGE:
+#   # Run tests with isolated test environment
+#   docker-compose -f docker/docker-compose.test.yml up -d
+#   npm run test
+#   docker-compose -f docker/docker-compose.test.yml down -v
+#
+#   # Or use npm script (recommended)
+#   npm run test:ci
+#
+# KEY DIFFERENCES FROM DEVELOPMENT:
+# - Separate database and Redis instances
+# - Lower resource limits (optimized for CI)
+# - Faster health checks for quick startup
+# - No persistent volumes (clean state each run)
+# - Test-specific credentials
+# - Minimal logging for performance
+#
+# ============================================================================
+
+version: '3.9'
+
+services:
+  # ==========================================================================
+  # PostgreSQL Test Database
+  # ==========================================================================
+  # Isolated PostgreSQL instance for running tests. Uses Alpine for smaller
+  # image size and faster startup. No data persistence between test runs.
+  #
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: barberpro-postgres-test
+    restart: unless-stopped
+    environment:
+      # Test-specific database configuration
+      POSTGRES_DB: barberpro_test
+      POSTGRES_USER: ${TEST_POSTGRES_USER:-test_user}
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:-test_password}
+      # Performance optimizations for testing
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+      # Reduce fsync for faster tests (acceptable for test data)
+      POSTGRES_HOST_AUTH_METHOD: trust
+    command:
+      - "postgres"
+      # Performance tuning for test environment
+      - "-c"
+      - "shared_buffers=128MB"
+      - "-c"
+      - "effective_cache_size=256MB"
+      - "-c"
+      - "maintenance_work_mem=64MB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "wal_buffers=4MB"
+      - "-c"
+      - "default_statistics_target=50"
+      # Reduce durability for faster tests (test data is disposable)
+      - "-c"
+      - "fsync=off"
+      - "-c"
+      - "synchronous_commit=off"
+      - "-c"
+      - "full_page_writes=off"
+      # Connection settings
+      - "-c"
+      - "max_connections=50"
+      # Logging (minimal for tests)
+      - "-c"
+      - "log_statement=none"
+      - "-c"
+      - "log_duration=off"
+    ports:
+      - "${TEST_POSTGRES_PORT:-5433}:5432"
+    networks:
+      - barberpro-test
+    # Fast health checks for quick test startup
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TEST_POSTGRES_USER:-test_user} -d barberpro_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    # Lower resource limits for CI/CD
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    # Temporary volume (data cleared on down -v)
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+    # Labels for organization
+    labels:
+      - "com.barberpro.environment=test"
+      - "com.barberpro.service=database"
+
+  # ==========================================================================
+  # Redis Test Cache
+  # ==========================================================================
+  # Isolated Redis instance for testing caching, sessions, and queues.
+  # Uses Alpine for smaller image size and faster startup.
+  #
+  redis-test:
+    image: redis:7-alpine
+    container_name: barberpro-redis-test
+    restart: unless-stopped
+    command:
+      - "redis-server"
+      # Memory limits for test environment
+      - "--maxmemory"
+      - "128mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+      # Fast persistence settings (test data is disposable)
+      - "--save"
+      - ""
+      - "--appendonly"
+      - "no"
+      # Connection settings
+      - "--maxclients"
+      - "50"
+      # Minimal logging
+      - "--loglevel"
+      - "warning"
+      # Password protection (optional for tests)
+      - "--requirepass"
+      - "${TEST_REDIS_PASSWORD:-test_redis_password}"
+    ports:
+      - "${TEST_REDIS_PORT:-6380}:6379"
+    networks:
+      - barberpro-test
+    # Fast health checks for quick test startup
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    # Lower resource limits for CI/CD
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    # Temporary volume (data cleared on down -v)
+    volumes:
+      - redis-test-data:/data
+    # Labels for organization
+    labels:
+      - "com.barberpro.environment=test"
+      - "com.barberpro.service=cache"
+
+  # ==========================================================================
+  # Test Database Seeder (Optional)
+  # ==========================================================================
+  # Runs once to seed the test database with initial test data.
+  # Useful for integration and e2e tests that need consistent data.
+  #
+  # test-seeder:
+  #   build:
+  #     context: ../backend
+  #     dockerfile: Dockerfile
+  #     target: development
+  #   container_name: barberpro-test-seeder
+  #   command: npm run db:seed:test
+  #   environment:
+  #     - NODE_ENV=test
+  #     - DATABASE_URL=postgresql://${TEST_POSTGRES_USER:-test_user}:${TEST_POSTGRES_PASSWORD:-test_password}@postgres-test:5432/barberpro_test
+  #     - REDIS_URL=redis://:${TEST_REDIS_PASSWORD:-test_redis_password}@redis-test:6379
+  #   networks:
+  #     - barberpro-test
+  #   depends_on:
+  #     postgres-test:
+  #       condition: service_healthy
+  #     redis-test:
+  #       condition: service_healthy
+  #   restart: "no"
+  #   labels:
+  #     - "com.barberpro.environment=test"
+  #     - "com.barberpro.service=seeder"
+
+  # ==========================================================================
+  # Mailhog - Email Testing (Optional)
+  # ==========================================================================
+  # Catches all outgoing emails in test environment for verification.
+  # Useful for testing email notifications without sending real emails.
+  #
+  # mailhog-test:
+  #   image: mailhog/mailhog:v1.0.1
+  #   container_name: barberpro-mailhog-test
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${TEST_MAILHOG_SMTP_PORT:-1026}:1025"  # SMTP port
+  #     - "${TEST_MAILHOG_WEB_PORT:-8026}:8025"   # Web UI port
+  #   networks:
+  #     - barberpro-test
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8025"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '0.1'
+  #         memory: 128M
+  #       reservations:
+  #         cpus: '0.05'
+  #         memory: 64M
+  #   labels:
+  #     - "com.barberpro.environment=test"
+  #     - "com.barberpro.service=mail"
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  barberpro-test:
+    driver: bridge
+    name: barberpro-test
+    # Isolated network for test environment
+    labels:
+      - "com.barberpro.environment=test"
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  # Temporary volumes - use docker-compose down -v to clean up
+  postgres-test-data:
+    name: barberpro-postgres-test-data
+    labels:
+      - "com.barberpro.environment=test"
+  redis-test-data:
+    name: barberpro-redis-test-data
+    labels:
+      - "com.barberpro.environment=test"
+
+# ============================================================================
+# Environment Variables
+# ============================================================================
+#
+# Required variables (set in .env.test or CI/CD environment):
+#
+# Database:
+# - TEST_POSTGRES_USER=test_user
+# - TEST_POSTGRES_PASSWORD=test_password
+# - TEST_POSTGRES_DB=barberpro_test
+# - TEST_POSTGRES_PORT=5433 (host port, different from dev)
+#
+# Redis:
+# - TEST_REDIS_PASSWORD=test_redis_password
+# - TEST_REDIS_PORT=6380 (host port, different from dev)
+#
+# Application:
+# - NODE_ENV=test
+# - DATABASE_URL=postgresql://test_user:test_password@localhost:5433/barberpro_test
+# - REDIS_URL=redis://:test_redis_password@localhost:6380
+#
+# Optional:
+# - TEST_MAILHOG_SMTP_PORT=1026
+# - TEST_MAILHOG_WEB_PORT=8026
+#
+# ============================================================================
+# Usage Examples
+# ============================================================================
+#
+# Start test environment:
+#   docker-compose -f docker/docker-compose.test.yml up -d
+#
+# Wait for services to be healthy:
+#   docker-compose -f docker/docker-compose.test.yml ps
+#
+# Run migrations:
+#   cd backend && npm run db:migrate:test
+#
+# Seed test data:
+#   cd backend && npm run db:seed:test
+#
+# Run tests:
+#   npm run test
+#   npm run test:integration
+#   npm run test:e2e
+#
+# Check logs:
+#   docker-compose -f docker/docker-compose.test.yml logs -f
+#
+# Clean up (including volumes):
+#   docker-compose -f docker/docker-compose.test.yml down -v
+#
+# ============================================================================
+# Integration with CI/CD
+# ============================================================================
+#
+# GitHub Actions Example:
+#
+# - name: Start test environment
+#   run: docker-compose -f docker/docker-compose.test.yml up -d
+#
+# - name: Wait for services
+#   run: |
+#     until docker-compose -f docker/docker-compose.test.yml ps | grep healthy; do
+#       sleep 2
+#     done
+#
+# - name: Run migrations
+#   run: cd backend && npm run db:migrate:test
+#
+# - name: Run tests
+#   run: npm run test:ci
+#
+# - name: Cleanup
+#   if: always()
+#   run: docker-compose -f docker/docker-compose.test.yml down -v
+#
+# ============================================================================
+# Testing Best Practices
+# ============================================================================
+#
+# 1. Database Isolation:
+#    - Always use a separate test database
+#    - Never point tests at development or production databases
+#    - Use transactions and rollbacks to isolate test cases
+#
+# 2. Clean State:
+#    - Reset database state before each test suite
+#    - Clear Redis cache between test runs
+#    - Use docker-compose down -v to ensure clean start
+#
+# 3. Fast Startup:
+#    - Health checks optimized for quick startup (5s intervals)
+#    - Minimal logging to reduce overhead
+#    - Disabled durability features (fsync, etc.)
+#
+# 4. Resource Efficiency:
+#    - Lower memory limits suitable for CI runners
+#    - Shared CPU limits prevent resource exhaustion
+#    - Alpine images for smaller size and faster pulls
+#
+# 5. Deterministic Tests:
+#    - Seed database with consistent test data
+#    - Use fixed timestamps and IDs in tests
+#    - Mock external services (use docker-compose.mocks.yml)
+#
+# 6. Parallel Testing:
+#    - Run multiple test suites in parallel
+#    - Each suite can have its own database schema
+#    - Use Prisma's DATABASE_URL with different schemas
+#
+# ============================================================================
+# Troubleshooting
+# ============================================================================
+#
+# Services not starting:
+#   - Check Docker resources (memory, CPU limits)
+#   - Verify ports 5433, 6380 are available
+#   - Check logs: docker-compose -f docker/docker-compose.test.yml logs
+#
+# Health checks failing:
+#   - Wait longer for services to initialize
+#   - Check credentials match between compose and app
+#   - Verify network connectivity between containers
+#
+# Tests failing in CI but passing locally:
+#   - Ensure CI has same environment variables
+#   - Check for timing issues (add retries/waits)
+#   - Verify CI has sufficient resources
+#
+# Slow test runs:
+#   - Reduce logging verbosity
+#   - Use in-memory databases for unit tests
+#   - Enable test parallelization
+#   - Cache Docker layers in CI
+#
+# Port conflicts:
+#   - Change TEST_POSTGRES_PORT and TEST_REDIS_PORT
+#   - Ensure no dev services running on same ports
+#   - Use docker ps to check port usage
+#
+# ============================================================================
+# Performance Benchmarks
+# ============================================================================
+#
+# Target startup times (from docker-compose up to healthy):
+# - PostgreSQL: < 10 seconds
+# - Redis: < 5 seconds
+# - Total environment: < 15 seconds
+#
+# Target resource usage:
+# - PostgreSQL: ~256-512 MB RAM
+# - Redis: ~128-256 MB RAM
+# - Total: < 1 GB RAM (suitable for CI runners)
+#
+# Test execution:
+# - Unit tests: < 30 seconds
+# - Integration tests: < 2 minutes
+# - E2E tests: < 5 minutes
+#
+# ============================================================================

@@ -1,0 +1,199 @@
+# BarberPro Development Environment Overrides
+# Extends docker-compose.yml with development-specific configurations
+# Usage: docker-compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
+version: '3.8'
+
+services:
+  # PostgreSQL - Development Overrides
+  postgres:
+    container_name: barberpro-postgres-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-barberpro_dev}
+    volumes:
+      # Add init script for development data
+      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      # More frequent checks for faster development feedback
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+
+  # Redis - Development Overrides
+  redis:
+    container_name: barberpro-redis-dev
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    healthcheck:
+      # More frequent checks for faster development feedback
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Nginx - Development Overrides
+  nginx:
+    container_name: barberpro-nginx-dev
+    healthcheck:
+      # More frequent checks for faster development feedback
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # pgAdmin - Development Overrides
+  pgadmin:
+    container_name: barberpro-pgadmin-dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@barberpro.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    healthcheck:
+      # More frequent checks for faster development feedback
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Redis Commander - Development Overrides
+  redis-commander:
+    container_name: barberpro-redis-commander-dev
+    environment:
+      HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin}
+    healthcheck:
+      # More frequent checks for faster development feedback
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Backend API - Development with Hot Reload
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    container_name: barberpro-backend-dev
+    environment:
+      NODE_ENV: development
+      PORT: ${BACKEND_PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-barberpro}:${POSTGRES_PASSWORD:-barberpro_dev_password}@postgres:5432/${POSTGRES_DB:-barberpro_dev}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # Argentina specific - development
+      TIMEZONE: ${TIMEZONE:-America/Argentina/Buenos_Aires}
+      LOCALE: ${LOCALE:-es-AR}
+      CURRENCY: ${CURRENCY:-ARS}
+      # Enable development tools
+      APP_DEBUG: true
+      ENABLE_SWAGGER: true
+      # CORS - allow all for development
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    env_file:
+      - ../backend/.env
+    ports:
+      - "3000:3000"
+    volumes:
+      # Hot reload - mount source code for live updates
+      - ../backend:/app
+      # Exclude node_modules and build artifacts from host
+      - /app/node_modules
+      - /app/dist
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - barberpro-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Frontend - Development with Hot Reload
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    container_name: barberpro-frontend-dev
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:3000}
+      # Argentina specific - development
+      VITE_TIMEZONE: ${TIMEZONE:-America/Argentina/Buenos_Aires}
+      VITE_LOCALE: ${LOCALE:-es-AR}
+      VITE_CURRENCY: ${CURRENCY:-ARS}
+    env_file:
+      - ../frontend/.env
+    ports:
+      - "5173:5173"
+    volumes:
+      # Hot reload - mount source code for live updates
+      - ../frontend:/app
+      # Exclude node_modules and build artifacts from host
+      - /app/node_modules
+      - /app/build
+      - /app/.svelte-kit
+    depends_on:
+      - backend
+    networks:
+      - barberpro-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+# Volumes use separate names for dev environment
+volumes:
+  postgres_data:
+    name: barberpro-postgres-data-dev
+  redis_data:
+    name: barberpro-redis-data-dev
+  pgadmin_data:
+    name: barberpro-pgadmin-data-dev
+  nginx_logs:
+    name: barberpro-nginx-logs-dev
+
+# Development network
+networks:
+  barberpro-network:
+    name: barberpro-network-dev

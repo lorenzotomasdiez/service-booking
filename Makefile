@@ -60,7 +60,7 @@ COMPOSE_FULL := $(COMPOSE_MOCKS) -f docker/docker-compose.monitoring.yml
 # All targets are .PHONY as they don't represent actual files
 .PHONY: help version doctor
 .PHONY: up down restart rebuild clean
-.PHONY: dev full monitoring mocks mocks-down mocks-logs mocks-reset test
+.PHONY: dev full monitoring monitoring-down monitoring-logs grafana mocks mocks-down mocks-logs mocks-reset test
 .PHONY: db-migrate db-seed db-reset db-backup db-restore db-shell
 .PHONY: logs status ps stats health logs-backend logs-frontend
 .PHONY: reset prune update validate
@@ -103,6 +103,9 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(YELLOW)Mock Services:$(RESET) $(GREEN)(Issue #7)$(RESET)"
 	@echo "  $(CYAN)mocks, mocks-down, mocks-logs, mocks-reset$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)Monitoring Stack:$(RESET) $(GREEN)(Issue #8)$(RESET)"
+	@echo "  $(CYAN)monitoring, monitoring-down, monitoring-logs, grafana$(RESET)"
 	@echo ""
 	@echo "$(YELLOW)Database Operations:$(RESET) $(GREEN)(Stream C)$(RESET)"
 	@echo "  $(CYAN)db-migrate, db-seed, db-reset, db-backup, db-restore, db-shell$(RESET)"
@@ -367,22 +370,25 @@ full: check-docker check-ports ## Start everything (dev + monitoring + mocks)
 	@echo "  $(CYAN)WhatsApp:$(RESET)       http://localhost:8083"
 	@echo ""
 
-monitoring: check-docker ## Start monitoring stack only
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Monitoring Stack..."
+monitoring: check-docker ## Start monitoring stack
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting monitoring stack..."
+	@docker-compose -f docker/docker-compose.monitoring.yml up -d
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Monitoring stack started"
 	@echo ""
-	@echo "$(YELLOW)[$(INFO)]$(RESET) Note: Monitoring stack is currently a placeholder (Phase 3)"
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting base services + monitoring..."
-	@$(DOCKER_COMPOSE) $(COMPOSE_MONITORING) up -d || \
-	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start monitoring stack" && exit 1)
-	@echo ""
-	@echo "$(GREEN)[$(CHECK)]$(RESET) Monitoring stack started!"
-	@echo ""
-	@echo "$(BLUE)When fully implemented, monitoring will be available at:$(RESET)"
-	@echo "  $(CYAN)Prometheus:$(RESET)     http://localhost:9090"
-	@echo "  $(CYAN)Grafana:$(RESET)        http://localhost:3001"
-	@echo "  $(CYAN)Loki:$(RESET)           http://localhost:3100"
-	@echo ""
+	@echo "Monitoring services:"
+	@echo "  Prometheus: http://localhost:9090"
+	@echo "  Grafana:    http://localhost:3001 (admin/admin)"
+	@echo "  Loki:       http://localhost:3100"
+	@echo "  cAdvisor:   http://localhost:8080"
+
+monitoring-down: ## Stop monitoring stack
+	@docker-compose -f docker/docker-compose.monitoring.yml down
+
+monitoring-logs: ## View monitoring stack logs
+	@docker-compose -f docker/docker-compose.monitoring.yml logs -f
+
+grafana: ## Open Grafana in browser
+	@$(OPEN) http://localhost:3001
 
 mocks: check-docker ## Start all Argentina mock services
 	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Argentina mock services..."

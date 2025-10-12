@@ -6,6 +6,7 @@ import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { createServer } from 'http';
+import metricsPlugin from './plugins/metrics';
 
 // Database connection
 import { database, prisma } from './services/database';
@@ -44,6 +45,9 @@ export function buildServer(): FastifyInstance {
 
   // Add database to Fastify instance
   server.decorate('prisma', prisma);
+
+  // Register Prometheus metrics plugin
+  server.register(metricsPlugin);
 
   // Add metrics middleware
   server.addHook('onRequest', createMetricsMiddleware());

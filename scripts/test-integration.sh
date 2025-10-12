@@ -243,11 +243,15 @@ test_docker_environment() {
     fi
 
     # Test required containers
+    # Check for both prod and dev container names
     local containers=("barberpro-postgres" "barberpro-redis" "barberpro-mercadopago-mock" "barberpro-afip-mock" "barberpro-whatsapp-mock" "barberpro-sms-mock" "barberpro-mailhog")
+    local dev_containers=("barberpro-postgres-dev" "barberpro-redis-dev" "barberpro-mercadopago-mock" "barberpro-afip-mock" "barberpro-whatsapp-mock" "barberpro-sms-mock" "barberpro-mailhog")
 
-    for container in "${containers[@]}"; do
+    for i in "${!containers[@]}"; do
+        local container="${containers[$i]}"
+        local dev_container="${dev_containers[$i]}"
         print_test "Container $container"
-        if is_container_running "$container"; then
+        if is_container_running "$container" || is_container_running "$dev_container"; then
             test_passed
         else
             test_failed "Container not running"
@@ -277,7 +281,9 @@ test_database_connectivity() {
 
     # Test Redis connection
     print_test "Redis connection"
-    if docker exec barberpro-redis redis-cli ping | grep -q "PONG"; then
+    # Try both prod and dev container names
+    if docker exec barberpro-redis redis-cli ping 2>/dev/null | grep -q "PONG" || \
+       docker exec barberpro-redis-dev redis-cli ping 2>/dev/null | grep -q "PONG"; then
         test_passed
     else
         test_failed "Cannot connect to Redis"

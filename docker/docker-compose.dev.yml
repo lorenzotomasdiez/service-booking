@@ -45,14 +45,16 @@ services:
       start_period: 5s
 
   # Nginx - Development Overrides
-  nginx:
-    container_name: barberpro-nginx-dev
-    healthcheck:
-      # More frequent checks for faster development feedback
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+  # Note: Nginx is not needed for local development (frontend runs on Vite dev server)
+  # Uncomment if you need nginx for testing
+  # nginx:
+  #   container_name: barberpro-nginx-dev
+  #   healthcheck:
+  #     # More frequent checks for faster development feedback
+  #     interval: 15s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 10s
 
   # pgAdmin - Development Overrides
   pgadmin:

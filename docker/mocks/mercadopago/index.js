@@ -1,123 +1,153 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
-const winston = require('winston');
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+const logger = require('./utils/logger');
+const paymentService = require('./services/payment.service');
+const webhookService = require('./services/webhook.service');
 
-// ===== Logger Configuration =====
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.printf(({ timestamp, level, message, ...meta }) => {
-          return `${timestamp} [${level}]: ${message} ${
-            Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''
-          }`;
-        })
-      ),
-    }),
-  ],
-});
+// Routes
+const paymentsRouter = require('./routes/payments');
+const dashboardRoutes = require('./routes/dashboard');
 
-// ===== Express App Configuration =====
 const app = express();
-const PORT = process.env.MERCADOPAGO_MOCK_PORT || 3001;
+const PORT = process.env.MERCADOPAGO_MOCK_PORT || process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
 
 // Request logging middleware
 app.use((req, res, next) => {
-  logger.info('Incoming request', {
-    method: req.method,
-    path: req.path,
+  logger.info(req.method + ' ' + req.path, {
     query: req.query,
-    body: req.method === 'POST' || req.method === 'PUT' ? req.body : undefined,
+    body: req.method !== 'GET' ? req.body : undefined
   });
   next();
 });
 
-// ===== Health Check Endpoint =====
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'MercadoPago Mock API',
+      version: '1.0.0',
+      description: 'Mock server for MercadoPago payment gateway - Argentina',
+    },
+    servers: [
+      {
+        url: 'http://localhost:' + PORT,
+        description: 'Development server',
+      },
+    ],
+  },
+  apis: ['./routes/*.js', './index.js'],
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
+// Swagger UI
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Serve static files (dashboard)
+app.use(express.static('public'));
+
+// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    service: 'mercadopago-mock',
-    version: '1.0.0',
     timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    service: 'mercadopago-mock'
   });
 });
 
-// ===== Payment Routes =====
-// (Stream A)
-const paymentRoutes = require('./routes/payments');
-app.use('/v1/payments', paymentRoutes);
+// Dashboard endpoint (legacy)
+app.get('/dashboard', (req, res) => {
+  const stats = paymentService.getStatistics();
+  const payments = paymentService.getAllPayments();
 
-// ===== Refund Routes =====
-// (Stream B will add)
-// const refundRoutes = require('./routes/refunds');
-// app.use('/v1/payments/:id/refunds', refundRoutes);
-
-// ===== Webhook Routes =====
-// (Stream C will add)
-// const webhookRoutes = require('./routes/webhooks');
-// app.use('/webhooks', webhookRoutes);
-
-// ===== Dashboard Routes =====
-// (Stream D will add)
-// app.use('/dashboard', express.static('public'));
-
-// ===== Error Handling =====
-app.use((err, req, res, next) => {
-  logger.error('Error handling request', {
-    error: err.message,
-    stack: err.stack,
-    path: req.path,
-    method: req.method,
+  res.json({
+    statistics: stats,
+    recent_payments: payments.slice(0, 10)
   });
+});
 
-  res.status(err.statusCode || 500).json({
-    error: err.message || 'Internal server error',
-    status: err.statusCode || 500,
-    timestamp: new Date().toISOString(),
+// Dashboard Routes (Stream D)
+app.use('/api/dashboard', dashboardRoutes.router);
+
+// API routes
+app.use('/', paymentsRouter);
+
+// Admin/Test endpoints
+app.get('/admin/payments', (req, res) => {
+  const payments = paymentService.getAllPayments();
+  res.json({
+    total: payments.length,
+    payments: payments
   });
+});
+
+app.delete('/admin/payments', (req, res) => {
+  paymentService.clearAllPayments();
+  res.json({
+    message: 'All payments cleared successfully'
+  });
+});
+
+app.post('/admin/webhook/test', async (req, res) => {
+  const payment_id = req.body.payment_id;
+  const webhook_url = req.body.webhook_url;
+  
+  const payment = paymentService.getPayment(payment_id);
+  if (!payment) {
+    return res.status(404).json({ error: 'Payment not found' });
+  }
+
+  const url = webhook_url || process.env.MERCADOPAGO_MOCK_WEBHOOK_URL;
+  if (!url) {
+    return res.status(400).json({ error: 'Webhook URL required' });
+  }
+
+  const result = await webhookService.sendWebhook(url, payment, 'payment.updated');
+  res.json(result);
+});
+
+app.get('/admin/statistics', (req, res) => {
+  const stats = paymentService.getStatistics();
+  res.json(stats);
 });
 
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
-    error: 'Not found',
-    message: `Route ${req.method} ${req.path} not found`,
-    status: 404,
-    timestamp: new Date().toISOString(),
+    error: 'not_found',
+    message: 'Endpoint not found',
+    path: req.path
   });
 });
 
-// ===== Server Start =====
+// Error handler
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error', { error: err.message, stack: err.stack });
+  res.status(500).json({
+    error: 'internal_server_error',
+    message: 'An unexpected error occurred'
+  });
+});
+
+// Start server
 app.listen(PORT, () => {
-  logger.info(`MercadoPago Mock Server running on port ${PORT}`, {
-    port: PORT,
-    env: process.env.NODE_ENV || 'development',
-    webhookUrl: process.env.MERCADOPAGO_MOCK_WEBHOOK_URL || 'not configured',
-  });
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  process.exit(0);
+  const defaultScenario = process.env.MERCADOPAGO_MOCK_DEFAULT_SCENARIO || 'success';
+  const webhookUrl = process.env.MERCADOPAGO_MOCK_WEBHOOK_URL || 'not configured';
+  
+  logger.info('MercadoPago Mock Server started on port ' + PORT);
+  logger.info('Swagger documentation available at http://localhost:' + PORT + '/docs');
+  logger.info('Dashboard available at http://localhost:' + PORT + '/dashboard');
+  logger.info('Health check at http://localhost:' + PORT + '/health');
+  logger.info('Default scenario: ' + defaultScenario);
+  logger.info('Webhook URL: ' + webhookUrl);
 });
 
 module.exports = app;

@@ -29,54 +29,52 @@ services:
   # ---------------------------------------------------------------------------
   # MERCADOPAGO MOCK - Payment Gateway
   # ---------------------------------------------------------------------------
-  # mercadopago-mock:
-  #   image: node:20-alpine
-  #   container_name: barberpro-mercadopago-mock
-  #   restart: unless-stopped
-  #   working_dir: /app
-  #   command: node server.js
-  #   ports:
-  #     - "8081:8081"
-  #   environment:
-  #     - NODE_ENV=development
-  #     - PORT=8081
-  #     - LOG_LEVEL=debug
-  #     # Mock configuration
-  #     - MOCK_SUCCESS_RATE=0.95  # 95% payment success rate
-  #     - MOCK_RESPONSE_DELAY=500  # Simulate 500ms API latency
-  #     - MOCK_WEBHOOK_ENABLED=true
-  #     - MOCK_WEBHOOK_URL=http://backend:3000/webhooks/mercadopago
-  #   volumes:
-  #     - ./mocks/mercadopago:/app:ro
-  #     - mercadopago_mock_data:/app/data
-  #   networks:
-  #     - barberpro-network
-  #   healthcheck:
-  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '0.25'
-  #         memory: 256M
+  mercadopago-mock:
+    build: ./mocks/mercadopago
+    container_name: barberpro-mercadopago-mock
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - MERCADOPAGO_MOCK_PORT=3001
+      - LOG_LEVEL=info
+      # Mock configuration
+      - MERCADOPAGO_MOCK_WEBHOOK_URL=http://backend:3000/api/webhooks/mercadopago
+      - MERCADOPAGO_MOCK_DEFAULT_SCENARIO=success
+    volumes:
+      - ./mocks/mercadopago:/app
+      - /app/node_modules
+    networks:
+      - barberpro-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # Mock API Endpoints Implemented:
+  # POST /v1/payments - Create payment
+  # GET /v1/payments/:id - Get payment status
+  # POST /v1/payments/:id/refunds - Refund payment
+  # GET /v1/payment_methods - List payment methods
+  # GET /health - Health check
+  # GET /dashboard - Payment dashboard
+  # GET /docs - Swagger documentation
+  # GET /admin/payments - Get all payments (admin)
+  # DELETE /admin/payments - Clear all payments (testing)
+  # POST /admin/webhook/test - Test webhook delivery
   #
-  # # Mock API Endpoints to Implement:
-  # # POST /v1/payments - Create payment
-  # # GET /v1/payments/:id - Get payment status
-  # # POST /v1/payments/:id/refund - Refund payment
-  # # POST /v1/subscriptions - Create subscription
-  # # GET /v1/subscriptions/:id - Get subscription
-  # # POST /oauth/token - OAuth authentication
-  # # POST /webhooks/test - Trigger test webhook
-  # #
-  # # Supported Payment Methods:
-  # # - Credit cards (Visa, Mastercard, Amex)
-  # # - Debit cards
-  # # - Rapipago/Pago Fácil (cash payment codes)
-  # # - MercadoPago wallet
-  # # - Bank transfers (PSE)
+  # Supported Payment Methods:
+  # - Credit cards (Visa, Mastercard, Amex)
+  # - Debit cards (Visa Débito, Mastercard Débito)
+  # - Rapipago/Pago Fácil (cash payment codes)
+  # - MercadoPago wallet (account_money)
 
   # ---------------------------------------------------------------------------
   # AFIP MOCK - Tax Authority Integration
@@ -186,12 +184,6 @@ services:
   # # Message Status Transitions:
   # # - sent → delivered → read
   # # - Auto-generate status webhooks
-
-  # Placeholder service to prevent empty services section
-  mocks-placeholder:
-    image: alpine:3.18
-    container_name: barberpro-mocks-placeholder
-    command: echo "Argentina service mocks placeholder - Implement in Phase 2"
 
 # NETWORKS
 networks:

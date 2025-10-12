@@ -1,292 +1,340 @@
-const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
+const logger = require('../utils/logger');
 
 // In-memory storage for payments
 const payments = new Map();
+const refunds = new Map();
 
-// Load scenarios configuration
-let scenarios = {};
+// Load scenarios
+let scenarios;
 try {
-  const scenariosPath = path.join(__dirname, '../config/scenarios.json');
-  scenarios = JSON.parse(fs.readFileSync(scenariosPath, 'utf8'));
+  scenarios = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '../config/scenarios.json'), 'utf8')
+  );
 } catch (error) {
-  console.error('Failed to load scenarios.json:', error.message);
-  scenarios = { default: 'success', scenarios: {} };
+  logger.error('Failed to load scenarios.json', error);
+  scenarios = { default: 'success', scenarios: {}, payment_methods: {} };
 }
 
-// ===== Payment Operations (Stream A) =====
-
-/**
- * Get scenario configuration
- * @param {string} scenarioName - Name of the scenario to load
- * @returns {object} Scenario configuration
- */
-function getScenario(scenarioName) {
-  const name = scenarioName || scenarios.default || 'success';
-  const scenario = scenarios.scenarios[name];
-
-  if (!scenario) {
-    throw new Error(`Scenario '${name}' not found`);
-  }
-
-  return { ...scenario, name };
-}
+// Payment ID counter
+let paymentIdCounter = 1000000000;
+let refundIdCounter = 2000000000;
 
 /**
  * Generate a unique payment ID
- * @returns {string} Payment ID
  */
 function generatePaymentId() {
-  return Math.floor(Math.random() * 9000000000) + 1000000000;
+  return ++paymentIdCounter;
+}
+
+/**
+ * Generate a unique refund ID
+ */
+function generateRefundId() {
+  return ++refundIdCounter;
+}
+
+/**
+ * Get scenario configuration
+ */
+function getScenario(scenarioName) {
+  const name = scenarioName || scenarios.default;
+  return scenarios.scenarios[name] || scenarios.scenarios[scenarios.default];
 }
 
 /**
  * Validate payment request
- * @param {object} paymentData - Payment data to validate
- * @returns {object} Validation result
  */
-function validatePaymentRequest(paymentData) {
+function validatePaymentRequest(body) {
   const errors = [];
 
-  if (!paymentData.transaction_amount || paymentData.transaction_amount <= 0) {
-    errors.push('transaction_amount is required and must be greater than 0');
+  if (!body.transaction_amount || body.transaction_amount <= 0) {
+    errors.push('transaction_amount must be greater than 0');
   }
 
-  if (!paymentData.payment_method_id) {
+  if (!body.payment_method_id) {
     errors.push('payment_method_id is required');
   }
 
-  if (!paymentData.payer || !paymentData.payer.email) {
-    errors.push('payer.email is required');
+  if (!body.payer) {
+    errors.push('payer information is required');
+  } else {
+    if (!body.payer.email) {
+      errors.push('payer.email is required');
+    }
   }
 
-  // Validate Argentina-specific payment methods
-  const validPaymentMethods = [
-    'visa', 'master', 'amex', 'naranja', 'cabal', 'maestro',
-    'mercadopago', 'account_money', 'debin_transfer',
-    'rapipago', 'pagofacil', 'bapropagos', 'cargavirtual'
-  ];
-
-  if (paymentData.payment_method_id && !validPaymentMethods.includes(paymentData.payment_method_id)) {
-    errors.push(`payment_method_id '${paymentData.payment_method_id}' is not supported. Valid methods: ${validPaymentMethods.join(', ')}`);
+  if (body.installments && (body.installments < 1 || body.installments > 24)) {
+    errors.push('installments must be between 1 and 24');
   }
 
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
-}
-
-/**
- * Calculate installment amount
- * @param {number} amount - Total transaction amount
- * @param {number} installments - Number of installments
- * @returns {object} Installment details
- */
-function calculateInstallments(amount, installments = 1) {
-  const installmentAmount = amount / installments;
-  const totalAmount = amount;
-
-  return {
-    installments,
-    installment_amount: parseFloat(installmentAmount.toFixed(2)),
-    total_amount: parseFloat(totalAmount.toFixed(2)),
-  };
+  return errors;
 }
 
 /**
  * Create a new payment
- * @param {object} paymentData - Payment request data
- * @param {string} scenarioName - Scenario to apply
- * @returns {Promise<object>} Created payment
  */
-async function createPayment(paymentData, scenarioName) {
-  // Validate payment request
-  const validation = validatePaymentRequest(paymentData);
-  if (!validation.valid) {
-    const error = new Error('Invalid payment request');
-    error.statusCode = 400;
-    error.details = validation.errors;
-    throw error;
-  }
-
-  // Get scenario configuration
+function createPayment(body, scenarioName) {
   const scenario = getScenario(scenarioName);
-
-  // Simulate network delay
-  if (scenario.delay_ms) {
-    await sleep(scenario.delay_ms);
-  }
-
-  // Simulate timeout
-  if (scenario.simulate_timeout) {
-    await sleep(scenario.delay_ms || 30000);
-    const error = new Error('Request timeout');
-    error.statusCode = 408;
-    throw error;
-  }
-
-  // Simulate server error
-  if (scenario.simulate_error) {
-    const error = new Error(scenario.message || 'Internal server error');
-    error.statusCode = scenario.status_code || 500;
-    throw error;
-  }
-
-  // Calculate installments
-  const installmentDetails = calculateInstallments(
-    paymentData.transaction_amount,
-    paymentData.installments || 1
-  );
-
-  // Generate payment ID
   const paymentId = generatePaymentId();
-
-  // Create payment object
+  
   const payment = {
     id: paymentId,
-    status: scenario.status,
-    status_detail: scenario.status_detail,
-    transaction_amount: paymentData.transaction_amount,
-    currency_id: paymentData.currency_id || 'ARS',
-    description: paymentData.description || '',
-    payment_method_id: paymentData.payment_method_id,
-    payment_type_id: getPaymentTypeId(paymentData.payment_method_id),
-    installments: installmentDetails.installments,
-    installment_amount: installmentDetails.installment_amount,
-    payer: {
-      id: paymentData.payer.id || generatePaymentId(),
-      email: paymentData.payer.email,
-      identification: paymentData.payer.identification || {},
-      phone: paymentData.payer.phone || {},
-      type: paymentData.payer.type || 'guest',
-    },
-    metadata: paymentData.metadata || {},
-    additional_info: paymentData.additional_info || {},
     date_created: new Date().toISOString(),
     date_approved: scenario.status === 'approved' ? new Date().toISOString() : null,
     date_last_updated: new Date().toISOString(),
-    money_release_date: scenario.status === 'approved'
-      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    money_release_date: scenario.status === 'approved' 
+      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() 
       : null,
-    collector_id: 123456789,
     operation_type: 'regular_payment',
+    issuer_id: '25',
+    payment_method_id: body.payment_method_id,
+    payment_type_id: body.payment_type_id || 'credit_card',
+    status: scenario.status,
+    status_detail: scenario.status_detail,
+    currency_id: 'ARS',
+    description: body.description || 'Payment',
     live_mode: false,
-    scenario: scenario.name,
+    sponsor_id: null,
+    authorization_code: scenario.status === 'approved' ? '1234567' : null,
+    money_release_schema: null,
+    taxes_amount: 0,
+    counter_currency: null,
+    shipping_amount: 0,
+    pos_id: null,
+    store_id: null,
+    collector_id: 123456789,
+    payer: {
+      id: body.payer.id || '987654321',
+      email: body.payer.email,
+      identification: body.payer.identification || {},
+      phone: body.payer.phone || {},
+      type: 'guest',
+      entity_type: null,
+      first_name: body.payer.first_name || null,
+      last_name: body.payer.last_name || null
+    },
+    metadata: body.metadata || {},
+    additional_info: body.additional_info || {},
+    order: {},
+    external_reference: body.external_reference || null,
+    transaction_amount: body.transaction_amount,
+    transaction_amount_refunded: 0,
+    coupon_amount: 0,
+    differential_pricing_id: null,
+    deduction_schema: null,
+    transaction_details: {
+      payment_method_reference_id: null,
+      net_received_amount: scenario.status === 'approved' 
+        ? body.transaction_amount - (body.transaction_amount * 0.029) // 2.9% fee
+        : 0,
+      total_paid_amount: body.transaction_amount,
+      overpaid_amount: 0,
+      external_resource_url: null,
+      installment_amount: body.installments 
+        ? (body.transaction_amount / body.installments).toFixed(2)
+        : body.transaction_amount,
+      financial_institution: null,
+      payable_deferral_period: null,
+      acquirer_reference: null
+    },
+    fee_details: scenario.status === 'approved' ? [
+      {
+        type: 'mercadopago_fee',
+        amount: body.transaction_amount * 0.029,
+        fee_payer: 'collector'
+      }
+    ] : [],
+    captured: true,
+    binary_mode: false,
+    call_for_authorize_id: null,
+    statement_descriptor: 'BarberPro',
+    installments: body.installments || 1,
+    card: body.token ? {
+      id: null,
+      first_six_digits: '450995',
+      last_four_digits: '3704',
+      expiration_month: 11,
+      expiration_year: 2025,
+      date_created: new Date().toISOString(),
+      date_last_updated: new Date().toISOString(),
+      cardholder: {
+        name: body.payer.first_name && body.payer.last_name
+          ? `${body.payer.first_name} ${body.payer.last_name}`
+          : 'APRO',
+        identification: body.payer.identification || {}
+      }
+    } : null,
+    notification_url: body.notification_url || null,
+    refunds: [],
+    processing_mode: 'aggregator',
+    merchant_account_id: null,
+    acquirer: null,
+    merchant_number: null,
+    _scenario: scenarioName || scenarios.default,
+    _delay_ms: scenario.delay_ms || 0
   };
 
-  // Store payment
   payments.set(paymentId, payment);
-
+  logger.info(`Payment created: ${paymentId} with status ${scenario.status}`);
+  
   return payment;
 }
 
 /**
  * Get payment by ID
- * @param {number} paymentId - Payment ID
- * @returns {object} Payment data
  */
 function getPayment(paymentId) {
-  const payment = payments.get(parseInt(paymentId));
-
-  if (!payment) {
-    const error = new Error('Payment not found');
-    error.statusCode = 404;
-    throw error;
-  }
-
-  return payment;
+  return payments.get(parseInt(paymentId));
 }
 
 /**
  * Update payment status
- * @param {number} paymentId - Payment ID
- * @param {object} updates - Payment updates
- * @returns {object} Updated payment
  */
-function updatePayment(paymentId, updates) {
-  const payment = getPayment(paymentId);
+function updatePaymentStatus(paymentId, status, statusDetail) {
+  const payment = payments.get(parseInt(paymentId));
+  
+  if (!payment) {
+    return null;
+  }
 
-  const updatedPayment = {
-    ...payment,
-    ...updates,
-    date_last_updated: new Date().toISOString(),
+  payment.status = status;
+  payment.status_detail = statusDetail;
+  payment.date_last_updated = new Date().toISOString();
+
+  if (status === 'approved' && !payment.date_approved) {
+    payment.date_approved = new Date().toISOString();
+    payment.authorization_code = '1234567';
+  }
+
+  payments.set(parseInt(paymentId), payment);
+  logger.info(`Payment ${paymentId} status updated to ${status}`);
+  
+  return payment;
+}
+
+/**
+ * Create a refund
+ */
+function createRefund(paymentId, amount) {
+  const payment = payments.get(parseInt(paymentId));
+  
+  if (!payment) {
+    return { error: 'payment_not_found' };
+  }
+
+  if (payment.status !== 'approved') {
+    return { error: 'payment_not_approved' };
+  }
+
+  const remainingAmount = payment.transaction_amount - payment.transaction_amount_refunded;
+  
+  if (amount > remainingAmount) {
+    return { error: 'amount_exceeds_payment' };
+  }
+
+  const refundId = generateRefundId();
+  const refund = {
+    id: refundId,
+    payment_id: paymentId,
+    amount: amount || remainingAmount,
+    metadata: {},
+    source: {
+      id: '123456789',
+      name: 'Collector',
+      type: 'collector'
+    },
+    date_created: new Date().toISOString(),
+    unique_sequence_number: null,
+    refund_mode: 'standard',
+    adjustment_amount: 0,
+    status: 'approved',
+    reason: 'Refund requested'
   };
 
-  // Update approved date if status changes to approved
-  if (updates.status === 'approved' && payment.status !== 'approved') {
-    updatedPayment.date_approved = new Date().toISOString();
-    updatedPayment.money_release_date = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  payment.transaction_amount_refunded += refund.amount;
+  payment.refunds.push(refund);
+  
+  if (payment.transaction_amount_refunded >= payment.transaction_amount) {
+    payment.status = 'refunded';
   }
 
-  payments.set(parseInt(paymentId), updatedPayment);
-  return updatedPayment;
+  refunds.set(refundId, refund);
+  payments.set(parseInt(paymentId), payment);
+  
+  logger.info(`Refund ${refundId} created for payment ${paymentId}`);
+  
+  return refund;
 }
 
 /**
- * Get all payments
- * @returns {array} List of all payments
+ * Get all payment methods
+ */
+function getPaymentMethods() {
+  const allMethods = [];
+  
+  Object.keys(scenarios.payment_methods).forEach(type => {
+    allMethods.push(...scenarios.payment_methods[type]);
+  });
+  
+  return allMethods;
+}
+
+/**
+ * Get payment methods by type
+ */
+function getPaymentMethodsByType(type) {
+  return scenarios.payment_methods[type] || [];
+}
+
+/**
+ * Get all payments (for dashboard)
  */
 function getAllPayments() {
-  return Array.from(payments.values());
+  return Array.from(payments.values()).reverse();
 }
 
 /**
- * Clear all payments from storage
+ * Clear all payments (for testing)
  */
-function clearPayments() {
+function clearAllPayments() {
   payments.clear();
-}
-
-// ===== Refund Operations (Stream B will add) =====
-// function createRefund(paymentId, refundData) { ... }
-// function getRefund(paymentId, refundId) { ... }
-
-// ===== Utility Functions =====
-
-/**
- * Sleep utility for simulating delays
- * @param {number} ms - Milliseconds to sleep
- */
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  refunds.clear();
+  paymentIdCounter = 1000000000;
+  refundIdCounter = 2000000000;
+  logger.info('All payments and refunds cleared');
 }
 
 /**
- * Get payment type ID from payment method
- * @param {string} paymentMethodId - Payment method ID
- * @returns {string} Payment type ID
+ * Get statistics
  */
-function getPaymentTypeId(paymentMethodId) {
-  const cardMethods = ['visa', 'master', 'amex', 'naranja', 'cabal', 'maestro'];
-  const ticketMethods = ['rapipago', 'pagofacil', 'bapropagos', 'cargavirtual'];
-  const bankTransferMethods = ['debin_transfer'];
-  const accountMoneyMethods = ['account_money', 'mercadopago'];
-
-  if (cardMethods.includes(paymentMethodId)) {
-    return 'credit_card';
-  } else if (ticketMethods.includes(paymentMethodId)) {
-    return 'ticket';
-  } else if (bankTransferMethods.includes(paymentMethodId)) {
-    return 'bank_transfer';
-  } else if (accountMoneyMethods.includes(paymentMethodId)) {
-    return 'account_money';
-  }
-
-  return 'other';
+function getStatistics() {
+  const allPayments = Array.from(payments.values());
+  
+  return {
+    total_payments: allPayments.length,
+    approved: allPayments.filter(p => p.status === 'approved').length,
+    pending: allPayments.filter(p => p.status === 'pending').length,
+    rejected: allPayments.filter(p => p.status === 'rejected').length,
+    refunded: allPayments.filter(p => p.status === 'refunded').length,
+    total_amount: allPayments.reduce((sum, p) => sum + p.transaction_amount, 0),
+    total_refunded: allPayments.reduce((sum, p) => sum + p.transaction_amount_refunded, 0)
+  };
 }
 
 module.exports = {
-  // Payment operations
-  createPayment,
-  getPayment,
-  updatePayment,
-  getAllPayments,
-  clearPayments,
-
-  // Utilities
+  generatePaymentId,
+  generateRefundId,
   getScenario,
   validatePaymentRequest,
-  calculateInstallments,
+  createPayment,
+  getPayment,
+  updatePaymentStatus,
+  createRefund,
+  getPaymentMethods,
+  getPaymentMethodsByType,
+  getAllPayments,
+  clearAllPayments,
+  getStatistics
 };

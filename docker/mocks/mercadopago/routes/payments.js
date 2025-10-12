@@ -1,167 +1,210 @@
 const express = require('express');
 const router = express.Router();
 const paymentService = require('../services/payment.service');
-const winston = require('winston');
-
-// Logger instance
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-  ],
-});
+const webhookService = require('../services/webhook.service');
+const logger = require('../utils/logger');
 
 /**
- * POST /v1/payments
- * Create a new payment
- *
- * Query params:
- *   - scenario: Scenario name to apply (optional, defaults to configured default)
- *
- * Body:
- *   - transaction_amount: number (required)
- *   - payment_method_id: string (required)
- *   - payer: object (required)
- *     - email: string (required)
- *     - identification: object (optional)
- *     - phone: object (optional)
- *   - description: string (optional)
- *   - installments: number (optional, default 1)
- *   - metadata: object (optional)
+ * @swagger
+ * /v1/payments:
+ *   post:
+ *     summary: Create a payment
+ *     tags: [Payments]
+ *     parameters:
+ *       - in: query
+ *         name: scenario
+ *         schema:
+ *           type: string
+ *         description: Scenario name (success, pending, rejected, etc.)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - transaction_amount
+ *               - payment_method_id
+ *               - payer
+ *             properties:
+ *               transaction_amount:
+ *                 type: number
+ *               payment_method_id:
+ *                 type: string
+ *               payer:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Payment created
+ *       400:
+ *         description: Invalid request
  */
-router.post('/', async (req, res, next) => {
+router.post('/v1/payments', async (req, res) => {
+  logger.info('POST /v1/payments', { scenario: req.query.scenario });
+
+  // Validate request
+  const errors = paymentService.validatePaymentRequest(req.body);
+  if (errors.length > 0) {
+    logger.warn('Payment validation failed', { errors });
+    return res.status(400).json({
+      error: 'bad_request',
+      message: 'Invalid payment request',
+      details: errors
+    });
+  }
+
   try {
-    const scenarioName = req.query.scenario;
-    const paymentData = req.body;
+    const scenario = paymentService.getScenario(req.query.scenario);
+    
+    // Simulate timeout scenario
+    if (scenario.simulate_timeout) {
+      logger.info('Simulating timeout scenario');
+      await new Promise(resolve => setTimeout(resolve, scenario.delay_ms));
+      return res.status(408).json({
+        error: 'timeout',
+        message: 'Request timeout'
+      });
+    }
 
-    logger.info('Creating payment', {
-      scenario: scenarioName,
-      amount: paymentData.transaction_amount,
-      paymentMethod: paymentData.payment_method_id,
-    });
+    // Simulate network error
+    if (scenario.simulate_error) {
+      logger.info('Simulating network error');
+      return res.status(500).json({
+        error: scenario.error_code || 'internal_server_error',
+        message: 'Internal server error'
+      });
+    }
 
-    const payment = await paymentService.createPayment(paymentData, scenarioName);
+    // Simulate delay
+    if (scenario.delay_ms > 0) {
+      await new Promise(resolve => setTimeout(resolve, scenario.delay_ms));
+    }
 
-    logger.info('Payment created successfully', {
-      paymentId: payment.id,
-      status: payment.status,
-    });
+    // Create payment
+    const payment = paymentService.createPayment(req.body, req.query.scenario);
 
-    // Return 201 Created
+    // Send webhook asynchronously if URL is provided
+    const webhookUrl = req.body.notification_url || process.env.MERCADOPAGO_MOCK_WEBHOOK_URL;
+    if (webhookUrl) {
+      // Don't await - send webhook asynchronously
+      webhookService.sendWebhook(webhookUrl, payment, 'payment.created')
+        .catch(err => logger.error('Webhook delivery failed', { error: err.message }));
+    }
+
     res.status(201).json(payment);
   } catch (error) {
-    logger.error('Failed to create payment', {
-      error: error.message,
-      details: error.details,
+    logger.error('Error creating payment', { error: error.message, stack: error.stack });
+    res.status(500).json({
+      error: 'internal_server_error',
+      message: 'Failed to create payment'
     });
-    next(error);
   }
 });
 
 /**
- * GET /v1/payments/:id
- * Get payment details by ID
- *
- * Params:
- *   - id: Payment ID (required)
+ * @swagger
+ * /v1/payments/{id}:
+ *   get:
+ *     summary: Get payment by ID
+ *     tags: [Payments]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Payment found
+ *       404:
+ *         description: Payment not found
  */
-router.get('/:id', (req, res, next) => {
-  try {
-    const paymentId = req.params.id;
+router.get('/v1/payments/:id', (req, res) => {
+  logger.info('GET /v1/payments/:id', { payment_id: req.params.id });
 
-    logger.info('Fetching payment', { paymentId });
+  const payment = paymentService.getPayment(req.params.id);
 
-    const payment = paymentService.getPayment(paymentId);
-
-    logger.info('Payment retrieved successfully', {
-      paymentId: payment.id,
-      status: payment.status,
+  if (!payment) {
+    logger.warn('Payment not found', { payment_id: req.params.id });
+    return res.status(404).json({
+      error: 'not_found',
+      message: 'Payment not found'
     });
-
-    res.json(payment);
-  } catch (error) {
-    logger.error('Failed to fetch payment', {
-      paymentId: req.params.id,
-      error: error.message,
-    });
-    next(error);
   }
+
+  res.json(payment);
 });
 
 /**
- * PUT /v1/payments/:id
- * Update payment (for status transitions)
- *
- * Params:
- *   - id: Payment ID (required)
- *
- * Body:
- *   - status: string (optional)
- *   - status_detail: string (optional)
+ * @swagger
+ * /v1/payments/{id}/refunds:
+ *   post:
+ *     summary: Refund a payment
+ *     tags: [Refunds]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               amount:
+ *                 type: number
+ *     responses:
+ *       201:
+ *         description: Refund created
+ *       404:
+ *         description: Payment not found
  */
-router.put('/:id', (req, res, next) => {
-  try {
-    const paymentId = req.params.id;
-    const updates = req.body;
-
-    logger.info('Updating payment', {
-      paymentId,
-      updates,
-    });
-
-    const payment = paymentService.updatePayment(paymentId, updates);
-
-    logger.info('Payment updated successfully', {
-      paymentId: payment.id,
-      status: payment.status,
-    });
-
-    res.json(payment);
-  } catch (error) {
-    logger.error('Failed to update payment', {
-      paymentId: req.params.id,
-      error: error.message,
-    });
-    next(error);
-  }
-});
-
-/**
- * GET /v1/payments
- * Get all payments (for testing/debugging)
- */
-router.get('/', (req, res) => {
-  logger.info('Fetching all payments');
-
-  const payments = paymentService.getAllPayments();
-
-  res.json({
-    results: payments,
-    paging: {
-      total: payments.length,
-      limit: 100,
-      offset: 0,
-    },
+router.post('/v1/payments/:id/refunds', async (req, res) => {
+  logger.info('POST /v1/payments/:id/refunds', { 
+    payment_id: req.params.id,
+    amount: req.body.amount 
   });
+
+  const result = paymentService.createRefund(
+    parseInt(req.params.id),
+    req.body.amount
+  );
+
+  if (result.error) {
+    const statusCode = result.error === 'payment_not_found' ? 404 : 400;
+    return res.status(statusCode).json({
+      error: result.error,
+      message: `Refund failed: ${result.error}`
+    });
+  }
+
+  // Send webhook for refund
+  const payment = paymentService.getPayment(req.params.id);
+  const webhookUrl = payment.notification_url || process.env.MERCADOPAGO_MOCK_WEBHOOK_URL;
+  if (webhookUrl) {
+    webhookService.sendWebhook(webhookUrl, payment, 'payment.updated')
+      .catch(err => logger.error('Webhook delivery failed', { error: err.message }));
+  }
+
+  res.status(201).json(result);
 });
 
 /**
- * DELETE /v1/payments
- * Clear all payments (for testing)
+ * @swagger
+ * /v1/payment_methods:
+ *   get:
+ *     summary: Get available payment methods
+ *     tags: [Payment Methods]
+ *     responses:
+ *       200:
+ *         description: List of payment methods
  */
-router.delete('/', (req, res) => {
-  logger.info('Clearing all payments');
-
-  paymentService.clearPayments();
-
-  res.json({
-    message: 'All payments cleared',
-    timestamp: new Date().toISOString(),
-  });
+router.get('/v1/payment_methods', (req, res) => {
+  logger.info('GET /v1/payment_methods');
+  const methods = paymentService.getPaymentMethods();
+  res.json(methods);
 });
 
 module.exports = router;

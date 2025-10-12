@@ -9,6 +9,7 @@ const webhookService = require('./services/webhook.service');
 // Routes
 const paymentsRouter = require('./routes/payments');
 const dashboardRoutes = require('./routes/dashboard');
+const webhooksRouter = require('./routes/webhooks');
 
 const app = express();
 const PORT = process.env.MERCADOPAGO_MOCK_PORT || process.env.PORT || 3001;
@@ -76,6 +77,9 @@ app.get('/dashboard', (req, res) => {
 
 // Dashboard Routes (Stream D)
 app.use('/api/dashboard', dashboardRoutes.router);
+
+// Webhook Routes (Stream C)
+app.use('/', webhooksRouter);
 
 // API routes
 app.use('/', paymentsRouter);

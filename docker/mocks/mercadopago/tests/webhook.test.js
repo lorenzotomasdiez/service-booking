@@ -273,7 +273,7 @@ describe('Webhook Integration Tests', () => {
 
       expect(result.status).toBe('failed');
       expect(result.error).toBeDefined();
-    });
+    }, 10000); // Increase timeout to 10 seconds to handle connection timeout
 
     test('sendWebhook handles missing webhook URL', async () => {
       const payment = paymentService.createPayment({
@@ -284,9 +284,188 @@ describe('Webhook Integration Tests', () => {
         }
       }, 'success');
 
+      // Temporarily clear the configured webhook URL
+      const originalUrl = webhookService.webhookUrl;
+      webhookService.webhookUrl = null;
+
       const result = await webhookService.sendWebhook(null, payment, 'payment.created');
 
-      expect(result).toBeNull();
+      expect(result.status).toBe('skipped');
+      expect(result.message).toContain('No webhook URL configured');
+
+      // Restore original URL
+      webhookService.webhookUrl = originalUrl;
+    });
+
+    test('builds correct webhook payload', () => {
+      const payment = {
+        id: '123',
+        payer: { id: 'user1', email: 'test@example.com' }
+      };
+
+      const webhook = webhookService.buildWebhookPayload(payment, 'payment.created');
+
+      expect(webhook.action).toBe('payment.created');
+      expect(webhook.data.id).toBe('123');
+      expect(webhook.type).toBe('payment');
+      expect(webhook.api_version).toBe('v1');
+    });
+
+    test('triggerWebhook with delay', async () => {
+      const payment = paymentService.createPayment({
+        transaction_amount: 100,
+        payment_method_id: 'visa',
+        payer: {
+          email: 'test@example.com'
+        }
+      }, 'success');
+
+      const startTime = Date.now();
+      const delay = 1000;
+
+      // Set webhook URL temporarily
+      const originalUrl = webhookService.webhookUrl;
+      webhookService.setWebhookUrl(`http://localhost:${WEBHOOK_PORT}/webhook`);
+
+      await webhookService.triggerWebhook(payment, 'payment.created', delay, false);
+
+      const elapsed = Date.now() - startTime;
+
+      // Restore URL
+      webhookService.setWebhookUrl(originalUrl);
+
+      expect(elapsed).toBeGreaterThanOrEqual(delay - 100); // Allow small variance
+      expect(webhookReceiver.receivedWebhooks.length).toBeGreaterThan(0);
+    });
+
+    test('getConfig returns current configuration', () => {
+      const config = webhookService.getConfig();
+
+      expect(config.webhookUrl).toBeDefined();
+      expect(config.retryAttempts).toBe(3);
+      expect(config.baseDelay).toBe(2000);
+    });
+
+    test('setWebhookUrl updates webhook URL', () => {
+      const originalUrl = webhookService.webhookUrl;
+      const newUrl = 'http://new-url.com/webhook';
+
+      webhookService.setWebhookUrl(newUrl);
+
+      expect(webhookService.webhookUrl).toBe(newUrl);
+
+      // Restore original
+      webhookService.setWebhookUrl(originalUrl);
+    });
+  });
+
+  describe('Webhook Routes', () => {
+    test('GET /api/webhooks/config returns configuration', async () => {
+      const response = await request(app)
+        .get('/api/webhooks/config')
+        .expect(200);
+
+      expect(response.body.webhookUrl).toBeDefined();
+      expect(response.body.retryAttempts).toBe(3);
+      expect(response.body.baseDelay).toBe(2000);
+    });
+
+    test('PUT /api/webhooks/config updates webhook URL', async () => {
+      const newUrl = 'http://test-webhook.com/webhooks';
+
+      const response = await request(app)
+        .put('/api/webhooks/config')
+        .send({ webhookUrl: newUrl })
+        .expect(200);
+
+      expect(response.body.webhookUrl).toBe(newUrl);
+      expect(response.body.previousUrl).toBeDefined();
+
+      // Restore original URL
+      webhookService.setWebhookUrl(process.env.MERCADOPAGO_MOCK_WEBHOOK_URL || 'http://localhost:3000/api/webhooks/mercadopago');
+    });
+
+    test('PUT /api/webhooks/config validates URL format', async () => {
+      const response = await request(app)
+        .put('/api/webhooks/config')
+        .send({ webhookUrl: 'invalid-url' })
+        .expect(400);
+
+      expect(response.body.error).toBe('invalid_url');
+    });
+
+    test('POST /api/webhooks/trigger/:paymentId triggers webhook', async () => {
+      // Create a payment first
+      const payment = paymentService.createPayment({
+        transaction_amount: 100,
+        payment_method_id: 'visa',
+        payer: {
+          email: 'test@example.com'
+        }
+      }, 'success');
+
+      // Set webhook URL
+      webhookService.setWebhookUrl(`http://localhost:${WEBHOOK_PORT}/webhook`);
+
+      // Trigger webhook
+      const response = await request(app)
+        .post(`/api/webhooks/trigger/${payment.id}`)
+        .send({
+          action: 'payment.updated',
+          delay: 0
+        })
+        .expect(200);
+
+      expect(response.body.message).toContain('Webhook triggered');
+      expect(response.body.paymentId).toBe(String(payment.id));
+
+      // Wait for webhook
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify webhook was received
+      expect(webhookReceiver.receivedWebhooks.length).toBeGreaterThan(0);
+    });
+
+    test('POST /api/webhooks/trigger/:paymentId with delay schedules webhook', async () => {
+      const payment = paymentService.createPayment({
+        transaction_amount: 100,
+        payment_method_id: 'visa',
+        payer: {
+          email: 'test@example.com'
+        }
+      }, 'success');
+
+      webhookService.setWebhookUrl(`http://localhost:${WEBHOOK_PORT}/webhook`);
+
+      const response = await request(app)
+        .post(`/api/webhooks/trigger/${payment.id}`)
+        .send({
+          action: 'payment.updated',
+          delay: 500
+        })
+        .expect(200);
+
+      expect(response.body.scheduled).toBe(true);
+      expect(response.body.note).toContain('500ms');
+    });
+
+    test('POST /api/webhooks/test sends test webhook', async () => {
+      webhookReceiver.receivedWebhooks.length = 0;
+
+      const response = await request(app)
+        .post('/api/webhooks/test')
+        .send({
+          webhookUrl: `http://localhost:${WEBHOOK_PORT}/webhook`
+        })
+        .expect(200);
+
+      expect(response.body.message).toBe('Test webhook sent');
+      expect(response.body.result.status).toBe('delivered');
+
+      // Wait for webhook
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      expect(webhookReceiver.receivedWebhooks.length).toBeGreaterThan(0);
     });
   });
 

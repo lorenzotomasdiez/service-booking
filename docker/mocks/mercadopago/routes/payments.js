@@ -86,9 +86,19 @@ router.post('/v1/payments', async (req, res) => {
     // Send webhook asynchronously if URL is provided
     const webhookUrl = req.body.notification_url || process.env.MERCADOPAGO_MOCK_WEBHOOK_URL;
     if (webhookUrl) {
-      // Don't await - send webhook asynchronously
-      webhookService.sendWebhook(webhookUrl, payment, 'payment.created')
-        .catch(err => logger.error('Webhook delivery failed', { error: err.message }));
+      // Get scenario delay for webhook
+      const webhookDelay = scenario.delay_ms || 500;
+
+      // Don't await - trigger webhook asynchronously with delay
+      if (webhookUrl !== webhookService.webhookUrl) {
+        // Custom webhook URL provided in notification_url
+        webhookService.triggerWebhookWithDelay(webhookUrl, payment, 'payment.created', webhookDelay)
+          .catch(err => logger.error('Webhook delivery failed', { error: err.message }));
+      } else {
+        // Use configured webhook URL
+        webhookService.triggerWebhook(payment, 'payment.created', webhookDelay, true)
+          .catch(err => logger.error('Webhook delivery failed', { error: err.message }));
+      }
     }
 
     res.status(201).json(payment);
@@ -180,12 +190,18 @@ router.post('/v1/payments/:id/refunds', async (req, res) => {
     });
   }
 
-  // Send webhook for refund
+  // Send webhook for refund with minimal delay
   const payment = paymentService.getPayment(req.params.id);
   const webhookUrl = payment.notification_url || process.env.MERCADOPAGO_MOCK_WEBHOOK_URL;
   if (webhookUrl) {
-    webhookService.sendWebhook(webhookUrl, payment, 'payment.updated')
-      .catch(err => logger.error('Webhook delivery failed', { error: err.message }));
+    // Trigger webhook with small delay for refund events
+    if (webhookUrl !== webhookService.webhookUrl) {
+      webhookService.triggerWebhookWithDelay(webhookUrl, payment, 'payment.updated', 500)
+        .catch(err => logger.error('Webhook delivery failed', { error: err.message }));
+    } else {
+      webhookService.triggerWebhook(payment, 'payment.updated', 500, true)
+        .catch(err => logger.error('Webhook delivery failed', { error: err.message }));
+    }
   }
 
   res.status(201).json(result);

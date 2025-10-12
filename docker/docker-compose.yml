@@ -1,0 +1,149 @@
+# BarberPro Base Docker Compose Configuration
+# This file contains common infrastructure services shared across all environments
+# Use with environment-specific override files:
+#   Development: docker-compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
+#   Production:  docker-compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up
+
+services:
+  # PostgreSQL Database - Upgraded to version 16
+  postgres:
+    image: postgres:16-alpine
+    container_name: barberpro-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-barberpro_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-barberpro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-barberpro_dev_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - barberpro-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-barberpro} -d ${POSTGRES_DB:-barberpro_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s  # Reduced from 60s - PostgreSQL starts in ~5s on WSL2/Linux
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Redis Cache & Session Store
+  redis:
+    image: redis:7.2-alpine
+    container_name: barberpro-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./configs/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - barberpro-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s  # Reduced from 30s - Redis starts in <5s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Database Administration Tool (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4:8.11
+    container_name: barberpro-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@barberpro.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "${PGADMIN_PORT:-8080}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - barberpro-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Redis Administration Tool
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: barberpro-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+      HTTP_USER: ${REDIS_COMMANDER_USER:-admin}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin}
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8081}:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - barberpro-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+# Persistent Data Volumes
+volumes:
+  postgres_data:
+    driver: local
+    name: barberpro-postgres-data
+  redis_data:
+    driver: local
+    name: barberpro-redis-data
+  pgadmin_data:
+    driver: local
+    name: barberpro-pgadmin-data
+
+# Network Configuration
+networks:
+  barberpro-network:
+    driver: bridge
+    name: barberpro-network

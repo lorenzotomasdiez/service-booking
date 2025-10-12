@@ -1,0 +1,268 @@
+# BarberPro Production Environment Overrides
+# Extends docker-compose.yml with production-specific configurations
+# Usage: docker-compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up
+version: '3.8'
+
+services:
+  # PostgreSQL - Production Overrides
+  postgres:
+    container_name: barberpro-postgres-prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-barberpro_prod}
+      # Performance tuning for Argentina workload
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=es_AR.UTF-8 --lc-ctype=es_AR.UTF-8"
+    volumes:
+      # Add production configuration
+      - ./configs/postgres-prod.conf:/etc/postgresql/postgresql.conf:ro
+      # Add production init script
+      - ../scripts/init-prod-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command: |
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=1GB
+      -c effective_cache_size=3GB
+      -c maintenance_work_mem=256MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    healthcheck:
+      # Less frequent checks for production
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Do not expose port to host in production (only internal network)
+    ports: []
+
+  # Redis - Production Overrides
+  redis:
+    container_name: barberpro-redis-prod
+    volumes:
+      # Use production Redis configuration
+      - ./configs/redis-prod.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    healthcheck:
+      # Less frequent checks for production
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # Do not expose port to host in production (only internal network)
+    ports: []
+
+  # Nginx - Production Overrides
+  nginx:
+    container_name: barberpro-nginx-prod
+    volumes:
+      # Use production Nginx configuration
+      - ./configs/nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
+      # SSL certificates (mount from host or secrets)
+      - ../ssl:/etc/nginx/ssl:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      # Less frequent checks for production
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # pgAdmin - Disabled in Production
+  # Uncomment only for temporary admin access
+  pgadmin:
+    profiles:
+      - admin-tools  # Only start when explicitly requested
+    container_name: barberpro-pgadmin-prod
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    # Do not expose port by default in production
+    ports: []
+
+  # Redis Commander - Disabled in Production
+  # Uncomment only for temporary admin access
+  redis-commander:
+    profiles:
+      - admin-tools  # Only start when explicitly requested
+    container_name: barberpro-redis-commander-prod
+    environment:
+      HTTP_USER: ${REDIS_COMMANDER_USER}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD}
+    # Do not expose port by default in production
+    ports: []
+
+  # Backend API - Production Build
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: production
+    image: barberpro-backend:latest
+    container_name: barberpro-backend-prod
+    environment:
+      NODE_ENV: production
+      PORT: ${BACKEND_PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-barberpro}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-barberpro_prod}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+      # Security and CORS
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://barberpro.com.ar}
+      API_BASE_URL: ${API_BASE_URL:-https://api.barberpro.com.ar}
+      APP_URL: ${APP_URL:-https://barberpro.com.ar}
+      FRONTEND_URL: ${FRONTEND_URL:-https://barberpro.com.ar}
+      # Argentina specific
+      TIMEZONE: ${TIMEZONE:-America/Argentina/Buenos_Aires}
+      LOCALE: ${LOCALE:-es-AR}
+      CURRENCY: ${CURRENCY:-ARS}
+      # Payment configuration
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
+      MERCADOPAGO_PUBLIC_KEY: ${MERCADOPAGO_PUBLIC_KEY}
+      MERCADOPAGO_ENVIRONMENT: ${MERCADOPAGO_ENVIRONMENT:-production}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET}
+      # AFIP Integration
+      AFIP_CUIT: ${AFIP_CUIT}
+      AFIP_CERTIFICATE: ${AFIP_CERTIFICATE}
+      AFIP_PRIVATE_KEY: ${AFIP_PRIVATE_KEY}
+      AFIP_ENVIRONMENT: ${AFIP_ENVIRONMENT:-production}
+      # WhatsApp Business
+      WHATSAPP_BUSINESS_PHONE: ${WHATSAPP_BUSINESS_PHONE}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN}
+      # Rate limiting
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-200}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      # Monitoring and APM
+      SENTRY_DSN: ${SENTRY_DSN}
+      NEWRELIC_LICENSE_KEY: ${NEWRELIC_LICENSE_KEY}
+      DATADOG_API_KEY: ${DATADOG_API_KEY}
+      # Security
+      BCRYPT_SALT_ROUNDS: ${BCRYPT_SALT_ROUNDS:-12}
+      # Production flags
+      APP_DEBUG: false
+      ENABLE_SWAGGER: false
+    env_file:
+      - ../backend/.env.production
+    # Only expose internally through nginx
+    ports: []
+    # No volume mounts in production - use container images only
+    volumes: []
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - barberpro-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+      replicas: 2  # Run multiple instances for high availability
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Frontend - Production Build
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      target: production
+    image: barberpro-frontend:latest
+    container_name: barberpro-frontend-prod
+    environment:
+      NODE_ENV: production
+      VITE_API_URL: ${VITE_API_URL:-https://api.barberpro.com.ar}
+      VITE_WS_URL: ${VITE_WS_URL:-wss://api.barberpro.com.ar}
+      # Argentina specific
+      VITE_TIMEZONE: ${TIMEZONE:-America/Argentina/Buenos_Aires}
+      VITE_LOCALE: ${LOCALE:-es-AR}
+      VITE_CURRENCY: ${CURRENCY:-ARS}
+      # Payment
+      VITE_MERCADOPAGO_PUBLIC_KEY: ${MERCADOPAGO_PUBLIC_KEY}
+      # Analytics
+      VITE_GOOGLE_ANALYTICS_ID: ${GOOGLE_ANALYTICS_ID}
+      VITE_HOTJAR_ID: ${HOTJAR_ID}
+      # Monitoring
+      VITE_SENTRY_DSN: ${VITE_SENTRY_DSN}
+    env_file:
+      - ../frontend/.env.production
+    # Only expose internally through nginx
+    ports: []
+    # No volume mounts in production - use container images only
+    volumes: []
+    depends_on:
+      - backend
+    networks:
+      - barberpro-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# Volumes use separate names for production environment
+volumes:
+  postgres_data:
+    name: barberpro-postgres-data-prod
+  redis_data:
+    name: barberpro-redis-data-prod
+  pgadmin_data:
+    name: barberpro-pgadmin-data-prod
+  nginx_logs:
+    name: barberpro-nginx-logs-prod
+
+# Production network with custom subnet
+networks:
+  barberpro-network:
+    name: barberpro-network-prod
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # AFIP Mock Server
+  # Simulates AFIP WebServices for local development and testing
+  afip-mock:
+    build:
+      context: ./docker/mocks/afip
+      dockerfile: Dockerfile
+    container_name: afip-mock
+    ports:
+      - "3002:3002"
+    environment:
+      - AFIP_MOCK_PORT=3002
+      - AFIP_MOCK_DB_PATH=/app/data/afip.db
+      - AFIP_MOCK_DEFAULT_POS=1
+      - NODE_ENV=production
+    volumes:
+      - afip-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - mock-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # MercadoPago Mock Server (placeholder for future implementation)
+  # mercadopago-mock:
+  #   build:
+  #     context: ./docker/mocks/mercadopago
+  #     dockerfile: Dockerfile
+  #   container_name: mercadopago-mock
+  #   ports:
+  #     - "3003:3003"
+  #   environment:
+  #     - MP_MOCK_PORT=3003
+  #     - NODE_ENV=production
+  #   networks:
+  #     - mock-network
+
+  # WhatsApp Mock Server (placeholder for future implementation)
+  # whatsapp-mock:
+  #   build:
+  #     context: ./docker/mocks/whatsapp
+  #     dockerfile: Dockerfile
+  #   container_name: whatsapp-mock
+  #   ports:
+  #     - "3004:3004"
+  #   environment:
+  #     - WA_MOCK_PORT=3004
+  #     - NODE_ENV=production
+  #   networks:
+  #     - mock-network
+
+volumes:
+  afip-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./docker/mocks/afip/data
+
+networks:
+  mock-network:
+    driver: bridge
+    name: barberpro-mocks

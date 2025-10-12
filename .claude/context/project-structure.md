@@ -1,7 +1,7 @@
 ---
 created: 2025-10-10T03:05:12Z
-last_updated: 2025-10-10T03:05:12Z
-version: 1.0
+last_updated: 2025-10-12T07:07:58Z
+version: 1.1
 author: Claude Code PM System
 ---
 
@@ -39,9 +39,22 @@ service-booking/
 │   └── tokens/
 ├── docker/                    # Docker configuration
 │   ├── backup/
-│   └── configs/
+│   ├── configs/               # nginx, redis, postgres configs
+│   ├── mocks/                 # Argentina service mocks
+│   │   ├── afip/             # AFIP tax authority mock
+│   │   ├── mercadopago/      # MercadoPago payment mock
+│   │   ├── shared/           # Shared mock utilities
+│   │   ├── sms/              # SMS gateway mock
+│   │   └── whatsapp/         # WhatsApp Business mock
+│   ├── PERFORMANCE.md         # Performance benchmarks
+│   ├── PLATFORM-NOTES.md      # Platform-specific notes
+│   ├── README.md              # Docker setup guide
+│   └── TROUBLESHOOTING.md     # Common issues guide
 ├── docs/                      # Project documentation
-│   └── claude/
+│   ├── claude/
+│   ├── docker-setup-guide.md       # Complete Docker setup
+│   ├── docker-migration-guide.md   # Migration guide
+│   └── docker-changelog.md         # Docker changes log
 ├── frontend/                  # SvelteKit frontend application
 │   ├── src/
 │   │   ├── app/              # SvelteKit app files
@@ -59,7 +72,12 @@ service-booking/
 └── scripts/                  # Build and deployment scripts
     ├── automation/
     ├── demos/
-    └── monitoring/
+    ├── monitoring/
+    ├── benchmark.sh          # Performance benchmarking
+    ├── final-test.sh         # Final validation checklist
+    ├── test-linux.sh         # Linux platform testing
+    ├── test-macos.sh         # macOS platform testing
+    └── test-wsl2.sh          # WSL2 platform testing
 ```
 
 ## Key Directory Purposes
@@ -102,11 +120,23 @@ service-booking/
 - **Stores**: Lowercase with dashes (e.g., `auth.ts`, `booking.ts`)
 - **Services**: Lowercase with dashes (e.g., `socket.ts`, `performance-optimization.ts`)
 
+### Docker Structure (Epic: local-docker-environment)
+- **docker/configs/**: nginx.conf, redis.conf, postgres.conf
+- **docker/mocks/**: Argentina service mocks (MercadoPago, AFIP, WhatsApp, SMS)
+- **docker-compose.yml**: Base infrastructure (PostgreSQL, Redis, pgAdmin, Redis Commander)
+- **docker-compose.dev.yml**: Development overrides with hot reload
+- **docker-compose.prod.yml**: Production configuration
+- **docker-compose.mocks.yml**: Argentina mock services
+- **docker-compose.monitoring.yml**: Prometheus, Grafana, Loki stack
+- **docker-compose.test.yml**: Test environment configuration
+- **Makefile**: 30+ Docker orchestration commands with colored output
+
 ### Configuration Files
 - **Docker**: `Dockerfile`, `docker-compose.yml`, `docker-compose.{env}.yml`
 - **Build**: `vite.config.ts`, `svelte.config.js`, `tsconfig.json`
 - **Linting**: `.eslintrc`, `prettier.config.js`
 - **CI/CD**: `.github/workflows/*.yml`
+- **Environment**: `.env`, `docker/.env`, `backend/.env`, `frontend/.env`
 
 ## Module Organization
 

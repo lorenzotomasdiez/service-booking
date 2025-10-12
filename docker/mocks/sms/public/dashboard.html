@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMS Mock Server - Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      color: #333;
+      font-size: 28px;
+      margin-bottom: 10px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-card h3 {
+      color: #666;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .stat-card .value {
+      color: #333;
+      font-size: 32px;
+      font-weight: bold;
+    }
+
+    .stat-card.total { border-left: 4px solid #667eea; }
+    .stat-card.delivered { border-left: 4px solid #48bb78; }
+    .stat-card.failed { border-left: 4px solid #f56565; }
+    .stat-card.cost { border-left: 4px solid #ed8936; }
+
+    .controls {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .controls label {
+      font-size: 14px;
+      color: #666;
+      font-weight: 500;
+    }
+
+    .controls select,
+    .controls button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .controls button {
+      background: #667eea;
+      color: white;
+      border: none;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .controls button:hover {
+      background: #5568d3;
+    }
+
+    .controls button.danger {
+      background: #f56565;
+    }
+
+    .controls button.danger:hover {
+      background: #e53e3e;
+    }
+
+    .messages {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .messages-header {
+      background: #f7fafc;
+      padding: 20px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .messages-header h2 {
+      color: #333;
+      font-size: 20px;
+    }
+
+    .messages-list {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    .message {
+      padding: 20px;
+      border-bottom: 1px solid #e2e8f0;
+      transition: background 0.2s;
+    }
+
+    .message:hover {
+      background: #f7fafc;
+    }
+
+    .message:last-child {
+      border-bottom: none;
+    }
+
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 10px;
+    }
+
+    .message-to {
+      font-weight: 600;
+      color: #333;
+      font-size: 16px;
+    }
+
+    .message-status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-queued {
+      background: #bee3f8;
+      color: #2c5282;
+    }
+
+    .status-sent {
+      background: #c6f6d5;
+      color: #22543d;
+    }
+
+    .status-delivered {
+      background: #9ae6b4;
+      color: #22543d;
+    }
+
+    .status-failed {
+      background: #fed7d7;
+      color: #742a2a;
+    }
+
+    .message-body {
+      color: #4a5568;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 10px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .message-meta {
+      display: flex;
+      gap: 20px;
+      font-size: 12px;
+      color: #718096;
+    }
+
+    .message-meta span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .empty-state {
+      padding: 60px 20px;
+      text-align: center;
+      color: #a0aec0;
+    }
+
+    .empty-state svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #e2e8f0;
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .auto-refresh {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .auto-refresh input[type="checkbox"] {
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .message-header {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .message-meta {
+        flex-direction: column;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>SMS Mock Server Dashboard</h1>
+      <p>Real-time monitoring of SMS messages for local development</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card total">
+        <h3>Total SMS</h3>
+        <div class="value" id="stat-total">0</div>
+      </div>
+      <div class="stat-card delivered">
+        <h3>Delivered</h3>
+        <div class="value" id="stat-delivered">0</div>
+      </div>
+      <div class="stat-card failed">
+        <h3>Failed</h3>
+        <div class="value" id="stat-failed">0</div>
+      </div>
+      <div class="stat-card cost">
+        <h3>Total Cost</h3>
+        <div class="value" id="stat-cost">$0.00</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <label for="filter-status">Filter:</label>
+      <select id="filter-status">
+        <option value="">All Status</option>
+        <option value="queued">Queued</option>
+        <option value="sent">Sent</option>
+        <option value="delivered">Delivered</option>
+        <option value="failed">Failed</option>
+      </select>
+
+      <button onclick="refreshMessages()">Refresh</button>
+      <button class="danger" onclick="clearAllMessages()">Clear All</button>
+
+      <div class="auto-refresh">
+        <input type="checkbox" id="auto-refresh" checked>
+        <label for="auto-refresh">Auto-refresh (3s)</label>
+      </div>
+    </div>
+
+    <div class="messages">
+      <div class="messages-header">
+        <h2>SMS Messages <span class="loading" id="loading" style="display: none;"></span></h2>
+      </div>
+      <div class="messages-list" id="messages-list">
+        <div class="empty-state">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+          </svg>
+          <p>No SMS messages yet. Send a message to see it here.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let autoRefreshInterval = null;
+
+    // Format timestamp
+    function formatTimestamp(isoString) {
+      const date = new Date(isoString);
+      return date.toLocaleString('es-AR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+
+    // Load statistics
+    async function loadStats() {
+      try {
+        const response = await fetch('/v1/stats');
+        const data = await response.json();
+
+        if (data.success) {
+          document.getElementById('stat-total').textContent = data.data.total;
+          document.getElementById('stat-delivered').textContent = data.data.delivered;
+          document.getElementById('stat-failed').textContent = data.data.failed;
+          document.getElementById('stat-cost').textContent = `$${data.data.totalCost}`;
+        }
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+      }
+    }
+
+    // Load messages
+    async function loadMessages() {
+      const status = document.getElementById('filter-status').value;
+      const loading = document.getElementById('loading');
+      loading.style.display = 'inline-block';
+
+      try {
+        const url = status ? `/v1/sms?status=${status}` : '/v1/sms';
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const messagesList = document.getElementById('messages-list');
+
+        if (data.success && data.data.messages.length > 0) {
+          messagesList.innerHTML = data.data.messages.map(msg => `
+            <div class="message">
+              <div class="message-header">
+                <div class="message-to">${msg.to}</div>
+                <span class="message-status status-${msg.status}">${msg.status}</span>
+              </div>
+              <div class="message-body">${escapeHtml(msg.body)}</div>
+              <div class="message-meta">
+                <span>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  ${formatTimestamp(msg.createdAt)}
+                </span>
+                <span>ID: ${msg.id}</span>
+                <span>Segments: ${msg.segments}</span>
+                <span>Cost: $${msg.cost}</span>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          messagesList.innerHTML = `
+            <div class="empty-state">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+              </svg>
+              <p>${status ? `No ${status} messages found.` : 'No SMS messages yet. Send a message to see it here.'}</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+        document.getElementById('messages-list').innerHTML = `
+          <div class="empty-state">
+            <p style="color: #f56565;">Failed to load messages. Please check the console.</p>
+          </div>
+        `;
+      } finally {
+        loading.style.display = 'none';
+      }
+    }
+
+    // Refresh messages and stats
+    async function refreshMessages() {
+      await Promise.all([loadMessages(), loadStats()]);
+    }
+
+    // Clear all messages
+    async function clearAllMessages() {
+      if (!confirm('Are you sure you want to clear all SMS messages? This cannot be undone.')) {
+        return;
+      }
+
+      try {
+        const response = await fetch('/v1/sms', { method: 'DELETE' });
+        const data = await response.json();
+
+        if (data.success) {
+          alert(data.message);
+          refreshMessages();
+        }
+      } catch (error) {
+        console.error('Failed to clear messages:', error);
+        alert('Failed to clear messages. Please try again.');
+      }
+    }
+
+    // Escape HTML to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Setup auto-refresh
+    function setupAutoRefresh() {
+      const checkbox = document.getElementById('auto-refresh');
+
+      if (checkbox.checked) {
+        autoRefreshInterval = setInterval(refreshMessages, 3000);
+      } else {
+        if (autoRefreshInterval) {
+          clearInterval(autoRefreshInterval);
+          autoRefreshInterval = null;
+        }
+      }
+    }
+
+    // Event listeners
+    document.getElementById('filter-status').addEventListener('change', loadMessages);
+    document.getElementById('auto-refresh').addEventListener('change', setupAutoRefresh);
+
+    // Initial load
+    refreshMessages();
+    setupAutoRefresh();
+  </script>
+</body>
+</html>

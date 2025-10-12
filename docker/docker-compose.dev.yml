@@ -24,7 +24,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 3
-      start_period: 30s
+      start_period: 10s  # Reduced from 30s - PostgreSQL starts quickly
 
   # Redis - Development Overrides
   redis:
@@ -45,14 +45,16 @@ services:
       start_period: 5s
 
   # Nginx - Development Overrides
-  nginx:
-    container_name: barberpro-nginx-dev
-    healthcheck:
-      # More frequent checks for faster development feedback
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+  # Note: Nginx is not needed for local development (frontend runs on Vite dev server)
+  # Uncomment if you need nginx for testing
+  # nginx:
+  #   container_name: barberpro-nginx-dev
+  #   healthcheck:
+  #     # More frequent checks for faster development feedback
+  #     interval: 15s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 10s
 
   # pgAdmin - Development Overrides
   pgadmin:
@@ -65,7 +67,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 30s
+      start_period: 15s  # Reduced from 30s - pgAdmin starts relatively quickly
 
   # Redis Commander - Development Overrides
   redis-commander:

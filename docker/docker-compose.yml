@@ -26,7 +26,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 20s  # Reduced from 60s - PostgreSQL starts in ~5s on WSL2/Linux
     restart: unless-stopped
     deploy:
       resources:
@@ -54,7 +54,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 10s  # Reduced from 30s - Redis starts in <5s
     restart: unless-stopped
     deploy:
       resources:

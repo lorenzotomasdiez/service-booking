@@ -1,0 +1,313 @@
+{
+  "info": {
+    "name": "MercadoPago Mock API",
+    "description": "Collection for testing MercadoPago Mock Server",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health & Monitoring",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Get Dashboard Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/statistics",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "statistics"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create Payment - Success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Payment created successfully', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql('approved');",
+                  "    pm.environment.set('payment_id', jsonData.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_amount\": 100,\n  \"payment_method_id\": \"visa\",\n  \"payer\": {\n    \"email\": \"test@example.com\",\n    \"first_name\": \"Juan\",\n    \"last_name\": \"Perez\"\n  },\n  \"description\": \"Test payment\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/payments?scenario=success",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "payments"],
+              "query": [
+                {
+                  "key": "scenario",
+                  "value": "success"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Payment - Pending",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_amount\": 500,\n  \"payment_method_id\": \"rapipago\",\n  \"payer\": {\n    \"email\": \"test@example.com\",\n    \"first_name\": \"Juan\",\n    \"last_name\": \"Perez\",\n    \"identification\": {\n      \"type\": \"DNI\",\n      \"number\": \"12345678\"\n    }\n  },\n  \"description\": \"Rapipago payment\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/payments?scenario=pending",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "payments"],
+              "query": [
+                {
+                  "key": "scenario",
+                  "value": "pending"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Payment - Rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_amount\": 10000,\n  \"payment_method_id\": \"visa\",\n  \"payer\": {\n    \"email\": \"test@example.com\"\n  },\n  \"description\": \"Rejected payment test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/payments?scenario=rejected_insufficient_amount",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "payments"],
+              "query": [
+                {
+                  "key": "scenario",
+                  "value": "rejected_insufficient_amount"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Payment with Installments",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_amount\": 1200,\n  \"payment_method_id\": \"visa\",\n  \"installments\": 12,\n  \"payer\": {\n    \"email\": \"test@example.com\",\n    \"first_name\": \"Juan\",\n    \"last_name\": \"Perez\"\n  },\n  \"description\": \"Payment in 12 installments\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/payments",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "payments"]
+            }
+          }
+        },
+        {
+          "name": "Get Payment by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/payments/{{payment_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "payments", "{{payment_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Refunds",
+      "item": [
+        {
+          "name": "Create Full Refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/payments/{{payment_id}}/refunds",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "payments", "{{payment_id}}", "refunds"]
+            }
+          }
+        },
+        {
+          "name": "Create Partial Refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/payments/{{payment_id}}/refunds",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "payments", "{{payment_id}}", "refunds"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment Methods",
+      "item": [
+        {
+          "name": "Get All Payment Methods",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/payment_methods",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "payment_methods"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get All Payments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/payments",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "payments"]
+            }
+          }
+        },
+        {
+          "name": "Clear All Payments",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/payments",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "payments"]
+            }
+          }
+        },
+        {
+          "name": "Test Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payment_id\": {{payment_id}},\n  \"webhook_url\": \"http://localhost:3000/webhooks/mercadopago\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/webhook/test",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "webhook", "test"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "payment_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

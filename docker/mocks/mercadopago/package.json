@@ -1,0 +1,50 @@
+{
+  "name": "mercadopago-mock",
+  "version": "1.0.0",
+  "description": "MercadoPago Mock Server for local development and testing",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:unit": "jest --testPathPattern=tests/.*\\.test\\.js",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "mercadopago",
+    "mock",
+    "argentina",
+    "payment"
+  ],
+  "author": "BarberPro Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "winston": "^3.11.0",
+    "uuid": "^9.0.1",
+    "swagger-ui-express": "^5.0.0",
+    "swagger-jsdoc": "^6.2.8",
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "nodemon": "^3.0.2",
+    "eslint": "^8.55.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageThreshold": {
+      "global": {
+        "branches": 60,
+        "functions": 55,
+        "lines": 65,
+        "statements": 65
+      }
+    },
+    "testTimeout": 10000,
+    "forceExit": true
+  }
+}

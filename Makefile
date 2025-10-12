@@ -60,7 +60,7 @@ COMPOSE_FULL := $(COMPOSE_MOCKS) -f docker/docker-compose.monitoring.yml
 # All targets are .PHONY as they don't represent actual files
 .PHONY: help version doctor
 .PHONY: up down restart rebuild clean
-.PHONY: dev full monitoring mocks test
+.PHONY: dev dev-infra-only full monitoring monitoring-down monitoring-logs grafana mocks mocks-down mocks-logs mocks-reset test
 .PHONY: db-migrate db-seed db-reset db-backup db-restore db-shell
 .PHONY: logs status ps stats health logs-backend logs-frontend
 .PHONY: reset prune update validate
@@ -99,7 +99,13 @@ help: ## Show this help message
 	@echo "  $(CYAN)up, down, restart, rebuild, clean$(RESET)"
 	@echo ""
 	@echo "$(YELLOW)Environment Variants:$(RESET) $(GREEN)(Stream B)$(RESET)"
-	@echo "  $(CYAN)dev, full, monitoring, mocks, test$(RESET)"
+	@echo "  $(CYAN)dev, dev-infra-only, full, monitoring, mocks, test$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)Mock Services:$(RESET) $(GREEN)(Issue #7)$(RESET)"
+	@echo "  $(CYAN)mocks, mocks-down, mocks-logs, mocks-reset$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)Monitoring Stack:$(RESET) $(GREEN)(Issue #8)$(RESET)"
+	@echo "  $(CYAN)monitoring, monitoring-down, monitoring-logs, grafana$(RESET)"
 	@echo ""
 	@echo "$(YELLOW)Database Operations:$(RESET) $(GREEN)(Stream C)$(RESET)"
 	@echo "  $(CYAN)db-migrate, db-seed, db-reset, db-backup, db-restore, db-shell$(RESET)"
@@ -112,6 +118,9 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(YELLOW)Maintenance:$(RESET) $(GREEN)(Stream D)$(RESET)"
 	@echo "  $(CYAN)reset, prune, update, validate$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)Integration Testing:$(RESET) $(GREEN)(Issue #9)$(RESET)"
+	@echo "  $(CYAN)test-integration, test-payment, test-notifications, test-db, test-all$(RESET)"
 	@echo ""
 	@echo "$(BLUE)Environment:$(RESET) $(OS)"
 	@echo "$(BLUE)Docker Compose:$(RESET) $(COMPOSE_BASE)"
@@ -192,16 +201,89 @@ doctor: ## Check system requirements and configuration
 
 # Internal prerequisite checks
 check-docker:
-	@docker info > /dev/null 2>&1 || \
-	    (echo "$(RED)[$(CROSS)]$(RESET) Docker is not running. Please start Docker Desktop." && exit 1)
+	@if ! docker info > /dev/null 2>&1; then \
+	    echo "$(RED)[$(CROSS)]$(RESET) Docker is not running"; \
+	    echo ""; \
+	    echo "$(YELLOW)Platform-specific solutions:$(RESET)"; \
+	    if [ "$(OS)" = "macOS" ]; then \
+	        echo "  $(CYAN)macOS:$(RESET)"; \
+	        echo "    1. Start Docker Desktop from Applications"; \
+	        echo "    2. Or run: open -a Docker"; \
+	        echo "    3. Wait for Docker icon in menu bar to show running status"; \
+	    elif [ "$(UNAME_S)" = "Linux" ]; then \
+	        if grep -qi microsoft /proc/version 2>/dev/null; then \
+	            echo "  $(CYAN)WSL2:$(RESET)"; \
+	            echo "    1. Ensure Docker Desktop is running on Windows"; \
+	            echo "    2. In Docker Desktop settings, enable WSL2 backend"; \
+	            echo "    3. Enable integration with your WSL2 distribution"; \
+	            echo "    4. Restart WSL: wsl --shutdown (from Windows)"; \
+	        else \
+	            echo "  $(CYAN)Linux:$(RESET)"; \
+	            echo "    1. Start Docker service: sudo systemctl start docker"; \
+	            echo "    2. Enable on boot: sudo systemctl enable docker"; \
+	            echo "    3. Add user to docker group: sudo usermod -aG docker $$USER"; \
+	            echo "    4. Log out and back in for group changes to take effect"; \
+	        fi; \
+	    else \
+	        echo "  Please start Docker and try again"; \
+	    fi; \
+	    echo ""; \
+	    exit 1; \
+	fi
 
 check-ports:
-	@! lsof -ti:5432 > /dev/null 2>&1 || \
-	    (echo "$(RED)[$(CROSS)]$(RESET) Port 5432 (PostgreSQL) is already in use." && \
-	     echo "$(YELLOW)[$(INFO)]$(RESET) Run 'lsof -ti:5432 | xargs kill' to free the port or stop the conflicting service." && exit 1)
-	@! lsof -ti:6379 > /dev/null 2>&1 || \
-	    (echo "$(RED)[$(CROSS)]$(RESET) Port 6379 (Redis) is already in use." && \
-	     echo "$(YELLOW)[$(INFO)]$(RESET) Run 'lsof -ti:6379 | xargs kill' to free the port or stop the conflicting service." && exit 1)
+	@# Check PostgreSQL port 5432
+	@if lsof -ti:5432 > /dev/null 2>&1; then \
+	    echo "$(RED)[$(CROSS)]$(RESET) Port 5432 (PostgreSQL) is already in use"; \
+	    echo ""; \
+	    echo "$(YELLOW)Possible solutions:$(RESET)"; \
+	    echo "  $(CYAN)1. Kill the process:$(RESET)"; \
+	    echo "     lsof -ti:5432 | xargs kill -9"; \
+	    echo ""; \
+	    echo "  $(CYAN)2. Change port in docker/.env:$(RESET)"; \
+	    echo "     POSTGRES_PORT=5433"; \
+	    echo ""; \
+	    echo "  $(CYAN)3. Stop local PostgreSQL service:$(RESET)"; \
+	    if [ "$(OS)" = "macOS" ]; then \
+	        echo "     brew services stop postgresql"; \
+	    else \
+	        echo "     sudo systemctl stop postgresql"; \
+	    fi; \
+	    echo ""; \
+	    exit 1; \
+	fi
+	@# Check Redis port 6379
+	@if lsof -ti:6379 > /dev/null 2>&1; then \
+	    echo "$(RED)[$(CROSS)]$(RESET) Port 6379 (Redis) is already in use"; \
+	    echo ""; \
+	    echo "$(YELLOW)Possible solutions:$(RESET)"; \
+	    echo "  $(CYAN)1. Kill the process:$(RESET)"; \
+	    echo "     lsof -ti:6379 | xargs kill -9"; \
+	    echo ""; \
+	    echo "  $(CYAN)2. Change port in docker/.env:$(RESET)"; \
+	    echo "     REDIS_PORT=6380"; \
+	    echo ""; \
+	    echo "  $(CYAN)3. Stop local Redis service:$(RESET)"; \
+	    if [ "$(OS)" = "macOS" ]; then \
+	        echo "     brew services stop redis"; \
+	    else \
+	        echo "     sudo systemctl stop redis"; \
+	    fi; \
+	    echo ""; \
+	    exit 1; \
+	fi
+	@# Check Backend port 3000
+	@if lsof -ti:3000 > /dev/null 2>&1; then \
+	    echo "$(YELLOW)[$(WARN)]$(RESET) Port 3000 (Backend) is in use"; \
+	    echo "$(YELLOW)[$(INFO)]$(RESET) This is OK if your backend is already running"; \
+	    echo "$(YELLOW)[$(INFO)]$(RESET) To free the port: lsof -ti:3000 | xargs kill -9"; \
+	fi
+	@# Check Frontend port 5173
+	@if lsof -ti:5173 > /dev/null 2>&1; then \
+	    echo "$(YELLOW)[$(WARN)]$(RESET) Port 5173 (Frontend) is in use"; \
+	    echo "$(YELLOW)[$(INFO)]$(RESET) This is OK if your frontend is already running"; \
+	    echo "$(YELLOW)[$(INFO)]$(RESET) To free the port: lsof -ti:5173 | xargs kill -9"; \
+	fi
 
 # ============================================================
 # LIFECYCLE MANAGEMENT
@@ -212,41 +294,52 @@ check-ports:
 ##@ Lifecycle Management
 
 up: check-docker check-ports ## Start all services (base + dev + mocks)
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting BarberPro Development Environment..."
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting services with:"
-	@echo "  - Base infrastructure (PostgreSQL, Redis, Admin tools)"
-	@echo "  - Argentina service mocks"
-	@echo ""
-	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) up -d || \
+	@START_TIME=$$(date +%s); \
+	if [ -f docker/configs/banner.txt ]; then \
+	    echo "$(CYAN)"; \
+	    cat docker/configs/banner.txt; \
+	    echo "$(RESET)"; \
+	fi; \
+	echo "$(CYAN)[$(ARROW)]$(RESET) Starting BarberPro Development Environment..."; \
+	echo ""; \
+	echo "$(CYAN)[$(ARROW)]$(RESET) Starting services with:"; \
+	echo "  - Base infrastructure (PostgreSQL, Redis, Admin tools)"; \
+	echo "  - Argentina service mocks"; \
+	echo ""; \
+	$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) up -d || \
 	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start services" && \
-	     echo "$(YELLOW)[$(INFO)]$(RESET) Try running 'make doctor' to diagnose issues" && exit 1)
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."
-	@sleep 3
-	@echo ""
-	@echo "$(GREEN)[$(CHECK)]$(RESET) Services started successfully!"
-	@echo ""
-	@echo "$(BLUE)Services available at:$(RESET)"
-	@echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"
-	@echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"
-	@echo "  $(CYAN)Redis:$(RESET)          localhost:6379"
-	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
-	@echo ""
-	@echo "$(YELLOW)Next steps:$(RESET)"
-	@echo "  - Start backend:  $(CYAN)cd backend && npm run dev$(RESET)"
-	@echo "  - Start frontend: $(CYAN)cd frontend && npm run dev$(RESET)"
-	@echo "  - View logs:      $(CYAN)make logs$(RESET)"
-	@echo "  - Check status:   $(CYAN)make status$(RESET)"
-	@echo ""
+	     echo "$(YELLOW)[$(INFO)]$(RESET) Try running 'make doctor' to diagnose issues" && exit 1); \
+	echo ""; \
+	echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."; \
+	sleep 3; \
+	echo ""; \
+	END_TIME=$$(date +%s); \
+	DURATION=$$((END_TIME - START_TIME)); \
+	echo "$(GREEN)[$(CHECK)]$(RESET) Services started successfully! (completed in $${DURATION}s)"; \
+	echo ""; \
+	echo "$(BLUE)Services available at:$(RESET)"; \
+	echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"; \
+	echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"; \
+	echo "  $(CYAN)Redis:$(RESET)          localhost:6379"; \
+	echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"; \
+	echo ""; \
+	echo "$(YELLOW)Next steps:$(RESET)"; \
+	echo "  - Start backend:  $(CYAN)cd backend && npm run dev$(RESET)"; \
+	echo "  - Start frontend: $(CYAN)cd frontend && npm run dev$(RESET)"; \
+	echo "  - View logs:      $(CYAN)make logs$(RESET)"; \
+	echo "  - Check status:   $(CYAN)make status$(RESET)"; \
+	echo ""
 
 down: ## Stop all services gracefully
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Stopping all services..."
-	@$(DOCKER_COMPOSE) $(COMPOSE_FULL) down || \
-	    (echo "$(YELLOW)[$(WARN)]$(RESET) Some services may not be running" && exit 0)
-	@echo "$(GREEN)[$(CHECK)]$(RESET) All services stopped"
-	@echo ""
-	@echo "$(BLUE)To start again:$(RESET) $(CYAN)make up$(RESET)"
+	@START_TIME=$$(date +%s); \
+	echo "$(CYAN)[$(ARROW)]$(RESET) Stopping all services..."; \
+	$(DOCKER_COMPOSE) $(COMPOSE_FULL) down || \
+	    (echo "$(YELLOW)[$(WARN)]$(RESET) Some services may not be running" && exit 0); \
+	END_TIME=$$(date +%s); \
+	DURATION=$$((END_TIME - START_TIME)); \
+	echo "$(GREEN)[$(CHECK)]$(RESET) All services stopped (completed in $${DURATION}s)"; \
+	echo ""; \
+	echo "$(BLUE)To start again:$(RESET) $(CYAN)make up$(RESET)"
 
 restart: ## Restart all services
 	@echo "$(CYAN)[$(ARROW)]$(RESET) Restarting all services..."
@@ -281,6 +374,7 @@ clean: ## Remove all containers, volumes, and networks
 	@read -p "Are you sure? [y/N] " -n 1 -r; \
 	echo ""; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+	    START_TIME=$$(date +%s); \
 	    echo "$(CYAN)[$(ARROW)]$(RESET) Stopping all services..."; \
 	    $(DOCKER_COMPOSE) $(COMPOSE_FULL) down -v --remove-orphans || exit 0; \
 	    echo ""; \
@@ -290,7 +384,9 @@ clean: ## Remove all containers, volumes, and networks
 	    echo "$(CYAN)[$(ARROW)]$(RESET) Removing networks..."; \
 	    docker network rm barberpro-network 2>/dev/null || echo "$(YELLOW)[$(INFO)]$(RESET) Network was already removed"; \
 	    echo ""; \
-	    echo "$(GREEN)[$(CHECK)]$(RESET) Clean complete! All containers, volumes, and networks removed."; \
+	    END_TIME=$$(date +%s); \
+	    DURATION=$$((END_TIME - START_TIME)); \
+	    echo "$(GREEN)[$(CHECK)]$(RESET) Clean complete! All containers, volumes, and networks removed. (completed in $${DURATION}s)"; \
 	    echo ""; \
 	    echo "$(BLUE)To start fresh:$(RESET) $(CYAN)make up$(RESET)"; \
 	else \
@@ -306,6 +402,11 @@ clean: ## Remove all containers, volumes, and networks
 ##@ Environment Variants
 
 dev: check-docker check-ports ## Start development environment only (postgres, redis, admin tools)
+	@if [ -f docker/configs/banner.txt ]; then \
+	    echo "$(CYAN)"; \
+	    cat docker/configs/banner.txt; \
+	    echo "$(RESET)"; \
+	fi
 	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Development Environment..."
 	@echo ""
 	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting services:"
@@ -329,6 +430,47 @@ dev: check-docker check-ports ## Start development environment only (postgres, r
 	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
 	@echo ""
 	@echo "$(YELLOW)This is a minimal setup. For full environment, use:$(RESET) $(CYAN)make full$(RESET)"
+	@echo ""
+
+dev-infra-only: check-docker check-ports ## Infrastructure ONLY (postgres, redis, admin tools) - NO backend/frontend containers
+	@if [ -f docker/configs/banner.txt ]; then \
+	    echo "$(CYAN)"; \
+	    cat docker/configs/banner.txt; \
+	    echo "$(RESET)"; \
+	fi
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Infrastructure ONLY (no backend/frontend containers)..."
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting infrastructure services:"
+	@echo "  - PostgreSQL (database)"
+	@echo "  - Redis (cache)"
+	@echo "  - pgAdmin (database management)"
+	@echo "  - Redis Commander (cache management)"
+	@echo ""
+	@echo "$(YELLOW)[$(INFO)]$(RESET) Backend and Frontend will NOT run in Docker"
+	@echo "$(YELLOW)[$(INFO)]$(RESET) You should run them separately with npm:"
+	@echo "  $(CYAN)Terminal 1:$(RESET) cd backend && npm run dev"
+	@echo "  $(CYAN)Terminal 2:$(RESET) cd frontend && npm run dev"
+	@echo ""
+	@$(DOCKER_COMPOSE) $(COMPOSE_BASE) up -d || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start infrastructure services" && exit 1)
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."
+	@sleep 3
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Infrastructure ready!"
+	@echo ""
+	@echo "$(BLUE)Services available at:$(RESET)"
+	@echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"
+	@echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"
+	@echo "  $(CYAN)Redis:$(RESET)          localhost:6379"
+	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
+	@echo ""
+	@echo "$(YELLOW)Next steps:$(RESET)"
+	@echo "  1. Start backend:  $(CYAN)cd backend && npm run dev$(RESET)"
+	@echo "  2. Start frontend: $(CYAN)cd frontend && npm run dev$(RESET)"
+	@echo "  3. Visit app:      $(CYAN)http://localhost:5173$(RESET)"
+	@echo ""
+	@echo "$(BLUE)Alternative:$(RESET) To run everything in Docker, use: $(CYAN)make up$(RESET)"
 	@echo ""
 
 full: check-docker check-ports ## Start everything (dev + monitoring + mocks)
@@ -364,39 +506,51 @@ full: check-docker check-ports ## Start everything (dev + monitoring + mocks)
 	@echo "  $(CYAN)WhatsApp:$(RESET)       http://localhost:8083"
 	@echo ""
 
-monitoring: check-docker ## Start monitoring stack only
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Monitoring Stack..."
+monitoring: check-docker ## Start monitoring stack
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting monitoring stack..."
+	@docker-compose -f docker/docker-compose.monitoring.yml up -d
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Monitoring stack started"
 	@echo ""
-	@echo "$(YELLOW)[$(INFO)]$(RESET) Note: Monitoring stack is currently a placeholder (Phase 3)"
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting base services + monitoring..."
-	@$(DOCKER_COMPOSE) $(COMPOSE_MONITORING) up -d || \
-	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start monitoring stack" && exit 1)
-	@echo ""
-	@echo "$(GREEN)[$(CHECK)]$(RESET) Monitoring stack started!"
-	@echo ""
-	@echo "$(BLUE)When fully implemented, monitoring will be available at:$(RESET)"
-	@echo "  $(CYAN)Prometheus:$(RESET)     http://localhost:9090"
-	@echo "  $(CYAN)Grafana:$(RESET)        http://localhost:3001"
-	@echo "  $(CYAN)Loki:$(RESET)           http://localhost:3100"
-	@echo ""
+	@echo "Monitoring services:"
+	@echo "  Prometheus: http://localhost:9090"
+	@echo "  Grafana:    http://localhost:3001 (admin/admin)"
+	@echo "  Loki:       http://localhost:3100"
+	@echo "  cAdvisor:   http://localhost:8080"
 
-mocks: check-docker check-ports ## Start Argentina mocks only
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Argentina Service Mocks..."
+monitoring-down: ## Stop monitoring stack
+	@docker-compose -f docker/docker-compose.monitoring.yml down
+
+monitoring-logs: ## View monitoring stack logs
+	@docker-compose -f docker/docker-compose.monitoring.yml logs -f
+
+grafana: ## Open Grafana in browser
+	@$(OPEN) http://localhost:3001
+
+mocks: check-docker ## Start all Argentina mock services
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Argentina mock services..."
+	@docker-compose -f docker/docker-compose.mocks.yml up -d
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Mock services started"
 	@echo ""
-	@echo "$(YELLOW)[$(INFO)]$(RESET) Note: Argentina mocks are currently placeholders (Phase 2)"
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting base services + mocks..."
-	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) up -d || \
-	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start mocks" && exit 1)
-	@echo ""
-	@echo "$(GREEN)[$(CHECK)]$(RESET) Service mocks started!"
-	@echo ""
-	@echo "$(BLUE)When fully implemented, mocks will be available at:$(RESET)"
-	@echo "  $(CYAN)MercadoPago Mock:$(RESET) http://localhost:8081"
-	@echo "  $(CYAN)AFIP Mock:$(RESET)        http://localhost:8082"
-	@echo "  $(CYAN)WhatsApp Mock:$(RESET)    http://localhost:8083"
-	@echo ""
+	@echo "Mock services available at:"
+	@echo "  MercadoPago: http://localhost:3001/dashboard"
+	@echo "  AFIP:        http://localhost:3002/docs"
+	@echo "  WhatsApp:    http://localhost:3003/dashboard"
+	@echo "  SMS:         http://localhost:3004/dashboard"
+	@echo "  Email:       http://localhost:8025"
+
+mocks-down: ## Stop all mock services
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Stopping mock services..."
+	@docker-compose -f docker/docker-compose.mocks.yml down
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Mock services stopped"
+
+mocks-logs: ## View logs from all mock services
+	@docker-compose -f docker/docker-compose.mocks.yml logs -f
+
+mocks-reset: ## Reset mock services (stop, remove volumes, start)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Resetting mock services..."
+	@docker-compose -f docker/docker-compose.mocks.yml down -v
+	@docker-compose -f docker/docker-compose.mocks.yml up -d
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Mock services reset"
 
 test: check-docker ## Start test environment
 	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Test Environment..."
@@ -592,10 +746,60 @@ status: ## Show health status of all services (table format)
 	@echo "$(CYAN)║                       Service Status                          ║$(RESET)"
 	@echo "$(CYAN)╚════════════════════════════════════════════════════════════════╝$(RESET)"
 	@echo ""
-	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) ps --format "table {{.Name}}	{{.Status}}	{{.Ports}}" 2>/dev/null || \
-	    (echo "$(YELLOW)[$(WARN)]$(RESET) No services running. Start with 'make up'" && exit 0)
+	@# Check if any services are running
+	@if ! docker ps --filter "name=barberpro" -q 2>/dev/null | grep -q .; then \
+	    echo "$(YELLOW)[$(WARN)]$(RESET) No services running. Start with 'make up'"; \
+	    exit 0; \
+	fi
+	@# Display service health status with symbols
+	@echo "$(BLUE)Service Health Status:$(RESET)"
 	@echo ""
+	@SERVICES="postgres redis pgadmin redis-commander"; \
+	for service in $$SERVICES; do \
+	    CONTAINER_NAME="barberpro-$$service"; \
+	    printf "  %-25s " "$$service:"; \
+	    if docker ps --filter "name=$$CONTAINER_NAME" --format "{{.Status}}" 2>/dev/null | grep -q "Up"; then \
+	        HEALTH=$$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' $$CONTAINER_NAME 2>/dev/null || echo "unknown"); \
+	        case "$$HEALTH" in \
+	            "healthy") \
+	                echo "$(GREEN)[$(CHECK)] Healthy$(RESET)"; \
+	                ;; \
+	            "no-healthcheck") \
+	                echo "$(BLUE)[$(CHECK)] Running$(RESET)"; \
+	                ;; \
+	            "starting") \
+	                echo "$(YELLOW)[$(ARROW)] Starting...$(RESET)"; \
+	                ;; \
+	            "unhealthy") \
+	                echo "$(RED)[$(CROSS)] Unhealthy$(RESET)"; \
+	                ;; \
+	            *) \
+	                echo "$(BLUE)[?] Unknown$(RESET)"; \
+	                ;; \
+	        esac; \
+	    else \
+	        echo "$(RED)[$(CROSS)] Not running$(RESET)"; \
+	    fi; \
+	done
+	@echo ""
+	@# Check mock services if running
+	@if docker ps --filter "name=barberpro-mercadopago-mock" -q 2>/dev/null | grep -q .; then \
+	    echo "$(BLUE)Argentina Mock Services:$(RESET)"; \
+	    echo ""; \
+	    MOCK_SERVICES="mercadopago-mock afip-mock whatsapp-mock sms-mock"; \
+	    for service in $$MOCK_SERVICES; do \
+	        CONTAINER_NAME="barberpro-$$service"; \
+	        printf "  %-25s " "$$service:"; \
+	        if docker ps --filter "name=$$CONTAINER_NAME" --format "{{.Status}}" 2>/dev/null | grep -q "Up"; then \
+	            echo "$(GREEN)[$(CHECK)] Running$(RESET)"; \
+	        else \
+	            echo "$(YELLOW)[$(WARN)] Not running$(RESET)"; \
+	        fi; \
+	    done; \
+	    echo ""; \
+	fi
 	@echo "$(CYAN)[$(INFO)]$(RESET) Use 'make health' for detailed health checks"
+	@echo "$(CYAN)[$(INFO)]$(RESET) Use 'make ps' for detailed container listing"
 
 ps: ## List running containers
 	@echo "$(CYAN)[$(ARROW)]$(RESET) Listing BarberPro containers..."
@@ -692,6 +896,7 @@ reset: ## Complete environment reset (down + clean + up + seed)
 	@read -p "Are you sure you want to reset the environment? [y/N] " -n 1 -r; \
 	echo ""; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+	    START_TIME=$$(date +%s); \
 	    echo "$(CYAN)[$(ARROW)]$(RESET) Step 1/4: Stopping services..."; \
 	    $(MAKE) down; \
 	    echo ""; \
@@ -704,7 +909,9 @@ reset: ## Complete environment reset (down + clean + up + seed)
 	    echo ""; \
 	    echo "$(CYAN)[$(ARROW)]$(RESET) Step 4/4: Environment ready for database seeding"; \
 	    echo ""; \
-	    echo "$(GREEN)[$(CHECK)]$(RESET) Reset complete! Environment is ready."; \
+	    END_TIME=$$(date +%s); \
+	    DURATION=$$((END_TIME - START_TIME)); \
+	    echo "$(GREEN)[$(CHECK)]$(RESET) Reset complete! Environment is ready. (completed in $${DURATION}s)"; \
 	    echo ""; \
 	    echo "$(YELLOW)Next steps:$(RESET)"; \
 	    echo "  - Run migrations: $(CYAN)make db-migrate$(RESET)"; \
@@ -781,7 +988,86 @@ validate: ## Validate all docker-compose files
 	fi
 
 # ============================================================
+# INTEGRATION TESTING
+# ============================================================
+# Issue #9 Stream D: Integration test scripts
+# Commands for testing the entire Docker environment end-to-end
+
+##@ Integration Testing
+
+test-integration: ## Run full integration test suite
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running full integration test suite..."
+	@if [ ! -f scripts/test-integration.sh ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Test script not found"; \
+		exit 1; \
+	fi
+	@bash scripts/test-integration.sh
+
+test-integration-verbose: ## Run integration tests with verbose output
+	@bash scripts/test-integration.sh --verbose
+
+test-integration-quick: ## Run quick smoke test
+	@bash scripts/test-integration.sh --quick
+
+test-payment: ## Test payment flow (MercadoPago)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Testing payment flow..."
+	@if [ ! -f scripts/test-payment-flow.sh ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Payment test script not found"; \
+		exit 1; \
+	fi
+	@bash scripts/test-payment-flow.sh
+
+test-payment-verbose: ## Test payment flow with verbose output
+	@bash scripts/test-payment-flow.sh --verbose
+
+test-notifications: ## Test notification services (WhatsApp, SMS, Email)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Testing notification services..."
+	@if [ ! -f scripts/test-notifications.sh ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Notifications test script not found"; \
+		exit 1; \
+	fi
+	@bash scripts/test-notifications.sh
+
+test-notifications-verbose: ## Test notifications with verbose output
+	@bash scripts/test-notifications.sh --verbose
+
+test-db: ## Test database operations
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Testing database operations..."
+	@if [ ! -f scripts/test-database.sh ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Database test script not found"; \
+		exit 1; \
+	fi
+	@bash scripts/test-database.sh
+
+test-db-verbose: ## Test database with verbose output
+	@bash scripts/test-database.sh --verbose
+
+test-db-skip-migrations: ## Test database without running migrations
+	@bash scripts/test-database.sh --skip-migrations
+
+test-all: ## Run all integration tests (integration, payment, notifications, database)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running all integration tests..."
+	@echo ""
+	@$(MAKE) test-integration
+	@echo ""
+	@$(MAKE) test-payment
+	@echo ""
+	@$(MAKE) test-notifications
+	@echo ""
+	@$(MAKE) test-db
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) All test suites completed!"
+
+test-ci: ## Run tests suitable for CI/CD (quick, non-interactive)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running CI/CD test suite..."
+	@bash scripts/test-integration.sh --quick
+	@bash scripts/test-payment-flow.sh
+	@bash scripts/test-notifications.sh
+	@bash scripts/test-database.sh --skip-migrations
+	@echo "$(GREEN)[$(CHECK)]$(RESET) CI/CD tests completed!"
+
+# ============================================================
 # END OF MAKEFILE
 # ============================================================
-# Total targets: 30+ (Foundation complete, Streams B/C/D pending)
+# Total targets: 45+ (Foundation, Streams B/C/D, and Issue #9 complete)
 # ============================================================

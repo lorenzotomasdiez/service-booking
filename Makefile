@@ -60,7 +60,7 @@ COMPOSE_FULL := $(COMPOSE_MOCKS) -f docker/docker-compose.monitoring.yml
 # All targets are .PHONY as they don't represent actual files
 .PHONY: help version doctor
 .PHONY: up down restart rebuild clean
-.PHONY: dev full monitoring monitoring-down monitoring-logs grafana mocks mocks-down mocks-logs mocks-reset test
+.PHONY: dev dev-infra-only full monitoring monitoring-down monitoring-logs grafana mocks mocks-down mocks-logs mocks-reset test
 .PHONY: db-migrate db-seed db-reset db-backup db-restore db-shell
 .PHONY: logs status ps stats health logs-backend logs-frontend
 .PHONY: reset prune update validate
@@ -99,7 +99,7 @@ help: ## Show this help message
 	@echo "  $(CYAN)up, down, restart, rebuild, clean$(RESET)"
 	@echo ""
 	@echo "$(YELLOW)Environment Variants:$(RESET) $(GREEN)(Stream B)$(RESET)"
-	@echo "  $(CYAN)dev, full, monitoring, mocks, test$(RESET)"
+	@echo "  $(CYAN)dev, dev-infra-only, full, monitoring, mocks, test$(RESET)"
 	@echo ""
 	@echo "$(YELLOW)Mock Services:$(RESET) $(GREEN)(Issue #7)$(RESET)"
 	@echo "  $(CYAN)mocks, mocks-down, mocks-logs, mocks-reset$(RESET)"
@@ -430,6 +430,47 @@ dev: check-docker check-ports ## Start development environment only (postgres, r
 	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
 	@echo ""
 	@echo "$(YELLOW)This is a minimal setup. For full environment, use:$(RESET) $(CYAN)make full$(RESET)"
+	@echo ""
+
+dev-infra-only: check-docker check-ports ## Infrastructure ONLY (postgres, redis, admin tools) - NO backend/frontend containers
+	@if [ -f docker/configs/banner.txt ]; then \
+	    echo "$(CYAN)"; \
+	    cat docker/configs/banner.txt; \
+	    echo "$(RESET)"; \
+	fi
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Infrastructure ONLY (no backend/frontend containers)..."
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting infrastructure services:"
+	@echo "  - PostgreSQL (database)"
+	@echo "  - Redis (cache)"
+	@echo "  - pgAdmin (database management)"
+	@echo "  - Redis Commander (cache management)"
+	@echo ""
+	@echo "$(YELLOW)[$(INFO)]$(RESET) Backend and Frontend will NOT run in Docker"
+	@echo "$(YELLOW)[$(INFO)]$(RESET) You should run them separately with npm:"
+	@echo "  $(CYAN)Terminal 1:$(RESET) cd backend && npm run dev"
+	@echo "  $(CYAN)Terminal 2:$(RESET) cd frontend && npm run dev"
+	@echo ""
+	@$(DOCKER_COMPOSE) $(COMPOSE_BASE) up -d || \
+	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start infrastructure services" && exit 1)
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."
+	@sleep 3
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Infrastructure ready!"
+	@echo ""
+	@echo "$(BLUE)Services available at:$(RESET)"
+	@echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"
+	@echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"
+	@echo "  $(CYAN)Redis:$(RESET)          localhost:6379"
+	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
+	@echo ""
+	@echo "$(YELLOW)Next steps:$(RESET)"
+	@echo "  1. Start backend:  $(CYAN)cd backend && npm run dev$(RESET)"
+	@echo "  2. Start frontend: $(CYAN)cd frontend && npm run dev$(RESET)"
+	@echo "  3. Visit app:      $(CYAN)http://localhost:5173$(RESET)"
+	@echo ""
+	@echo "$(BLUE)Alternative:$(RESET) To run everything in Docker, use: $(CYAN)make up$(RESET)"
 	@echo ""
 
 full: check-docker check-ports ## Start everything (dev + monitoring + mocks)

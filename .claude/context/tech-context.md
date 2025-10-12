@@ -1,7 +1,7 @@
 ---
 created: 2025-10-10T03:05:12Z
-last_updated: 2025-10-10T03:05:12Z
-version: 1.0
+last_updated: 2025-10-12T07:07:58Z
+version: 1.1
 author: Claude Code PM System
 ---
 
@@ -73,8 +73,8 @@ author: Claude Code PM System
 ### Database & ORM
 - **Prisma**: 6.15.0 - Type-safe ORM
 - **@prisma/client**: 6.15.0 - Prisma client
-- **PostgreSQL**: Primary database (via Docker)
-- **Redis**: 5.8.2 - Caching and sessions (via Docker)
+- **PostgreSQL 16**: Primary database (via Docker, upgraded from v15)
+- **Redis 7.2**: Caching and sessions (via Docker)
 
 ### Authentication & Security
 - **bcrypt**: 5.1.1 - Password hashing
@@ -121,15 +121,34 @@ author: Claude Code PM System
 
 ## Infrastructure & DevOps
 
-### Containerization
+### Containerization (Epic: local-docker-environment - COMPLETED)
 - **Docker**: Multi-stage builds for frontend, backend, and databases
-- **docker-compose**: Development, production, and dev-only configurations
-  - Services: PostgreSQL, Redis, Nginx, monitoring stack
+- **docker-compose**: Modular multi-file architecture
+  - **Base** (docker-compose.yml): PostgreSQL 16, Redis 7.2, pgAdmin, Redis Commander
+  - **Dev** (docker-compose.dev.yml): Hot reload, volume mounts, optimized health checks
+  - **Prod** (docker-compose.prod.yml): Production configuration
+  - **Mocks** (docker-compose.mocks.yml): Argentina service mocks
+  - **Monitoring** (docker-compose.monitoring.yml): Prometheus, Grafana, Loki
+  - **Test** (docker-compose.test.yml): Test environment
+- **Makefile**: 30+ orchestration commands with colored output and health checks
+  - `make dev-infra-only` - Infrastructure only (postgres, redis, admin tools)
+  - `make up` - Infrastructure + mocks
+  - `make full` - Everything including monitoring
+  - `make mocks` - Argentina service mocks
+  - `make monitoring` - Prometheus, Grafana, Loki stack
+
+### Argentina Service Mocks (Development & Testing)
+- **MercadoPago Mock** (Port 3001): Payment gateway simulation
+- **AFIP Mock** (Port 3002): Tax authority simulation
+- **WhatsApp Mock** (Port 3003): Business messaging simulation
+- **SMS Mock** (Port 3004): SMS gateway simulation
+- **MailHog** (Ports 8025/1025): Email SMTP capture
 
 ### Monitoring Stack (Docker-based)
 - **Prometheus**: Metrics collection
-- **Grafana**: Dashboards and visualization
+- **Grafana**: Dashboards and visualization (http://localhost:3001)
 - **Loki**: Log aggregation
+- **cAdvisor**: Container resource monitoring
 
 ### Deployment Targets
 - **Railway**: Primary deployment platform

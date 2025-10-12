@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20-slim
 
 LABEL maintainer="BarberPro Team"
 LABEL description="AFIP Mock Server for local development and testing"
@@ -6,11 +6,12 @@ LABEL version="1.0.0"
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apk add --no-cache \
-    sqlite \
+# Install system dependencies (SQLite and wget for health checks)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    sqlite3 \
     wget \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./

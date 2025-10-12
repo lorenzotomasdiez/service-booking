@@ -6,6 +6,12 @@ const logger = require('./utils/logger');
 const config = require('./utils/config');
 const db = require('./database/db');
 
+// Import routes
+const authRoutes = require('./routes/auth');
+const invoiceRoutes = require('./routes/invoice');
+const validationRoutes = require('./routes/validation');
+const { swaggerUi, swaggerDocument, swaggerOptions } = require('./routes/swagger');
+
 const app = express();
 const PORT = process.env.AFIP_MOCK_PORT || 3002;
 
@@ -51,6 +57,10 @@ app.get('/health', (req, res) => {
   res.json(healthStatus);
 });
 
+// Swagger/OpenAPI documentation
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
+logger.info('Swagger documentation enabled at /docs');
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
@@ -59,7 +69,26 @@ app.get('/', (req, res) => {
     description: 'Mock server for AFIP WebServices (Argentina Federal Tax Authority)',
     endpoints: {
       health: '/health',
-      docs: '/docs'
+      docs: '/docs',
+      wsaa: {
+        auth: 'POST /wsaa/auth',
+        status: 'GET /wsaa/status'
+      },
+      wsfev1: {
+        solicitar_cae: 'POST /wsfev1/FECAESolicitar',
+        ultimo_autorizado: 'GET /wsfev1/FECompUltimoAutorizado',
+        puntos_venta: 'POST /wsfev1/FEParamGetPtosVenta',
+        tipos_cbte: 'POST /wsfev1/FEParamGetTiposCbte',
+        consultar: 'GET /wsfev1/FECompConsultar'
+      },
+      padron: {
+        get_persona: 'POST /ws_sr_padron_a5/getPersona',
+        get_persona_list: 'POST /ws_sr_padron_a5/getPersonaList'
+      },
+      validation: {
+        validate_cuit_post: 'POST /validate/cuit',
+        validate_cuit_get: 'GET /validate/cuit/:cuit'
+      }
     },
     note: 'This is a MOCK server for development purposes only'
   });
@@ -80,12 +109,19 @@ app.get('/config', (req, res) => {
   }
 });
 
+// Register API routes
+app.use('/', authRoutes);
+app.use('/', invoiceRoutes);
+app.use('/', validationRoutes);
+
+logger.info('API routes registered');
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not Found',
     message: `Route ${req.method} ${req.path} not found`,
-    availableEndpoints: ['/health', '/', '/config']
+    hint: 'See available endpoints at GET / or view API docs at /docs'
   });
 });
 
@@ -162,7 +198,8 @@ async function start() {
         pid: process.pid
       });
       logger.info(`Health check available at http://localhost:${PORT}/health`);
-      logger.info(`API documentation available at http://localhost:${PORT}/`);
+      logger.info(`API documentation available at http://localhost:${PORT}/docs`);
+      logger.info(`Endpoints available at http://localhost:${PORT}/`);
     });
 
   } catch (error) {

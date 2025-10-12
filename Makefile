@@ -119,6 +119,9 @@ help: ## Show this help message
 	@echo "$(YELLOW)Maintenance:$(RESET) $(GREEN)(Stream D)$(RESET)"
 	@echo "  $(CYAN)reset, prune, update, validate$(RESET)"
 	@echo ""
+	@echo "$(YELLOW)Integration Testing:$(RESET) $(GREEN)(Issue #9)$(RESET)"
+	@echo "  $(CYAN)test-integration, test-payment, test-notifications, test-db, test-all$(RESET)"
+	@echo ""
 	@echo "$(BLUE)Environment:$(RESET) $(OS)"
 	@echo "$(BLUE)Docker Compose:$(RESET) $(COMPOSE_BASE)"
 	@echo ""
@@ -799,7 +802,86 @@ validate: ## Validate all docker-compose files
 	fi
 
 # ============================================================
+# INTEGRATION TESTING
+# ============================================================
+# Issue #9 Stream D: Integration test scripts
+# Commands for testing the entire Docker environment end-to-end
+
+##@ Integration Testing
+
+test-integration: ## Run full integration test suite
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running full integration test suite..."
+	@if [ ! -f scripts/test-integration.sh ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Test script not found"; \
+		exit 1; \
+	fi
+	@bash scripts/test-integration.sh
+
+test-integration-verbose: ## Run integration tests with verbose output
+	@bash scripts/test-integration.sh --verbose
+
+test-integration-quick: ## Run quick smoke test
+	@bash scripts/test-integration.sh --quick
+
+test-payment: ## Test payment flow (MercadoPago)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Testing payment flow..."
+	@if [ ! -f scripts/test-payment-flow.sh ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Payment test script not found"; \
+		exit 1; \
+	fi
+	@bash scripts/test-payment-flow.sh
+
+test-payment-verbose: ## Test payment flow with verbose output
+	@bash scripts/test-payment-flow.sh --verbose
+
+test-notifications: ## Test notification services (WhatsApp, SMS, Email)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Testing notification services..."
+	@if [ ! -f scripts/test-notifications.sh ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Notifications test script not found"; \
+		exit 1; \
+	fi
+	@bash scripts/test-notifications.sh
+
+test-notifications-verbose: ## Test notifications with verbose output
+	@bash scripts/test-notifications.sh --verbose
+
+test-db: ## Test database operations
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Testing database operations..."
+	@if [ ! -f scripts/test-database.sh ]; then \
+		echo "$(RED)[$(CROSS)]$(RESET) Database test script not found"; \
+		exit 1; \
+	fi
+	@bash scripts/test-database.sh
+
+test-db-verbose: ## Test database with verbose output
+	@bash scripts/test-database.sh --verbose
+
+test-db-skip-migrations: ## Test database without running migrations
+	@bash scripts/test-database.sh --skip-migrations
+
+test-all: ## Run all integration tests (integration, payment, notifications, database)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running all integration tests..."
+	@echo ""
+	@$(MAKE) test-integration
+	@echo ""
+	@$(MAKE) test-payment
+	@echo ""
+	@$(MAKE) test-notifications
+	@echo ""
+	@$(MAKE) test-db
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) All test suites completed!"
+
+test-ci: ## Run tests suitable for CI/CD (quick, non-interactive)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running CI/CD test suite..."
+	@bash scripts/test-integration.sh --quick
+	@bash scripts/test-payment-flow.sh
+	@bash scripts/test-notifications.sh
+	@bash scripts/test-database.sh --skip-migrations
+	@echo "$(GREEN)[$(CHECK)]$(RESET) CI/CD tests completed!"
+
+# ============================================================
 # END OF MAKEFILE
 # ============================================================
-# Total targets: 30+ (Foundation complete, Streams B/C/D pending)
+# Total targets: 45+ (Foundation, Streams B/C/D, and Issue #9 complete)
 # ============================================================

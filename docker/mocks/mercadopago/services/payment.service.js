@@ -65,7 +65,7 @@ function validatePaymentRequest(body) {
     }
   }
 
-  if (body.installments && (body.installments < 1 || body.installments > 24)) {
+  if (body.installments !== undefined && (body.installments < 1 || body.installments > 24)) {
     errors.push('installments must be between 1 and 24');
   }
 

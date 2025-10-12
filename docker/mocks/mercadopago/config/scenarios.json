@@ -1,0 +1,152 @@
+{
+  "default": "success",
+  "scenarios": {
+    "success": {
+      "status": "approved",
+      "status_detail": "accredited",
+      "delay_ms": 500
+    },
+    "pending": {
+      "status": "pending",
+      "status_detail": "pending_waiting_payment",
+      "delay_ms": 1000
+    },
+    "pending_contingency": {
+      "status": "pending",
+      "status_detail": "pending_contingency",
+      "delay_ms": 800
+    },
+    "rejected_insufficient_amount": {
+      "status": "rejected",
+      "status_detail": "cc_rejected_insufficient_amount",
+      "delay_ms": 500
+    },
+    "rejected_bad_filled": {
+      "status": "rejected",
+      "status_detail": "cc_rejected_bad_filled_card_number",
+      "delay_ms": 500
+    },
+    "rejected_call_for_authorize": {
+      "status": "rejected",
+      "status_detail": "cc_rejected_call_for_authorize",
+      "delay_ms": 600
+    },
+    "rejected_card_disabled": {
+      "status": "rejected",
+      "status_detail": "cc_rejected_card_disabled",
+      "delay_ms": 500
+    },
+    "rejected_high_risk": {
+      "status": "rejected",
+      "status_detail": "cc_rejected_high_risk",
+      "delay_ms": 700
+    },
+    "timeout": {
+      "simulate_timeout": true,
+      "delay_ms": 30000
+    },
+    "network_error": {
+      "simulate_error": true,
+      "error_code": "NETWORK_ERROR",
+      "delay_ms": 100
+    }
+  },
+  "payment_methods": {
+    "credit_card": [
+      {
+        "id": "visa",
+        "name": "Visa",
+        "payment_type_id": "credit_card",
+        "status": "active",
+        "secure_thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/visa.gif",
+        "thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/visa.gif",
+        "min_allowed_amount": 0,
+        "max_allowed_amount": 2500000,
+        "accreditation_time": 0
+      },
+      {
+        "id": "master",
+        "name": "Mastercard",
+        "payment_type_id": "credit_card",
+        "status": "active",
+        "secure_thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/master.gif",
+        "thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/master.gif",
+        "min_allowed_amount": 0,
+        "max_allowed_amount": 2500000,
+        "accreditation_time": 0
+      },
+      {
+        "id": "amex",
+        "name": "American Express",
+        "payment_type_id": "credit_card",
+        "status": "active",
+        "secure_thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/amex.gif",
+        "thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/amex.gif",
+        "min_allowed_amount": 0,
+        "max_allowed_amount": 2500000,
+        "accreditation_time": 0
+      }
+    ],
+    "debit_card": [
+      {
+        "id": "debvisa",
+        "name": "Visa Débito",
+        "payment_type_id": "debit_card",
+        "status": "active",
+        "secure_thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/debvisa.gif",
+        "thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/debvisa.gif",
+        "min_allowed_amount": 0,
+        "max_allowed_amount": 2500000,
+        "accreditation_time": 0
+      },
+      {
+        "id": "debmaster",
+        "name": "Mastercard Débito",
+        "payment_type_id": "debit_card",
+        "status": "active",
+        "secure_thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/debmaster.gif",
+        "thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/debmaster.gif",
+        "min_allowed_amount": 0,
+        "max_allowed_amount": 2500000,
+        "accreditation_time": 0
+      }
+    ],
+    "ticket": [
+      {
+        "id": "rapipago",
+        "name": "Rapipago",
+        "payment_type_id": "ticket",
+        "status": "active",
+        "secure_thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/rapipago.gif",
+        "thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/rapipago.gif",
+        "min_allowed_amount": 0,
+        "max_allowed_amount": 2500000,
+        "accreditation_time": 2880
+      },
+      {
+        "id": "pagofacil",
+        "name": "Pago Fácil",
+        "payment_type_id": "ticket",
+        "status": "active",
+        "secure_thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/pagofacil.gif",
+        "thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/pagofacil.gif",
+        "min_allowed_amount": 0,
+        "max_allowed_amount": 2500000,
+        "accreditation_time": 2880
+      }
+    ],
+    "account_money": [
+      {
+        "id": "account_money",
+        "name": "Dinero en cuenta",
+        "payment_type_id": "account_money",
+        "status": "active",
+        "secure_thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/account_money.gif",
+        "thumbnail": "https://www.mercadopago.com/org-img/MP3/API/logos/account_money.gif",
+        "min_allowed_amount": 0,
+        "max_allowed_amount": 10000000,
+        "accreditation_time": 0
+      }
+    ]
+  }
+}

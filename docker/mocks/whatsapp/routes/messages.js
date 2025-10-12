@@ -61,20 +61,29 @@ router.post('/v1/messages', async (req, res) => {
       });
     }
 
-    // Simulate async delivery with webhooks
+    // Simulate async delivery with webhooks (only in non-test environment)
     const messageId = response.messages[0].id;
-    const messageDetails = messageService.getMessageStatus(messageId);
 
-    // Schedule status updates
-    setTimeout(() => {
-      messageService.updateMessageStatus(messageId, 'delivered');
-      webhookService.scheduleWebhook('delivered', messageDetails, 0);
-    }, 1000);
+    if (process.env.NODE_ENV !== 'test') {
+      const messageDetails = messageService.getMessageStatus(messageId);
 
-    setTimeout(() => {
-      messageService.updateMessageStatus(messageId, 'read');
-      webhookService.scheduleWebhook('read', messageDetails, 0);
-    }, 5000);
+      // Schedule status updates
+      setTimeout(() => {
+        const msg = messageService.getMessageStatus(messageId);
+        if (msg) {
+          messageService.updateMessageStatus(messageId, 'delivered');
+          webhookService.scheduleWebhook('delivered', msg, 0);
+        }
+      }, 1000);
+
+      setTimeout(() => {
+        const msg = messageService.getMessageStatus(messageId);
+        if (msg) {
+          messageService.updateMessageStatus(messageId, 'read');
+          webhookService.scheduleWebhook('read', msg, 0);
+        }
+      }, 5000);
+    }
 
     res.status(200).json(response);
 
@@ -104,20 +113,29 @@ router.post('/v1/messages/template', async (req, res) => {
       template
     });
 
-    // Simulate async delivery with webhooks
+    // Simulate async delivery with webhooks (only in non-test environment)
     const messageId = response.messages[0].id;
-    const messageDetails = messageService.getMessageStatus(messageId);
 
-    // Schedule status updates
-    setTimeout(() => {
-      messageService.updateMessageStatus(messageId, 'delivered');
-      webhookService.scheduleWebhook('delivered', messageDetails, 0);
-    }, 1000);
+    if (process.env.NODE_ENV !== 'test') {
+      const messageDetails = messageService.getMessageStatus(messageId);
 
-    setTimeout(() => {
-      messageService.updateMessageStatus(messageId, 'read');
-      webhookService.scheduleWebhook('read', messageDetails, 0);
-    }, 5000);
+      // Schedule status updates
+      setTimeout(() => {
+        const msg = messageService.getMessageStatus(messageId);
+        if (msg) {
+          messageService.updateMessageStatus(messageId, 'delivered');
+          webhookService.scheduleWebhook('delivered', msg, 0);
+        }
+      }, 1000);
+
+      setTimeout(() => {
+        const msg = messageService.getMessageStatus(messageId);
+        if (msg) {
+          messageService.updateMessageStatus(messageId, 'read');
+          webhookService.scheduleWebhook('read', msg, 0);
+        }
+      }, 5000);
+    }
 
     res.status(200).json(response);
 

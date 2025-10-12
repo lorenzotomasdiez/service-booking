@@ -1,4 +1,8 @@
 const request = require('supertest');
+
+// Set test environment before importing app
+process.env.NODE_ENV = 'test';
+
 const app = require('../index');
 const messageService = require('../services/message.service');
 

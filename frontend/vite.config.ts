@@ -5,11 +5,7 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	server: {
 		port: 5173,
-		host: true,
-		// Allow connections from Docker containers
-		strictPort: false,
-		// Enable CORS for Docker networking
-		cors: true
+		host: true
 	},
 	// Performance optimizations for Argentina mobile users
 	build: {

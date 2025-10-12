@@ -58,7 +58,7 @@ export const securityConfig = {
   // CORS configuration for Argentina domains
   cors: {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      const allowedOrigins: (string | RegExp)[] = [
+      const allowedOrigins = [
         'https://barberpro.com.ar',
         'https://www.barberpro.com.ar',
         'https://app.barberpro.com.ar',
@@ -71,25 +71,11 @@ export const securityConfig = {
           'http://localhost:3000',
           'http://localhost:5173',
           'http://127.0.0.1:3000',
-          'http://127.0.0.1:5173',
-          // Docker service names for container-to-container communication
-          'http://frontend:5173',
-          'http://backend:3000',
-          // Docker container IP range (172.x.x.x is the default Docker bridge network)
-          /^http:\/\/172\.[\d]+\.[\d]+\.[\d]+:5173$/,
-          /^http:\/\/172\.[\d]+\.[\d]+\.[\d]+:3000$/
+          'http://127.0.0.1:5173'
         );
       }
 
-      // Parse CORS_ORIGIN from environment if provided
-      if (process.env.CORS_ORIGIN) {
-        const envOrigins = process.env.CORS_ORIGIN.split(',').map(o => o.trim());
-        allowedOrigins.push(...envOrigins);
-      }
-
-      if (!origin || allowedOrigins.some(allowed =>
-        typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
-      )) {
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS policy'), false);

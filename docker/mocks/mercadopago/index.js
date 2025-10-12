@@ -51,9 +51,6 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 // Swagger UI
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Serve static files (dashboard)
-app.use(express.static('public'));
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -64,8 +61,14 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Dashboard endpoint (legacy)
+// Dashboard endpoint - serve HTML file directly
+const path = require('path');
 app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+// Dashboard API endpoint (for dashboard.js to fetch data)
+app.get('/api/dashboard/stats', (req, res) => {
   const stats = paymentService.getStatistics();
   const payments = paymentService.getAllPayments();
 
@@ -74,6 +77,9 @@ app.get('/dashboard', (req, res) => {
     recent_payments: payments.slice(0, 10)
   });
 });
+
+// Serve static files (for dashboard assets)
+app.use(express.static('public'));
 
 // Dashboard Routes (Stream D)
 app.use('/api/dashboard', dashboardRoutes.router);

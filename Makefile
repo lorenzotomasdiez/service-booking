@@ -60,7 +60,7 @@ COMPOSE_FULL := $(COMPOSE_MOCKS) -f docker/docker-compose.monitoring.yml
 # All targets are .PHONY as they don't represent actual files
 .PHONY: help version doctor
 .PHONY: up down restart rebuild clean
-.PHONY: dev full monitoring mocks test
+.PHONY: dev full monitoring mocks mocks-down mocks-logs mocks-reset test
 .PHONY: db-migrate db-seed db-reset db-backup db-restore db-shell
 .PHONY: logs status ps stats health logs-backend logs-frontend
 .PHONY: reset prune update validate
@@ -100,6 +100,9 @@ help: ## Show this help message
 	@echo ""
 	@echo "$(YELLOW)Environment Variants:$(RESET) $(GREEN)(Stream B)$(RESET)"
 	@echo "  $(CYAN)dev, full, monitoring, mocks, test$(RESET)"
+	@echo ""
+	@echo "$(YELLOW)Mock Services:$(RESET) $(GREEN)(Issue #7)$(RESET)"
+	@echo "  $(CYAN)mocks, mocks-down, mocks-logs, mocks-reset$(RESET)"
 	@echo ""
 	@echo "$(YELLOW)Database Operations:$(RESET) $(GREEN)(Stream C)$(RESET)"
 	@echo "  $(CYAN)db-migrate, db-seed, db-reset, db-backup, db-restore, db-shell$(RESET)"
@@ -381,22 +384,31 @@ monitoring: check-docker ## Start monitoring stack only
 	@echo "  $(CYAN)Loki:$(RESET)           http://localhost:3100"
 	@echo ""
 
-mocks: check-docker check-ports ## Start Argentina mocks only
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Argentina Service Mocks..."
+mocks: check-docker ## Start all Argentina mock services
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Argentina mock services..."
+	@docker-compose -f docker/docker-compose.mocks.yml up -d
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Mock services started"
 	@echo ""
-	@echo "$(YELLOW)[$(INFO)]$(RESET) Note: Argentina mocks are currently placeholders (Phase 2)"
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting base services + mocks..."
-	@$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) up -d || \
-	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start mocks" && exit 1)
-	@echo ""
-	@echo "$(GREEN)[$(CHECK)]$(RESET) Service mocks started!"
-	@echo ""
-	@echo "$(BLUE)When fully implemented, mocks will be available at:$(RESET)"
-	@echo "  $(CYAN)MercadoPago Mock:$(RESET) http://localhost:8081"
-	@echo "  $(CYAN)AFIP Mock:$(RESET)        http://localhost:8082"
-	@echo "  $(CYAN)WhatsApp Mock:$(RESET)    http://localhost:8083"
-	@echo ""
+	@echo "Mock services available at:"
+	@echo "  MercadoPago: http://localhost:3001/dashboard"
+	@echo "  AFIP:        http://localhost:3002/docs"
+	@echo "  WhatsApp:    http://localhost:3003/dashboard"
+	@echo "  SMS:         http://localhost:3004/dashboard"
+	@echo "  Email:       http://localhost:8025"
+
+mocks-down: ## Stop all mock services
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Stopping mock services..."
+	@docker-compose -f docker/docker-compose.mocks.yml down
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Mock services stopped"
+
+mocks-logs: ## View logs from all mock services
+	@docker-compose -f docker/docker-compose.mocks.yml logs -f
+
+mocks-reset: ## Reset mock services (stop, remove volumes, start)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Resetting mock services..."
+	@docker-compose -f docker/docker-compose.mocks.yml down -v
+	@docker-compose -f docker/docker-compose.mocks.yml up -d
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Mock services reset"
 
 test: check-docker ## Start test environment
 	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Test Environment..."

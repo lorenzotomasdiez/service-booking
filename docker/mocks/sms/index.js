@@ -57,8 +57,10 @@ app.get('/health', (req, res) => {
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
 logger.info('Swagger documentation enabled at /docs');
 
-// Serve static files (dashboard)
-app.use('/dashboard', express.static(path.join(__dirname, 'public')));
+// Dashboard endpoint - serve the HTML file directly
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
 logger.info('Dashboard UI enabled at /dashboard');
 
 // Root endpoint
@@ -177,6 +179,9 @@ function start() {
 }
 
 // Start the server
-start();
+// Start the server only if not in test mode
+if (process.env.NODE_ENV !== 'test') {
+  start();
+}
 
 module.exports = app;

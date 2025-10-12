@@ -83,32 +83,43 @@ async function triggerWebhook(event, sms) {
  * @param {object} sms - SMS object
  */
 function simulateDelivery(sms) {
+  // Skip simulation in test mode to prevent timer leaks
+  if (process.env.NODE_ENV === 'test') {
+    return;
+  }
+
   // Simulate queued -> sent -> delivered flow
 
   // After 1 second, mark as sent
   setTimeout(() => {
-    sms.status = 'sent';
-    sms.updatedAt = new Date().toISOString();
-    logger.info('SMS sent', { smsId: sms.id, to: sms.to });
+    const existingSms = smsStore.get(sms.id);
+    if (!existingSms) return; // SMS was deleted
+
+    existingSms.status = 'sent';
+    existingSms.updatedAt = new Date().toISOString();
+    logger.info('SMS sent', { smsId: existingSms.id, to: existingSms.to });
   }, 1000);
 
   // After 2 seconds total, mark as delivered (95% success rate)
   setTimeout(() => {
+    const existingSms = smsStore.get(sms.id);
+    if (!existingSms) return; // SMS was deleted
+
     const isSuccess = Math.random() < 0.95;
 
     if (isSuccess) {
-      sms.status = 'delivered';
-      sms.deliveredAt = new Date().toISOString();
-      logger.info('SMS delivered', { smsId: sms.id, to: sms.to });
-      triggerWebhook('delivered', sms);
+      existingSms.status = 'delivered';
+      existingSms.deliveredAt = new Date().toISOString();
+      logger.info('SMS delivered', { smsId: existingSms.id, to: existingSms.to });
+      triggerWebhook('delivered', existingSms);
     } else {
-      sms.status = 'failed';
-      sms.errorMessage = 'Delivery failed: Network error';
-      logger.warn('SMS delivery failed', { smsId: sms.id, to: sms.to });
-      triggerWebhook('failed', sms);
+      existingSms.status = 'failed';
+      existingSms.errorMessage = 'Delivery failed: Network error';
+      logger.warn('SMS delivery failed', { smsId: existingSms.id, to: existingSms.to });
+      triggerWebhook('failed', existingSms);
     }
 
-    sms.updatedAt = new Date().toISOString();
+    existingSms.updatedAt = new Date().toISOString();
   }, 2000);
 }
 

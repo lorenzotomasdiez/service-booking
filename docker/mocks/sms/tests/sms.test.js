@@ -3,6 +3,10 @@
  */
 
 const request = require('supertest');
+
+// Set test environment before importing app
+process.env.NODE_ENV = 'test';
+
 const app = require('../index');
 
 // Wait for server to be ready

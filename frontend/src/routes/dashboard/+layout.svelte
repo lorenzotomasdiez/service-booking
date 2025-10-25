@@ -1,14 +1,20 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { authStore, isAuthenticated, user, isProvider, isClient } from '$lib/stores/auth';
+	import { authStore, isAuthenticated, user, isProvider, isClient, verificationStatus } from '$lib/stores/auth';
 	import { socketService } from '$lib/services/socket';
 	import { OnboardingFlow } from '$lib/components';
 	import NotificationCenter from '$lib/components/notifications/NotificationCenter.svelte';
 	import { onMount, onDestroy } from 'svelte';
-	
+	import { authApi } from '$lib/api/auth';
+
 	let sidebarOpen = false;
 	let showOnboarding = false;
+	// T061: Verification reminder banner state
+	let showVerificationBanner = false;
+	let resendingVerification = false;
+	let resendSuccess = false;
+	let resendError = '';
 
 	onMount(() => {
 		// Verify authentication on mount
@@ -26,6 +32,11 @@
 			}
 		}
 
+		// T061: Check verification status and show banner if needed
+		if ($user && !$user.isVerified && $user.authMethod !== 'OAUTH') {
+			showVerificationBanner = true;
+		}
+
 		// Check if onboarding should be shown
 		const onboardingCompleted = localStorage.getItem('onboarding_completed');
 		if (!onboardingCompleted && $user && !$user.isProfileComplete) {
@@ -35,6 +46,46 @@
 			}, 1000);
 		}
 	});
+
+	// T061: Reactive statement to update banner visibility
+	$: if ($verificationStatus) {
+		showVerificationBanner = !$verificationStatus.isVerified && $user?.authMethod === 'EMAIL';
+	}
+
+	// T061: Handle resend verification email
+	async function handleResendVerification() {
+		resendingVerification = true;
+		resendSuccess = false;
+		resendError = '';
+
+		try {
+			const response = await authApi.resendEmailVerification();
+
+			if (response.success) {
+				resendSuccess = true;
+				// Hide success message after 5 seconds
+				setTimeout(() => {
+					resendSuccess = false;
+				}, 5000);
+			} else {
+				throw new Error(response.error?.message || 'Error al reenviar correo');
+			}
+		} catch (error: any) {
+			resendError = error.message || 'Error al reenviar correo de verificación';
+			// Hide error message after 5 seconds
+			setTimeout(() => {
+				resendError = '';
+			}, 5000);
+		} finally {
+			resendingVerification = false;
+		}
+	}
+
+	// T061: Dismiss verification banner temporarily
+	function dismissVerificationBanner() {
+		showVerificationBanner = false;
+		// Show again after page reload (banner persists until email is verified)
+	}
 
 	onDestroy(() => {
 		// Cleanup socket connection
@@ -349,6 +400,118 @@
 
 		<!-- Main content -->
 		<div class="flex flex-col w-0 flex-1 overflow-hidden">
+			<!-- T061: Verification Reminder Banner -->
+			{#if showVerificationBanner}
+				<div class="verification-banner" data-testid="verification-banner">
+					<div class="verification-content">
+						<div class="verification-icon">
+							<svg
+								class="w-5 h-5 text-amber-600"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+								aria-hidden="true"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+								/>
+							</svg>
+						</div>
+						<div class="verification-text">
+							<p class="verification-title">
+								Tu correo electrónico no ha sido verificado
+							</p>
+							<p class="verification-description">
+								Por favor, verifica tu correo electrónico para acceder a todas las funcionalidades.
+								{#if resendSuccess}
+									<span class="verification-success" data-testid="resend-success-message">
+										¡Correo enviado! Revisa tu bandeja de entrada.
+									</span>
+								{:else if resendError}
+									<span class="verification-error">
+										{resendError}
+									</span>
+								{/if}
+							</p>
+						</div>
+						<div class="verification-actions">
+							<button
+								class="btn-resend"
+								on:click={handleResendVerification}
+								disabled={resendingVerification || resendSuccess}
+								data-testid="resend-verification-btn"
+								aria-label="Reenviar correo de verificación"
+							>
+								{#if resendingVerification}
+									<svg
+										class="animate-spin h-4 w-4 text-white"
+										fill="none"
+										viewBox="0 0 24 24"
+										aria-hidden="true"
+									>
+										<circle
+											class="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										></circle>
+										<path
+											class="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
+									</svg>
+									Enviando...
+								{:else if resendSuccess}
+									<svg
+										class="h-4 w-4 text-white"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+										aria-hidden="true"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M5 13l4 4L19 7"
+										/>
+									</svg>
+									Enviado
+								{:else}
+									Reenviar correo
+								{/if}
+							</button>
+							<button
+								class="btn-dismiss"
+								on:click={dismissVerificationBanner}
+								aria-label="Cerrar banner"
+							>
+								<svg
+									class="h-5 w-5"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+									aria-hidden="true"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M6 18L18 6M6 6l12 12"
+									/>
+								</svg>
+							</button>
+						</div>
+					</div>
+				</div>
+			{/if}
+
 			<!-- Mobile header -->
 			<div class="lg:hidden">
 				<div class="flex items-center justify-between bg-white border-b border-neutral-200 px-4 py-3">
@@ -394,7 +557,165 @@
 {/if}
 
 <!-- Onboarding Flow -->
-<OnboardingFlow 
-	bind:open={showOnboarding} 
+<OnboardingFlow
+	bind:open={showOnboarding}
 	on:complete={handleOnboardingComplete}
 />
+
+<style>
+/* T061: Verification Banner Styles */
+.verification-banner {
+	background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+	border-bottom: 1px solid #f59e0b;
+	padding: 0.875rem 1rem;
+}
+
+.verification-content {
+	max-width: 1280px;
+	margin: 0 auto;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.verification-icon {
+	flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	background: white;
+	border-radius: 0.5rem;
+	box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.verification-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.verification-title {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: #92400e;
+	margin-bottom: 0.125rem;
+}
+
+.verification-description {
+	font-size: 0.75rem;
+	color: #78350f;
+	line-height: 1.4;
+}
+
+.verification-success {
+	display: inline-block;
+	font-weight: 600;
+	color: #065f46;
+	margin-left: 0.5rem;
+}
+
+.verification-error {
+	display: inline-block;
+	font-weight: 600;
+	color: #991b1b;
+	margin-left: 0.5rem;
+}
+
+.verification-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-shrink: 0;
+}
+
+.btn-resend {
+	display: flex;
+	align-items: center;
+	gap: 0.375rem;
+	background: #f59e0b;
+	color: white;
+	font-weight: 600;
+	font-size: 0.8125rem;
+	padding: 0.5rem 1rem;
+	border-radius: 0.375rem;
+	border: none;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	white-space: nowrap;
+}
+
+.btn-resend:hover:not(:disabled) {
+	background: #d97706;
+	transform: translateY(-1px);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-resend:disabled {
+	opacity: 0.7;
+	cursor: not-allowed;
+}
+
+.btn-resend:focus {
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
+}
+
+.btn-dismiss {
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	padding: 0.375rem;
+	color: #92400e;
+	transition: color 0.2s ease;
+}
+
+.btn-dismiss:hover {
+	color: #78350f;
+}
+
+.btn-dismiss:focus {
+	outline: none;
+	color: #78350f;
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+	.verification-banner {
+		padding: 0.75rem 1rem;
+	}
+
+	.verification-content {
+		flex-wrap: wrap;
+	}
+
+	.verification-text {
+		flex-basis: 100%;
+		margin-bottom: 0.5rem;
+	}
+
+	.verification-actions {
+		flex-basis: 100%;
+		justify-content: space-between;
+	}
+
+	.btn-resend {
+		flex: 1;
+		justify-content: center;
+	}
+}
+
+/* Animation for spinner */
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.animate-spin {
+	animation: spin 1s linear infinite;
+}
+</style>

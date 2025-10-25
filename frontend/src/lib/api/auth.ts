@@ -2,13 +2,15 @@
 import { z } from 'zod';
 import { apiClient, type ApiResponse } from './client';
 
-// Validation schemas
+// Validation schemas - These schemas are used for client-side pre-validation
+// The actual validation is done by the comprehensive schemas in $lib/validation/registration.ts
 export const loginSchema = z.object({
 	email: z.string().email('Ingresa un email válido'),
 	password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
 	rememberMe: z.boolean().optional()
 });
 
+// Note: This is a legacy schema. Use registrationSchema from $lib/validation/registration.ts instead
 export const registerSchema = z.object({
 	email: z.string().email('Ingresa un email válido'),
 	password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
@@ -167,5 +169,36 @@ export const authApi = {
 
 	async deleteAccount(): Promise<ApiResponse<null>> {
 		return apiClient.delete<ApiResponse<null>>('/auth/account');
+	},
+
+	// T047: OAuth API methods
+	async initiateGoogleOAuth(data: {
+		role?: 'CLIENT' | 'PROVIDER';
+		isRegistration?: boolean;
+		returnTo?: string;
+	}): Promise<ApiResponse<{ redirectUrl: string; state: string }>> {
+		return apiClient.post<ApiResponse<{ redirectUrl: string; state: string }>>(
+			'/auth/oauth/google/initiate',
+			data
+		);
+	},
+
+	async linkGoogleOAuth(accessToken: string): Promise<ApiResponse<{
+		message: string;
+		authMethod: string;
+	}>> {
+		return apiClient.post<ApiResponse<{ message: string; authMethod: string }>>(
+			'/auth/oauth/google/link',
+			{ accessToken }
+		);
+	},
+
+	async unlinkGoogleOAuth(): Promise<ApiResponse<{
+		message: string;
+		authMethod: string;
+	}>> {
+		return apiClient.delete<ApiResponse<{ message: string; authMethod: string }>>(
+			'/auth/oauth/google/unlink'
+		);
 	}
 };

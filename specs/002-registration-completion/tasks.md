@@ -72,23 +72,23 @@ This is a **Web app** monorepo structure:
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T019 [P] [US1] Create backend/tests/unit/email.service.test.ts with unit tests for email sending (template rendering, SMTP connection)
-- [ ] T020 [P] [US1] Create backend/tests/unit/verification.service.test.ts with unit tests for token generation, validation, and expiration
-- [ ] T021 [P] [US1] Create backend/tests/integration/verification.test.ts with integration tests for full verification flow (register → receive email → verify token)
+- [X] T019 [P] [US1] Create backend/tests/unit/email.service.test.ts with unit tests for email sending (template rendering, SMTP connection)
+- [X] T020 [P] [US1] Create backend/tests/unit/verification.service.test.ts with unit tests for token generation, validation, and expiration
+- [X] T021 [P] [US1] Create backend/tests/integration/verification.test.ts with integration tests for full verification flow (register → receive email → verify token)
 
 ### Implementation for User Story 1
 
 - [X] T022 [P] [US1] Create backend/src/services/email.service.ts with sendEmail method using Nodemailer
 - [X] T023 [P] [US1] Create backend/src/services/verification.service.ts with methods: generateToken, sendVerificationEmail, validateToken, markEmailVerified
 - [X] T024 [US1] Create backend/src/templates/email/verification.html with Spanish email verification template
-- [ ] T025 [US1] Extend backend/src/routes/auth.ts POST /auth/register to send verification email after user creation
-- [ ] T026 [US1] Extend backend/src/routes/auth.ts POST /auth/register to set authMethod='EMAIL' and isVerified=false
-- [ ] T027 [US1] Create backend/src/routes/auth.ts GET /auth/verify-email endpoint to validate token and mark user verified
-- [ ] T028 [P] [US1] Create backend/src/routes/auth.ts POST /auth/send-verification endpoint with rate limiting (3 emails/hour)
-- [ ] T029 [P] [US1] Create backend/src/routes/auth.ts POST /auth/resend-verification endpoint (authenticated) with rate limiting
-- [ ] T030 [P] [US1] Create backend/src/routes/auth.ts GET /auth/verification-status endpoint to check user verification status
-- [ ] T031 [US1] Add structured logging to verification.service.ts for verification sends (success/failure)
-- [ ] T032 [US1] Create frontend/src/routes/verify-email/+page.svelte to handle email verification confirmation
+- [X] T025 [US1] Extend backend/src/routes/auth.ts POST /auth/register to send verification email after user creation
+- [X] T026 [US1] Extend backend/src/routes/auth.ts POST /auth/register to set authMethod='EMAIL' and isVerified=false
+- [X] T027 [US1] Create backend/src/routes/auth.ts GET /auth/verify-email endpoint to validate token and mark user verified
+- [X] T028 [P] [US1] Create backend/src/routes/auth.ts POST /auth/send-verification endpoint with rate limiting (3 emails/hour)
+- [X] T029 [P] [US1] Create backend/src/routes/auth.ts POST /auth/resend-verification endpoint (authenticated) with rate limiting
+- [X] T030 [P] [US1] Create backend/src/routes/auth.ts GET /auth/verification-status endpoint to check user verification status
+- [X] T031 [US1] Add structured logging to verification.service.ts for verification sends (success/failure)
+- [X] T032 [US1] Create frontend/src/routes/verify-email/+page.svelte to handle email verification confirmation
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - users can register, receive verification emails in MailHog, and verify their accounts
 
@@ -102,24 +102,24 @@ This is a **Web app** monorepo structure:
 
 ### Tests for User Story 2
 
-- [ ] T033 [P] [US2] Create backend/tests/unit/oauth.service.test.ts with unit tests for OAuth state generation, Google profile fetching, user creation
-- [ ] T034 [P] [US2] Create backend/tests/integration/oauth.test.ts with integration tests for full OAuth flow (initiate → callback → user creation)
-- [ ] T035 [P] [US2] Create frontend/tests/registration-oauth.spec.ts (Playwright E2E) for complete OAuth registration flow
+- [X] T033 [P] [US2] Create backend/tests/unit/oauth.service.test.ts with unit tests for OAuth state generation, Google profile fetching, user creation
+- [X] T034 [P] [US2] Create backend/tests/integration/oauth.test.ts with integration tests for full OAuth flow (initiate → callback → user creation)
+- [X] T035 [P] [US2] Create frontend/tests/registration-oauth.spec.ts (Playwright E2E) for complete OAuth registration flow
 
 ### Implementation for User Story 2
 
-- [ ] T036 [P] [US2] Create backend/src/services/oauth.service.ts with methods: generateState, storeState (Redis), validateState, fetchGoogleProfile, createOrUpdateOAuthUser
-- [ ] T037 [US2] Register @fastify/cookie plugin in backend/src/server.ts (required BEFORE @fastify/oauth2)
-- [ ] T038 [US2] Register @fastify/oauth2 plugin in backend/src/server.ts with Google OAuth configuration
-- [ ] T039 [US2] Create backend/src/routes/oauth.ts GET /auth/oauth/google/initiate endpoint to redirect to Google with state token
-- [ ] T040 [US2] Create backend/src/routes/oauth.ts GET /auth/oauth/google/callback endpoint to handle Google callback, validate state, create user, return JWT
-- [ ] T041 [P] [US2] Create backend/src/routes/oauth.ts POST /auth/oauth/google/link endpoint (authenticated) to link Google account to existing user
-- [ ] T042 [P] [US2] Create backend/src/routes/oauth.ts DELETE /auth/oauth/google/unlink endpoint (authenticated) to unlink Google account
-- [ ] T043 [US2] Add OAuth attempt logging to oauth.service.ts with correlation IDs
-- [ ] T044 [P] [US2] Create frontend/src/lib/components/OAuthButton.svelte reusable component with Google icon and redirect logic
-- [ ] T045 [US2] Create frontend/src/routes/auth/callback/google/+page.svelte to receive tokens from OAuth redirect and store in auth store
-- [ ] T046 [US2] Update frontend/src/routes/register/+page.svelte to add OAuthButton component with divider
-- [ ] T047 [US2] Update frontend/src/lib/api/auth.ts to add OAuth-related API calls (initiateOAuth, linkOAuth, unlinkOAuth)
+- [X] T036 [P] [US2] Create backend/src/services/oauth.service.ts with methods: generateState, storeState (Redis), validateState, fetchGoogleProfile, createOrUpdateOAuthUser
+- [X] T037 [US2] Register @fastify/cookie plugin in backend/src/server.ts (required BEFORE @fastify/oauth2)
+- [X] T038 [US2] Register @fastify/oauth2 plugin in backend/src/server.ts with Google OAuth configuration
+- [X] T039 [US2] Create backend/src/routes/oauth.ts GET /auth/oauth/google/initiate endpoint to redirect to Google with state token
+- [X] T040 [US2] Create backend/src/routes/oauth.ts GET /auth/oauth/google/callback endpoint to handle Google callback, validate state, create user, return JWT
+- [X] T041 [P] [US2] Create backend/src/routes/oauth.ts POST /auth/oauth/google/link endpoint (authenticated) to link Google account to existing user
+- [X] T042 [P] [US2] Create backend/src/routes/oauth.ts DELETE /auth/oauth/google/unlink endpoint (authenticated) to unlink Google account
+- [X] T043 [US2] Add OAuth attempt logging to oauth.service.ts with correlation IDs
+- [X] T044 [P] [US2] Create frontend/src/lib/components/OAuthButton.svelte reusable component with Google icon and redirect logic
+- [X] T045 [US2] Create frontend/src/routes/auth/callback/google/+page.svelte to receive tokens from OAuth redirect and store in auth store
+- [X] T046 [US2] Update frontend/src/routes/register/+page.svelte to add OAuthButton component with divider
+- [X] T047 [US2] Update frontend/src/lib/api/auth.ts to add OAuth-related API calls (initiateOAuth, linkOAuth, unlinkOAuth)
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently - users can register via email OR Google OAuth
 
@@ -133,18 +133,18 @@ This is a **Web app** monorepo structure:
 
 ### Tests for User Story 3
 
-- [ ] T048 [P] [US3] Create frontend/tests/unit/validation.test.ts with unit tests for email format validation, password strength validation
-- [ ] T049 [P] [US3] Create frontend/tests/integration/registration-validation.spec.ts (Playwright) for real-time validation behavior
+- [X] T048 [P] [US3] Create frontend/tests/unit/validation.test.ts with unit tests for email format validation, password strength validation
+- [X] T049 [P] [US3] Create frontend/tests/integration/registration-validation.spec.ts (Playwright) for real-time validation behavior
 
 ### Implementation for User Story 3
 
-- [ ] T050 [P] [US3] Create frontend/src/lib/validation/registration.ts with Zod schemas for email, password, name validation
-- [ ] T051 [US3] Update frontend/src/routes/register/+page.svelte to add real-time field validation with onBlur and onChange handlers
-- [ ] T052 [US3] Update frontend/src/routes/register/+page.svelte to add password strength indicator component (weak/medium/strong)
-- [ ] T053 [US3] Update frontend/src/routes/register/+page.svelte to add confirm password field with mismatch validation
-- [ ] T054 [US3] Update frontend/src/routes/register/+page.svelte to disable submit button until all fields valid
-- [ ] T055 [US3] Add Spanish validation error messages to frontend/src/lib/validation/registration.ts
-- [ ] T056 [US3] Update backend/src/routes/auth.ts POST /auth/register to return detailed Zod validation errors with field-level messages
+- [X] T050 [P] [US3] Create frontend/src/lib/validation/registration.ts with Zod schemas for email, password, name validation
+- [X] T051 [US3] Update frontend/src/routes/register/+page.svelte to add real-time field validation with onBlur and onChange handlers
+- [X] T052 [US3] Update frontend/src/routes/register/+page.svelte to add password strength indicator component (weak/medium/strong)
+- [X] T053 [US3] Update frontend/src/routes/register/+page.svelte to add confirm password field with mismatch validation
+- [X] T054 [US3] Update frontend/src/routes/register/+page.svelte to disable submit button until all fields valid
+- [X] T055 [US3] Add Spanish validation error messages to frontend/src/lib/validation/registration.ts
+- [X] T056 [US3] Update backend/src/routes/auth.ts POST /auth/register to return detailed Zod validation errors with field-level messages
 
 **Checkpoint**: All user stories should now be independently functional - registration has email, OAuth, AND real-time validation
 
@@ -158,16 +158,16 @@ This is a **Web app** monorepo structure:
 
 ### Tests for User Story 4
 
-- [ ] T057 [P] [US4] Create frontend/tests/integration/post-registration.spec.ts (Playwright) for welcome flow and redirect behavior
+- [X] T057 [P] [US4] Create frontend/tests/integration/post-registration.spec.ts (Playwright) for welcome flow and redirect behavior
 
 ### Implementation for User Story 4
 
-- [ ] T058 [P] [US4] Create frontend/src/lib/components/WelcomeModal.svelte with welcome message and profile completion CTA
-- [ ] T059 [US4] Update frontend/src/routes/auth/callback/google/+page.svelte to show welcome modal for new OAuth users
-- [ ] T060 [US4] Update frontend/src/lib/stores/auth.ts to add firstLogin flag to track new registrations
-- [ ] T061 [US4] Create frontend/src/routes/dashboard/+layout.svelte to check verification status and show verification reminder banner
-- [ ] T062 [US4] Update frontend/src/lib/api/auth.ts to fetch verification status on app load
-- [ ] T063 [US4] Add role-based redirect logic to frontend/src/routes/auth/callback/google/+page.svelte (CLIENT → /dashboard/client, PROVIDER → /dashboard/provider)
+- [X] T058 [P] [US4] Create frontend/src/lib/components/WelcomeModal.svelte with welcome message and profile completion CTA
+- [X] T059 [US4] Update frontend/src/routes/auth/callback/google/+page.svelte to show welcome modal for new OAuth users
+- [X] T060 [US4] Update frontend/src/lib/stores/auth.ts to add firstLogin flag to track new registrations
+- [X] T061 [US4] Create frontend/src/routes/dashboard/+layout.svelte to check verification status and show verification reminder banner
+- [X] T062 [US4] Update frontend/src/lib/api/auth.ts to fetch verification status on app load
+- [X] T063 [US4] Add role-based redirect logic to frontend/src/routes/auth/callback/google/+page.svelte (CLIENT → /dashboard/client, PROVIDER → /dashboard/provider)
 
 **Checkpoint**: Complete onboarding experience - users are welcomed and directed to appropriate dashboards
 
@@ -181,12 +181,12 @@ This is a **Web app** monorepo structure:
 
 ### Implementation for Separate URLs
 
-- [ ] T064 [P] Extract registration form logic to frontend/src/lib/components/RegistrationForm.svelte with role prop (null | 'client' | 'provider')
-- [ ] T065 Update frontend/src/routes/register/+page.svelte to use RegistrationForm component with role={null}
-- [ ] T066 [P] Create frontend/src/routes/register/client/+page.svelte using RegistrationForm with role="client" and custom SEO metadata
-- [ ] T067 [P] Create frontend/src/routes/register/provider/+page.svelte using RegistrationForm with role="provider" and custom SEO metadata
-- [ ] T068 Update RegistrationForm.svelte to hide role selection UI when role prop is not null
-- [ ] T069 [P] Add analytics tracking to each registration route (client vs provider conversion tracking)
+- [X] T064 [P] Extract registration form logic to frontend/src/lib/components/RegistrationForm.svelte with role prop (null | 'client' | 'provider')
+- [X] T065 Update frontend/src/routes/register/+page.svelte to use RegistrationForm component with role={null}
+- [X] T066 [P] Create frontend/src/routes/register/client/+page.svelte using RegistrationForm with role="client" and custom SEO metadata
+- [X] T067 [P] Create frontend/src/routes/register/provider/+page.svelte using RegistrationForm with role="provider" and custom SEO metadata
+- [X] T068 Update RegistrationForm.svelte to hide role selection UI when role prop is not null
+- [X] T069 [P] Add analytics tracking to each registration route (client vs provider conversion tracking)
 
 **Checkpoint**: Marketing-ready registration URLs with role-specific landing pages
 
@@ -196,17 +196,17 @@ This is a **Web app** monorepo structure:
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T070 [P] Create backend cleanup cron job in backend/src/jobs/cleanup-tokens.ts to delete expired EmailVerificationTokens daily
-- [ ] T071 [P] Add rate limiting to backend/src/routes/auth.ts POST /auth/register (5 registrations per IP per hour using @fastify/rate-limit)
-- [ ] T072 [P] Add rate limiting to backend/src/routes/auth.ts POST /auth/send-verification (3 emails per hour per email using Redis)
-- [ ] T073 [P] Update backend/README.md with OAuth setup instructions and email service configuration
-- [ ] T074 [P] Update frontend/README.md with new registration routes and OAuth flow documentation
-- [ ] T075 [P] Create backend/tests/integration/registration.test.ts to extend existing tests with OAuth and verification scenarios
-- [ ] T076 Code review and refactoring: check for TypeScript `any` types, ensure all error messages in Spanish
-- [ ] T077 Performance optimization: add database indexes verification (token, userId, expiresAt)
-- [ ] T078 Security hardening: verify bcrypt hashing for tokens, HTTPS in production OAuth redirects, PKCE enabled
-- [ ] T079 Run quickstart.md validation: manually test all steps in quickstart guide, update if needed
-- [ ] T080 [P] Update CLAUDE.md with new technologies: Google OAuth 2.0, Nodemailer, Email verification system
+- [X] T070 [P] Create backend cleanup cron job in backend/src/jobs/cleanup-tokens.ts to delete expired EmailVerificationTokens daily
+- [X] T071 [P] Add rate limiting to backend/src/routes/auth.ts POST /auth/register (5 registrations per IP per hour using @fastify/rate-limit)
+- [X] T072 [P] Add rate limiting to backend/src/routes/auth.ts POST /auth/send-verification (3 emails per hour per email using Redis)
+- [X] T073 [P] Update backend/README.md with OAuth setup instructions and email service configuration
+- [X] T074 [P] Update frontend/README.md with new registration routes and OAuth flow documentation
+- [X] T075 [P] Create backend/tests/integration/registration.test.ts to extend existing tests with OAuth and verification scenarios
+- [X] T076 Code review and refactoring: check for TypeScript `any` types, ensure all error messages in Spanish
+- [X] T077 Performance optimization: add database indexes verification (token, userId, expiresAt)
+- [X] T078 Security hardening: verify bcrypt hashing for tokens, HTTPS in production OAuth redirects, PKCE enabled
+- [X] T079 Run quickstart.md validation: manually test all steps in quickstart guide, update if needed
+- [X] T080 [P] Update CLAUDE.md with new technologies: Google OAuth 2.0, Nodemailer, Email verification system
 
 ---
 

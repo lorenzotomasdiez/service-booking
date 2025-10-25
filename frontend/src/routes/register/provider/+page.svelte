@@ -3,19 +3,25 @@
 	import RegistrationForm from '$lib/components/RegistrationForm.svelte';
 	import { uxAnalytics } from '$lib/services/ux-analytics';
 
-	// T069: Track general registration page visit
+	// T069: Track provider registration page visit
 	onMount(() => {
 		uxAnalytics.trackExternalEvent('registration_page_visit', {
-			registrationType: 'general',
-			url: '/register',
+			registrationType: 'provider',
+			url: '/register/provider',
 			source: 'direct_link'
 		});
 	});
 </script>
 
 <svelte:head>
-	<title>Registrarse - BarberPro</title>
-	<meta name="description" content="Únete a BarberPro y accede a los mejores servicios de barbería en Argentina" />
+	<title>Regístrate como Profesional - BarberPro</title>
+	<meta name="description" content="Regístrate como profesional en BarberPro y comienza a ofrecer tus servicios de barbería. Gestiona tu negocio fácilmente." />
+	<meta property="og:title" content="Regístrate como Profesional - BarberPro" />
+	<meta property="og:description" content="Regístrate como profesional en BarberPro y comienza a ofrecer tus servicios de barbería. Gestiona tu negocio fácilmente." />
+	<meta property="og:type" content="website" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="Regístrate como Profesional - BarberPro" />
+	<meta name="twitter:description" content="Regístrate como profesional en BarberPro y comienza a ofrecer tus servicios de barbería. Gestiona tu negocio fácilmente." />
 </svelte:head>
 
 <div class="min-h-screen bg-neutral-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -26,18 +32,18 @@
 				B
 			</div>
 			<h2 class="text-3xl font-bold text-neutral-800">
-				Crear Cuenta
+				Crear Cuenta de Profesional
 			</h2>
 			<p class="mt-2 text-sm text-neutral-600">
-				¿Ya tienes cuenta? 
+				¿Ya tienes cuenta?
 				<a href="/login" class="text-brand hover:text-primary-700 font-medium">
 					Inicia sesión
 				</a>
 			</p>
 		</div>
 
-		<!-- T065: Use RegistrationForm component with role={null} to show role selection -->
-		<RegistrationForm role={null} />
+		<!-- T067: RegistrationForm with pre-selected provider role -->
+		<RegistrationForm role="provider" />
 
 		<!-- Help Section -->
 		<div class="text-center text-sm text-neutral-500 mt-8">

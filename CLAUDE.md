@@ -111,11 +111,17 @@ npm run build:frontend # Build frontend only
 - **Prisma**: Type-safe ORM with PostgreSQL
 - **TypeScript**: Server-side type safety
 - **JWT**: Authentication via @fastify/jwt
+- **OAuth 2.0**: Google OAuth integration via @fastify/oauth2
+- **Nodemailer**: Email service for verification emails
 - **Socket.io**: Real-time communications
-- **Redis**: Caching and session management
+- **Redis**: Caching, session management, and OAuth state storage
+- **Rate Limiting**: @fastify/rate-limit for endpoint protection
 
 ### Database Schema
-- **Users**: Authentication and profiles
+- **Users**: Authentication and profiles with email verification
+- **EmailVerificationToken**: Email verification tokens (24-hour expiry)
+- **OAuthProvider**: OAuth provider linking (Google, Facebook)
+- **RefreshToken**: JWT refresh tokens with revocation
 - **Services**: Service catalog management
 - **Bookings**: Appointment scheduling system
 - **Payments**: Argentina payment processing (MercadoPago integration)
@@ -191,9 +197,14 @@ The codebase is architected for easy vertical replication:
 
 ## Security & Compliance
 
-### Authentication
+### Authentication & Authorization
 - **JWT-based authentication** with @fastify/jwt
-- **Rate limiting** via @fastify/rate-limit
+- **OAuth 2.0 integration**: Google OAuth with PKCE flow
+- **Email verification system**: Nodemailer + MailHog (dev) / production SMTP
+- **Password security**: Bcrypt hashing (12 salt rounds)
+- **Token management**: Refresh tokens with database storage and revocation
+- **Rate limiting**: @fastify/rate-limit (5 registrations/IP/hour, 3 verification emails/hour)
+- **Multi-auth support**: Email/password, OAuth, or both
 - **CORS configuration** for frontend integration
 
 ### Argentina Compliance
@@ -279,6 +290,7 @@ The codebase is architected for easy vertical replication:
    - **Frontend**: http://localhost:5173
    - **Backend API**: http://localhost:3000
    - **API Documentation**: http://localhost:3000/docs
+   - **MailHog (Email Testing)**: http://localhost:8025
    - **pgAdmin**: http://localhost:8080 (admin@barberpro.com / admin)
    - **Redis Commander**: http://localhost:8081 (admin / admin)
 
@@ -304,6 +316,10 @@ This architecture supports rapid development while maintaining enterprise-grade 
 - PostgreSQL 15 (docker postgres:15-alpine), Redis 7 (docker redis:7-alpine) (001-docker-dev-hotreload)
 - TypeScript 5.9.2 with Node.js 24.6.0 (backend), TypeScript with SvelteKit/Vite (frontend) (002-registration-completion)
 - PostgreSQL 15 (primary database - existing), Redis 7 (session/token caching - existing, Docker environment) (002-registration-completion)
+- Google OAuth 2.0 (@fastify/oauth2 8.1.2), Nodemailer 6.9.9, MailHog (dev email testing) (002-registration-completion)
+- Email verification system with bcrypt token hashing, @fastify/rate-limit 10.3.0 (002-registration-completion)
+- JWT authentication with refresh tokens, @fastify/jwt 10.0.0, @fastify/cookie 10.0.0 (002-registration-completion)
 
 ## Recent Changes
 - 001-docker-dev-hotreload: Added TypeScript 5.9.2, Node.js 24.6.0 + Docker Compose 2.0+, Fastify 5.6.0, SvelteKit (Vite-based), Prisma 6.15.0, tsx 4.20.5 (hot reload)
+- 002-registration-completion: Added Google OAuth 2.0, email verification system, rate limiting, multi-auth support (email/password + OAuth), token cleanup cron job

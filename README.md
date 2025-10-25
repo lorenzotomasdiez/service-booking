@@ -4,19 +4,50 @@ A premium service booking platform designed for Argentina, starting with barber 
 
 ## 🚀 Quick Start
 
-```bash
-# Setup development environment
-npm run setup:dev
+### Option 1: Automated Setup (Recommended for First-Time Setup)
 
-# Start development servers
-npm run dev
+```bash
+# Run automated setup script
+./scripts/dev-setup.sh
+
+# This will:
+# - Check prerequisites (Docker, Docker Compose)
+# - Start all infrastructure (PostgreSQL, Redis, pgAdmin, Redis Commander)
+# - Run database migrations
+# - Seed initial data
+```
+
+### Option 2: Manual Setup with Make Commands
+
+```bash
+# 1. Check your system is ready
+make doctor
+
+# 2. Start the development environment
+make dev-infra-only    # Infrastructure only (postgres, redis, pgadmin, redis-commander)
+
+# 3. In separate terminals, start backend and frontend
+cd backend && npm run dev    # Terminal 1
+cd frontend && npm run dev   # Terminal 2
+```
+
+### Option 3: Full Docker-Based Development (Backend + Frontend in Docker)
+
+```bash
+# Start everything in Docker with hot reload enabled
+docker-compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
+
+# Or using make:
+make full
 ```
 
 **Access Points:**
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:3000
 - API Documentation: http://localhost:3000/docs
-- Database Studio: `npm run db:studio`
+- pgAdmin: http://localhost:8080 (admin@barberpro.com / admin123)
+- Redis Commander: http://localhost:8081 (admin / admin123)
+- Database Studio: `npm run db:studio` or `make db:studio`
 
 ## 🏗️ Architecture
 
@@ -80,6 +111,67 @@ npm run lint          # ESLint
 npm run typecheck     # TypeScript type checking
 npm test              # Run Jest tests
 npm run seed          # Seed database
+```
+
+## 🔄 Common Development Workflows
+
+### Workflow 1: Fresh Start with Automated Setup
+```bash
+# Best for: First-time setup on a new machine
+./scripts/dev-setup.sh          # Automated setup (~15 minutes)
+cd backend && npm run dev       # Terminal 1: Start backend
+cd frontend && npm run dev      # Terminal 2: Start frontend
+```
+
+### Workflow 2: Daily Development
+```bash
+# Best for: Normal development work
+make dev-infra-only             # Start infrastructure services
+cd backend && npm run dev       # Terminal 1: Start backend with hot reload
+cd frontend && npm run dev      # Terminal 2: Start frontend with HMR
+make logs                       # Terminal 3: Stream logs from all services
+```
+
+### Workflow 3: Full Docker-Based (Everything in Containers)
+```bash
+# Best for: Testing deployment-like environment or CI/CD simulation
+make full                       # Start everything in Docker
+# Or manually:
+docker-compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
+
+# Access:
+# - Frontend: http://localhost:5173
+# - Backend: http://localhost:3000
+# - API Docs: http://localhost:3000/docs
+```
+
+### Workflow 4: Database Management
+```bash
+# Reset database to clean state with seed data
+make db-reset                   # Drops and recreates database
+
+# View database with pgAdmin
+http://localhost:8080          # pgAdmin interface
+# Credentials: admin@barberpro.com / admin123
+
+# Inspect cache with Redis Commander
+http://localhost:8081          # Redis Commander interface
+```
+
+### Workflow 5: Debugging & Troubleshooting
+```bash
+# View all service logs with color coding
+make logs                       # Follow logs from all containers
+
+# Check system health
+make doctor                     # Run comprehensive diagnostics
+
+# Stop all services
+make down                       # Stop all containers
+
+# View specific service logs
+docker-compose -f docker/docker-compose.yml logs -f backend
+docker-compose -f docker/docker-compose.yml logs -f frontend
 ```
 
 ## 🇦🇷 Argentina-Specific Features

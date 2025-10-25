@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Button, Input, Card, Modal, Loading } from '$lib/components';
-	
+
+	// Hot reload test - this file changed to verify Vite HMR
 	let mounted = false;
 	let showModal = false;
 	let inputValue = '';

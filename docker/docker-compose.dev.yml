@@ -60,7 +60,7 @@ services:
   pgadmin:
     container_name: barberpro-pgadmin-dev
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@barberpro.local}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@barberpro.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
     healthcheck:
       # More frequent checks for faster development feedback

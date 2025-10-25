@@ -5,11 +5,18 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	server: {
 		port: 5173,
-		host: true,
+		host: '0.0.0.0', // Listen on all interfaces for Docker accessibility
 		// Allow connections from Docker containers
 		strictPort: false,
 		// Enable CORS for Docker networking
-		cors: true
+		cors: true,
+		// HMR configuration for hot module replacement in Docker
+		hmr: {
+			// Use localhost for HMR communication
+			protocol: 'ws',
+			host: 'localhost',
+			port: 5173
+		}
 	},
 	// Performance optimizations for Argentina mobile users
 	build: {

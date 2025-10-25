@@ -1,6 +1,7 @@
 import { startServer } from './app';
 
-// Handle graceful shutdown
+// Handle graceful shutdown - Hot reload test
+// This comment tests the hot reload functionality
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
   process.exit(0);

@@ -1,4 +1,10 @@
-FROM node:20-alpine
+# ============================================================================
+# BASE STAGE: Setup Node.js runtime and dependencies
+# ============================================================================
+FROM node:20-alpine AS base
+
+# Install build dependencies needed for native modules
+RUN apk add --no-cache python3 make g++ curl
 
 # Set working directory
 WORKDIR /app
@@ -9,14 +15,27 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
+# ============================================================================
+# DEVELOPMENT STAGE: Hot reload with tsx file watcher
+# ============================================================================
+FROM base AS development
+
+# Copy entrypoint script and make it executable
+COPY docker-entrypoint.sh ./
+RUN chmod +x ./docker-entrypoint.sh
+
 # Copy source code
 COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate
 
-# Expose port
+# Expose port for backend API
 EXPOSE 3000
 
-# Start development server
-CMD ["npm", "run", "dev"]
+# Health check: verify backend is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Start development server with hot reload via tsx watch
+ENTRYPOINT ["sh", "/app/docker-entrypoint.sh"]

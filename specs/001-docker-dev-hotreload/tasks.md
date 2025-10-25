@@ -71,12 +71,12 @@
 - [x] T019 [US1] [P] Add frontend service depends_on backend with condition: service_healthy
 - [x] T020 [US1] [P] Configure frontend service healthcheck with wget to http://localhost:5173, 30s interval, 30s start_period
 - [x] T021 [US1] Update Makefile to enhance existing dev-infra-only command with clear startup messages and service URLs
-- [ ] T022 [US1] Test backend hot reload: modify backend/src/server.ts, verify restart within 3 seconds
-- [ ] T023 [US1] Test frontend hot reload: modify frontend/src/routes/+page.svelte, verify browser refresh within 2 seconds
-- [ ] T024 [US1] Test data persistence: create database record, restart containers with `make down && make dev-infra-only`, verify data exists
+- [x] T022 [US1] Test backend hot reload: modify backend/src/server.ts, verify restart within 3 seconds
+- [x] T023 [US1] Test frontend hot reload: modify frontend/src/routes/+page.svelte, verify browser refresh within 2 seconds
+- [x] T024 [US1] Test data persistence: create database record, restart containers with `make down && make dev-infra-only`, verify data exists
 - [x] T025 [US4] Create scripts/dev-setup.sh automation script for first-time environment setup
 - [x] T026 [US4] Add error handling to scripts/dev-setup.sh with clear guidance for common issues (Docker not running, ports in use)
-- [ ] T027 [US4] Test first-time setup: run setup script on clean environment, measure time to running app (target <15 minutes)
+- [x] T027 [US4] Test first-time setup: run setup script on clean environment, measure time to running app (target <15 minutes)
 
 **Checkpoint**: At this point, User Stories 1 and 4 should be fully functional - developers can start environment and new developers can onboard easily
 
@@ -98,10 +98,10 @@
 - [x] T029 [US2] Test existing pgAdmin service is accessible at http://localhost:8080 after fixing email in .env
 - [x] T030 [US2] Test existing Redis Commander service is accessible at http://localhost:8081
 - [x] T031 [US2] Verify backend Swagger/OpenAPI documentation exists at http://localhost:3000/docs or add @fastify/swagger configuration
-- [ ] T032 [US2] Test log viewing: run `make logs`, verify color-coded output from all containers
-- [ ] T033 [US2] Test database inspection: access pgAdmin, connect to postgres, run queries on barberpro_dev database
-- [ ] T034 [US2] Test API documentation: access Swagger UI, test sample endpoints interactively
-- [ ] T035 [US2] Test Redis inspection: access Redis Commander, view cached keys and values
+- [x] T032 [US2] Test log viewing: run `make logs`, verify color-coded output from all containers
+- [x] T033 [US2] Test database inspection: access pgAdmin, connect to postgres, run queries on barberpro_dev database
+- [x] T034 [US2] Test API documentation: access Swagger UI, test sample endpoints interactively
+- [x] T035 [US2] Test Redis inspection: access Redis Commander, view cached keys and values
 
 **Checkpoint**: At this point, User Story 2 should be fully functional - developers have comprehensive debugging tools
 
@@ -122,9 +122,9 @@
 - [x] T036 [US3] Create or verify existing Makefile `db-reset` command calls Prisma migrate reset in backend
 - [x] T037 [US3] Ensure Makefile `db-reset` command checks if backend container is running, provides error if not
 - [x] T038 [US3] Add optional preservation flag to db-reset command to skip uploaded files deletion (document in Makefile help text)
-- [ ] T039 [US3] Test database reset: create test data, run `make db-reset`, verify clean state with seed data
-- [ ] T040 [US3] Test reset performance: measure time for database drop + migrations + seed, verify <30 seconds
-- [ ] T041 [US3] Test containers continue running: verify backend and frontend don't require restart after reset
+- [x] T039 [US3] Test database reset: create test data, run `make db-reset`, verify clean state with seed data
+- [x] T040 [US3] Test reset performance: measure time for database drop + migrations + seed, verify <30 seconds
+- [x] T041 [US3] Test containers continue running: verify backend and frontend don't require restart after reset
 
 **Checkpoint**: At this point, User Story 3 should be fully functional - developers can reset database easily
 
@@ -138,9 +138,9 @@
 - [x] T043 [P] Update root README.md with quick start pointing to docker/README.md and Makefile commands
 - [x] T044 [P] Add troubleshooting section to docker/README.md covering 6 common issues from quickstart.md
 - [x] T045 [P] Validate quickstart.md instructions match actual implementation
-- [ ] T046 Test cross-platform compatibility: verify environment works on macOS (already tested), document Linux/Windows considerations
-- [ ] T047 Performance validation: measure environment startup time (<5 min target), memory usage (<4GB target), hot reload times (<3s backend, <2s frontend)
-- [ ] T048 Run complete acceptance test: fresh clone → make dev-infra-only → backend hot reload test → frontend hot reload test → data persistence test → reset test
+- [x] T046 Test cross-platform compatibility: verify environment works on macOS (already tested), document Linux/Windows considerations
+- [x] T047 Performance validation: measure environment startup time (<5 min target), memory usage (<4GB target), hot reload times (<3s backend, <2s frontend)
+- [x] T048 Run complete acceptance test: fresh clone → make dev-infra-only → backend hot reload test → frontend hot reload test → data persistence test → reset test
 
 ---
 

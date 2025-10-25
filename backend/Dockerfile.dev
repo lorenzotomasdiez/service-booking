@@ -13,24 +13,22 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # ============================================================================
 # DEVELOPMENT STAGE: Hot reload with tsx file watcher
 # ============================================================================
 FROM base AS development
 
+# Copy entrypoint script and make it executable
+COPY docker-entrypoint.sh ./
+RUN chmod +x ./docker-entrypoint.sh
+
 # Copy source code
 COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate
-
-# Copy entrypoint script
-COPY docker-entrypoint.sh /app/
-
-# Make entrypoint script executable
-RUN chmod +x /app/docker-entrypoint.sh
 
 # Expose port for backend API
 EXPOSE 3000
@@ -40,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Start development server with hot reload via tsx watch
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+ENTRYPOINT ["sh", "/app/docker-entrypoint.sh"]

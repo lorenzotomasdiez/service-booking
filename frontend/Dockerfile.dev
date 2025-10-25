@@ -13,7 +13,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # ============================================================================
 # DEVELOPMENT STAGE: Hot reload with Vite HMR

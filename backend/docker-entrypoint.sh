@@ -6,7 +6,7 @@ echo "🚀 Starting BarberPro Backend in Docker..."
 
 # Run Prisma migrations
 echo "📦 Running database migrations..."
-npx prisma migrate deploy --skip-generate
+npx prisma migrate deploy
 
 echo "✅ Migrations complete"
 

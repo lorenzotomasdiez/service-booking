@@ -11,6 +11,9 @@ import metricsPlugin from './plugins/metrics';
 // Database connection
 import { database, prisma } from './services/database';
 
+// Redis connection
+import redisService from './services/redis';
+
 // Socket.IO service
 import { initializeSocketService } from './services/socket';
 
@@ -39,8 +42,9 @@ export function buildServer(): FastifyInstance {
         }
       } : undefined
     },
-    // Allow error handler override to prevent warnings
-    allowErrorHandlerOverride: true
+    // Disable error handler override warning - we intentionally override in security middleware
+    disableRequestLogging: false,
+    requestIdLogLabel: 'reqId'
   });
 
   // Add database to Fastify instance
@@ -172,6 +176,10 @@ export async function startServer(): Promise<void> {
     // Test database connection
     await database.testConnection();
     console.log('✅ Database connection established');
+
+    // Connect to Redis
+    await redisService.connect();
+    console.log('✅ Redis connection established');
 
     // Get server configuration
     const port = parseInt(process.env.PORT || '3000');

@@ -28,88 +28,72 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-### Root Level (Workspace Management)
+### Quick Start (Everything in Docker)
 ```bash
-# Development (runs both frontend and backend)
-npm run dev
+# Start all services (postgres, redis, backend, frontend, admin tools)
+npm start              # or: make up
 
-# Build entire project
-npm run build
+# Stop all services
+npm stop               # or: make down
 
-# Run tests across all projects
-npm test
+# View logs
+npm run logs           # or: make logs
 
-# Database operations
+# Check service status
+npm run status         # or: make status
+```
+
+### Setup (First Time)
+```bash
+# Complete setup (installs dependencies, starts Docker, runs migrations)
+npm run setup
+
+# Or manual setup:
+npm run install:all    # Install all dependencies
+npm start              # Start all Docker services (auto-generates .env files)
+npm run db:migrate     # Run database migrations
+npm run db:seed        # Seed database with test data
+```
+
+### Database Operations
+```bash
 npm run db:generate    # Generate Prisma client
 npm run db:migrate     # Run database migrations
 npm run db:studio      # Open Prisma Studio
 npm run db:seed        # Seed database with test data
-
-# Docker operations
-npm run docker:up      # Start postgres and redis containers
-npm run docker:dev     # Start dev dependencies only
-
-# Setup commands
-npm run setup:dev      # Full dev environment setup
-npm run install:all    # Install all dependencies
+npm run db:reset       # Reset database (drop + migrate + seed)
 ```
 
-### Frontend (SvelteKit)
+### Testing (TDD Workflow)
 ```bash
-cd frontend
-
-# Development
-npm run dev            # Start development server (port 5173)
-npm run build          # Build for production
-npm run preview        # Preview production build
-
-# Quality checks
-npm run check          # Svelte type checking
-npm run check:watch    # Watch mode type checking
-npm run lint           # ESLint
-npm run lint:fix       # Auto-fix linting issues
-
-# Testing
-npm test               # Run Vitest tests
-npm run test:watch     # Watch mode testing
-npm run test:coverage  # Generate coverage report
+npm test               # Run all tests
+npm run test:watch     # Run tests in watch mode (for TDD)
+npm run test:backend   # Run backend tests only
+npm run test:frontend  # Run frontend tests only
+npm run test:coverage  # Generate coverage reports
 ```
 
-### Backend (Fastify)
+### Advanced Commands (Makefile)
+For more advanced operations, use `make` commands directly:
 ```bash
-cd backend
+make help              # Show all available commands
+make doctor            # Check system requirements
+make clean             # Remove all containers and volumes
+make mocks             # Start Argentina mock services (MercadoPago, AFIP, etc.)
+```
 
-# Development
-npm run dev            # Start with tsx watch (port 3000)
-npm run build          # Compile TypeScript
-npm start              # Run compiled JavaScript
+### Code Quality
+```bash
+npm run lint           # Lint backend and frontend
+npm run lint:backend   # Lint backend only
+npm run lint:frontend  # Lint frontend only
+```
 
-# Quality checks
-npm run lint           # ESLint
-npm run lint:fix       # Auto-fix linting issues
-npm run typecheck      # TypeScript type checking
-npm run format:check   # Prettier format check
-npm run format:fix     # Auto-fix formatting
-
-# Testing
-npm test               # Run Jest tests
-npm run test:watch     # Watch mode testing
-npm run test:coverage  # Generate coverage report
-npm run test:unit      # Unit tests only
-npm run test:integration  # Integration tests only
-npm run test:e2e       # End-to-end tests
-
-# Database
-npm run seed           # Seed database
-npm run db:reset       # Reset and reseed database
-npm run db:migrate     # Run Prisma migrations
-npm run db:generate    # Generate Prisma client
-npm run db:studio      # Open Prisma Studio
-
-# Performance & Monitoring
-npm run performance:test    # Run Artillery load tests
-npm run security:audit      # Security audit
-npm run monitoring:start    # Start monitoring stack
+### Build (Production)
+```bash
+npm run build          # Build backend and frontend
+npm run build:backend  # Build backend only
+npm run build:frontend # Build frontend only
 ```
 
 ## Technology Stack Details
@@ -274,27 +258,43 @@ The codebase is architected for easy vertical replication:
 
 ## Quick Start for New Contributors
 
-1. **Setup development environment**:
+1. **Setup development environment** (first time only):
    ```bash
-   npm run setup:dev
+   npm run setup
    ```
+   This will:
+   - Install all dependencies
+   - Start all Docker services (auto-generates .env files with dummy data)
+   - Run database migrations
 
-2. **Start development servers**:
+2. **Daily workflow**:
    ```bash
-   npm run dev
+   npm start          # Start all services in Docker
+   npm run logs       # View logs (Ctrl+C to exit)
+   npm test           # Run tests
+   npm stop           # Stop all services when done
    ```
 
 3. **Access applications**:
-   - Frontend: http://localhost:5173
-   - Backend API: http://localhost:3000
-   - API Documentation: http://localhost:3000/docs
-   - Database Studio: `npm run db:studio`
+   - **Frontend**: http://localhost:5173
+   - **Backend API**: http://localhost:3000
+   - **API Documentation**: http://localhost:3000/docs
+   - **pgAdmin**: http://localhost:8080 (admin@barberpro.com / admin)
+   - **Redis Commander**: http://localhost:8081 (admin / admin)
 
-4. **Run quality checks before committing**:
+4. **TDD Workflow**:
    ```bash
-   npm run lint
-   npm run typecheck  # Backend only
-   npm test
+   npm run test:watch  # Run tests in watch mode
+   npm run lint        # Lint code
+   npm test            # Run all tests before committing
+   ```
+
+5. **Troubleshooting**:
+   ```bash
+   make doctor         # Check system requirements
+   make status         # Check service health
+   npm run db:reset    # Reset database if needed
+   make clean          # Nuclear option: remove everything and start fresh
    ```
 
 This architecture supports rapid development while maintaining enterprise-grade quality and Argentina market optimization.

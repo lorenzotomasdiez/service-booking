@@ -293,7 +293,12 @@ check-ports:
 
 ##@ Lifecycle Management
 
-up: check-docker check-ports ## Start all services (base + dev + mocks)
+up: check-docker check-ports ## Start all Docker services (postgres, redis, backend, frontend, admin tools)
+	@# Generate .env files if they don't exist
+	@if [ ! -f .env ] || [ ! -f backend/.env ] || [ ! -f frontend/.env ]; then \
+	    echo "$(CYAN)[$(ARROW)]$(RESET) Generating .env files..."; \
+	    ./scripts/generate-env.sh; \
+	fi
 	@START_TIME=$$(date +%s); \
 	if [ -f docker/configs/banner.txt ]; then \
 	    echo "$(CYAN)"; \
@@ -302,38 +307,47 @@ up: check-docker check-ports ## Start all services (base + dev + mocks)
 	fi; \
 	echo "$(CYAN)[$(ARROW)]$(RESET) Starting BarberPro Development Environment..."; \
 	echo ""; \
-	echo "$(CYAN)[$(ARROW)]$(RESET) Starting services with:"; \
-	echo "  - Base infrastructure (PostgreSQL, Redis, Admin tools)"; \
-	echo "  - Argentina service mocks"; \
+	echo "$(CYAN)[$(ARROW)]$(RESET) Starting all services in Docker:"; \
+	echo "  - PostgreSQL (database)"; \
+	echo "  - Redis (cache)"; \
+	echo "  - pgAdmin (database admin)"; \
+	echo "  - Redis Commander (cache admin)"; \
+	echo "  - Backend API (with hot reload)"; \
+	echo "  - Frontend (with hot reload)"; \
 	echo ""; \
-	$(DOCKER_COMPOSE) $(COMPOSE_MOCKS) up -d || \
+	$(DOCKER_COMPOSE) $(COMPOSE_DEV) up -d || \
 	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start services" && \
 	     echo "$(YELLOW)[$(INFO)]$(RESET) Try running 'make doctor' to diagnose issues" && exit 1); \
 	echo ""; \
 	echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."; \
-	sleep 3; \
+	sleep 5; \
 	echo ""; \
 	END_TIME=$$(date +%s); \
 	DURATION=$$((END_TIME - START_TIME)); \
-	echo "$(GREEN)[$(CHECK)]$(RESET) Services started successfully! (completed in $${DURATION}s)"; \
+	echo "$(GREEN)[$(CHECK)]$(RESET) All services started successfully! (completed in $${DURATION}s)"; \
 	echo ""; \
-	echo "$(BLUE)Services available at:$(RESET)"; \
+	echo "$(BLUE)Application:$(RESET)"; \
+	echo "  $(CYAN)Frontend:$(RESET)       http://localhost:5173"; \
+	echo "  $(CYAN)Backend API:$(RESET)    http://localhost:3000"; \
+	echo "  $(CYAN)API Docs:$(RESET)       http://localhost:3000/docs"; \
+	echo ""; \
+	echo "$(BLUE)Admin Tools:$(RESET)"; \
 	echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"; \
-	echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"; \
+	echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080 (admin@barberpro.com / admin)"; \
 	echo "  $(CYAN)Redis:$(RESET)          localhost:6379"; \
-	echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"; \
+	echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081 (admin / admin)"; \
 	echo ""; \
-	echo "$(YELLOW)Next steps:$(RESET)"; \
-	echo "  - Start backend:  $(CYAN)cd backend && npm run dev$(RESET)"; \
-	echo "  - Start frontend: $(CYAN)cd frontend && npm run dev$(RESET)"; \
+	echo "$(YELLOW)Useful commands:$(RESET)"; \
 	echo "  - View logs:      $(CYAN)make logs$(RESET)"; \
 	echo "  - Check status:   $(CYAN)make status$(RESET)"; \
+	echo "  - Run tests:      $(CYAN)make test$(RESET)"; \
+	echo "  - Stop all:       $(CYAN)make down$(RESET)"; \
 	echo ""
 
 down: ## Stop all services gracefully
 	@START_TIME=$$(date +%s); \
 	echo "$(CYAN)[$(ARROW)]$(RESET) Stopping all services..."; \
-	$(DOCKER_COMPOSE) $(COMPOSE_FULL) down || \
+	$(DOCKER_COMPOSE) $(COMPOSE_DEV) down || \
 	    (echo "$(YELLOW)[$(WARN)]$(RESET) Some services may not be running" && exit 0); \
 	END_TIME=$$(date +%s); \
 	DURATION=$$((END_TIME - START_TIME)); \
@@ -399,111 +413,25 @@ clean: ## Remove all containers, volumes, and networks
 # Stream B: Environment-specific startup commands
 # Choose which services to run based on your development needs
 
-##@ Environment Variants
+##@ Environment Variants (Advanced - Use 'make up' for standard development)
 
-dev: check-docker check-ports ## Start development environment only (postgres, redis, admin tools)
-	@if [ -f docker/configs/banner.txt ]; then \
-	    echo "$(CYAN)"; \
-	    cat docker/configs/banner.txt; \
-	    echo "$(RESET)"; \
-	fi
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Development Environment..."
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting services:"
-	@echo "  - PostgreSQL (database)"
-	@echo "  - Redis (cache)"
-	@echo "  - pgAdmin (database management)"
-	@echo "  - Redis Commander (cache management)"
-	@echo ""
-	@$(DOCKER_COMPOSE) $(COMPOSE_BASE) up -d || \
-	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start development services" && exit 1)
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."
-	@sleep 3
-	@echo ""
-	@echo "$(GREEN)[$(CHECK)]$(RESET) Development environment ready!"
-	@echo ""
-	@echo "$(BLUE)Services available at:$(RESET)"
-	@echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"
-	@echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"
-	@echo "  $(CYAN)Redis:$(RESET)          localhost:6379"
-	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
-	@echo ""
-	@echo "$(YELLOW)This is a minimal setup. For full environment, use:$(RESET) $(CYAN)make full$(RESET)"
+# DEPRECATED: Use 'make up' instead - it now starts all services in Docker
+dev: ## DEPRECATED: Use 'make up' instead
+	@echo "$(YELLOW)[!]$(RESET) This command is deprecated."
+	@echo "$(YELLOW)[!]$(RESET) Use $(CYAN)make up$(RESET) to start all Docker services (backend, frontend, database, etc.)"
 	@echo ""
 
-dev-infra-only: check-docker check-ports ## Infrastructure ONLY (postgres, redis, admin tools) - NO backend/frontend containers
-	@if [ -f docker/configs/banner.txt ]; then \
-	    echo "$(CYAN)"; \
-	    cat docker/configs/banner.txt; \
-	    echo "$(RESET)"; \
-	fi
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Infrastructure ONLY (no backend/frontend containers)..."
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting infrastructure services:"
-	@echo "  - PostgreSQL (database)"
-	@echo "  - Redis (cache)"
-	@echo "  - pgAdmin (database management)"
-	@echo "  - Redis Commander (cache management)"
-	@echo ""
-	@echo "$(YELLOW)[$(INFO)]$(RESET) Backend and Frontend will NOT run in Docker"
-	@echo "$(YELLOW)[$(INFO)]$(RESET) You should run them separately with npm:"
-	@echo "  $(CYAN)Terminal 1:$(RESET) cd backend && npm run dev"
-	@echo "  $(CYAN)Terminal 2:$(RESET) cd frontend && npm run dev"
-	@echo ""
-	@$(DOCKER_COMPOSE) $(COMPOSE_BASE) up -d || \
-	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start infrastructure services" && exit 1)
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."
-	@sleep 3
-	@echo ""
-	@echo "$(GREEN)[$(CHECK)]$(RESET) Infrastructure ready!"
-	@echo ""
-	@echo "$(BLUE)Services available at:$(RESET)"
-	@echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"
-	@echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"
-	@echo "  $(CYAN)Redis:$(RESET)          localhost:6379"
-	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
-	@echo ""
-	@echo "$(YELLOW)Next steps:$(RESET)"
-	@echo "  1. Start backend:  $(CYAN)cd backend && npm run dev$(RESET)"
-	@echo "  2. Start frontend: $(CYAN)cd frontend && npm run dev$(RESET)"
-	@echo "  3. Visit app:      $(CYAN)http://localhost:5173$(RESET)"
-	@echo ""
-	@echo "$(BLUE)Alternative:$(RESET) To run everything in Docker, use: $(CYAN)make up$(RESET)"
+# DEPRECATED: Use 'make up' instead
+dev-infra-only: ## DEPRECATED: Use 'make up' instead
+	@echo "$(YELLOW)[!]$(RESET) This command is deprecated."
+	@echo "$(YELLOW)[!]$(RESET) Use $(CYAN)make up$(RESET) to start all Docker services (backend, frontend, database, etc.)"
 	@echo ""
 
-full: check-docker check-ports ## Start everything (dev + monitoring + mocks)
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting Full Environment..."
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting all services:"
-	@echo "  - Base infrastructure (PostgreSQL, Redis, Admin tools)"
-	@echo "  - Monitoring stack (Prometheus, Grafana, Loki)"
-	@echo "  - Argentina service mocks (MercadoPago, AFIP, WhatsApp)"
-	@echo ""
-	@$(DOCKER_COMPOSE) $(COMPOSE_FULL) up -d || \
-	    (echo "$(RED)[$(CROSS)]$(RESET) Failed to start full environment" && exit 1)
-	@echo ""
-	@echo "$(CYAN)[$(ARROW)]$(RESET) Waiting for services to be healthy..."
-	@sleep 5
-	@echo ""
-	@echo "$(GREEN)[$(CHECK)]$(RESET) Full environment ready!"
-	@echo ""
-	@echo "$(BLUE)Core Services:$(RESET)"
-	@echo "  $(CYAN)PostgreSQL:$(RESET)     localhost:5432"
-	@echo "  $(CYAN)pgAdmin:$(RESET)        http://localhost:8080"
-	@echo "  $(CYAN)Redis:$(RESET)          localhost:6379"
-	@echo "  $(CYAN)Redis Commander:$(RESET) http://localhost:8081"
-	@echo ""
-	@echo "$(BLUE)Monitoring (when implemented):$(RESET)"
-	@echo "  $(CYAN)Prometheus:$(RESET)     http://localhost:9090"
-	@echo "  $(CYAN)Grafana:$(RESET)        http://localhost:3001"
-	@echo "  $(CYAN)Loki:$(RESET)           http://localhost:3100"
-	@echo ""
-	@echo "$(BLUE)Argentina Mocks (when implemented):$(RESET)"
-	@echo "  $(CYAN)MercadoPago:$(RESET)    http://localhost:8081"
-	@echo "  $(CYAN)AFIP:$(RESET)           http://localhost:8082"
-	@echo "  $(CYAN)WhatsApp:$(RESET)       http://localhost:8083"
+# DEPRECATED: Use 'make up' + 'make mocks' instead
+full: ## DEPRECATED: Use 'make up' for main services, 'make mocks' for Argentina mocks
+	@echo "$(YELLOW)[!]$(RESET) This command is deprecated."
+	@echo "$(YELLOW)[!]$(RESET) Use $(CYAN)make up$(RESET) for main services"
+	@echo "$(YELLOW)[!]$(RESET) Use $(CYAN)make mocks$(RESET) for Argentina mock services (MercadoPago, AFIP, WhatsApp)"
 	@echo ""
 
 monitoring: check-docker ## Start monitoring stack
@@ -988,12 +916,49 @@ validate: ## Validate all docker-compose files
 	fi
 
 # ============================================================
-# INTEGRATION TESTING
+# TESTING (TDD Workflow)
 # ============================================================
-# Issue #9 Stream D: Integration test scripts
-# Commands for testing the entire Docker environment end-to-end
+# Essential test commands for Test-Driven Development
 
-##@ Integration Testing
+##@ Testing
+
+test: ## Run all tests (backend + frontend)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running all tests..."
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running backend tests..."
+	@cd backend && npm test || (echo "$(RED)[$(CROSS)]$(RESET) Backend tests failed" && exit 1)
+	@echo ""
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running frontend tests..."
+	@cd frontend && npm test || (echo "$(RED)[$(CROSS)]$(RESET) Frontend tests failed" && exit 1)
+	@echo ""
+	@echo "$(GREEN)[$(CHECK)]$(RESET) All tests passed!"
+
+test-watch: ## Run tests in watch mode (for TDD)
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Starting tests in watch mode..."
+	@echo "$(YELLOW)[$(INFO)]$(RESET) Press 'q' to quit watch mode"
+	@echo ""
+	@cd backend && npm run test:watch
+
+test-backend: ## Run backend tests only
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running backend tests..."
+	@cd backend && npm test
+
+test-frontend: ## Run frontend tests only
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Running frontend tests..."
+	@cd frontend && npm test
+
+test-coverage: ## Generate test coverage report
+	@echo "$(CYAN)[$(ARROW)]$(RESET) Generating coverage report..."
+	@cd backend && npm run test:coverage
+	@cd frontend && npm run test:coverage
+	@echo "$(GREEN)[$(CHECK)]$(RESET) Coverage reports generated"
+
+# ============================================================
+# INTEGRATION TESTING (Advanced)
+# ============================================================
+# Full integration test scripts - run after TDD unit tests pass
+
+##@ Integration Testing (Advanced)
 
 test-integration: ## Run full integration test suite
 	@echo "$(CYAN)[$(ARROW)]$(RESET) Running full integration test suite..."

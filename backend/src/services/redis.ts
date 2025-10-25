@@ -6,12 +6,28 @@ class RedisService {
 
   constructor() {
     this.client = createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379'
+      url: process.env.REDIS_URL || 'redis://localhost:6379',
+      socket: {
+        reconnectStrategy: (retries) => {
+          if (retries > 10) {
+            console.error('Redis: Too many reconnection attempts, giving up');
+            return new Error('Too many reconnection attempts');
+          }
+          // Exponential backoff: wait 100ms * 2^retries
+          const delay = Math.min(100 * Math.pow(2, retries), 3000);
+          console.log(`Redis: Reconnecting in ${delay}ms (attempt ${retries})`);
+          return delay;
+        }
+      }
     });
 
+    // Handle errors gracefully to prevent process crash
+    // This catches all error events including socket errors
     this.client.on('error', (err) => {
-      console.error('Redis Client Error:', err);
+      console.error('Redis Client Error:', err.message || err);
+      // Mark as disconnected but don't crash the process
       this.isConnected = false;
+      // Error is now handled, won't crash Node.js
     });
 
     this.client.on('connect', () => {
@@ -19,8 +35,18 @@ class RedisService {
       this.isConnected = true;
     });
 
+    this.client.on('ready', () => {
+      console.log('✅ Redis ready to accept commands');
+      this.isConnected = true;
+    });
+
+    this.client.on('reconnecting', () => {
+      console.log('🔄 Redis reconnecting...');
+      this.isConnected = false;
+    });
+
     this.client.on('disconnect', () => {
-      console.log('Redis disconnected');
+      console.log('⚠️  Redis disconnected');
       this.isConnected = false;
     });
   }

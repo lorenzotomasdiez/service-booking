@@ -1,4 +1,10 @@
-FROM node:20-alpine
+# ============================================================================
+# BASE STAGE: Setup Node.js runtime and dependencies
+# ============================================================================
+FROM node:20-alpine AS base
+
+# Install curl for health checks
+RUN apk add --no-cache curl
 
 # Set working directory
 WORKDIR /app
@@ -7,13 +13,24 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci
+
+# ============================================================================
+# DEVELOPMENT STAGE: Hot reload with Vite HMR
+# ============================================================================
+FROM base AS development
 
 # Copy source code
 COPY . .
 
-# Expose port
+# Expose port for frontend dev server
 EXPOSE 5173
 
-# Start development server
+# Health check: verify frontend is responding
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:5173 || exit 1
+
+# Start development server with HMR enabled
+# HOST=0.0.0.0 allows connections from outside the container
+# Vite will automatically reload on file changes
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

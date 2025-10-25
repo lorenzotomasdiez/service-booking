@@ -205,30 +205,35 @@ export function responseFormatMiddleware(server: FastifyInstance): void {
     reply.header('X-Response-Time', Date.now() - (request.startTime || Date.now()));
     reply.header('X-API-Version', '1.0.0');
     reply.header('X-Country', 'AR');
-    
+
     // Don't modify error responses or non-JSON responses
     const contentType = reply.getHeader('content-type');
     if (reply.statusCode >= 400 || !(typeof contentType === 'string' && contentType.includes('application/json'))) {
       return payload;
     }
-    
+
+    // Exclude Swagger/OpenAPI schema endpoints from wrapping
+    if (request.url.includes('/docs/json') || request.url.includes('/swagger') || request.url.includes('openapi')) {
+      return payload;
+    }
+
     // Wrap successful responses in a standard format
     if (typeof payload === 'string') {
       try {
         const data = JSON.parse(payload);
-        
+
         // If it's already in our format, don't wrap again
         if (data.success !== undefined || data.error !== undefined) {
           return payload;
         }
-        
+
         const wrappedResponse = {
           success: true,
           data: data,
           timestamp: new Date().toISOString(),
           statusCode: reply.statusCode
         };
-        
+
         return JSON.stringify(wrappedResponse);
       } catch (e) {
         // If it's not JSON, return as-is

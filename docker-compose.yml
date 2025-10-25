@@ -133,6 +133,17 @@ services:
       - barberpro-network
     restart: unless-stopped
 
+  # MailHog - Email Testing Service
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: barberpro-mailhog
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - barberpro-network
+    restart: unless-stopped
+
 volumes:
   postgres_data:
     driver: local

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verifica tu email - BarberPro</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+        'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .email-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #ffffff;
+      padding: 40px 30px;
+      text-align: center;
+    }
+
+    .email-header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .email-body {
+      padding: 40px 30px;
+    }
+
+    .email-body h2 {
+      color: #333;
+      font-size: 20px;
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+
+    .email-body p {
+      margin: 15px 0;
+      color: #555;
+    }
+
+    .verification-code-box {
+      background-color: #f8f9fa;
+      border: 2px solid #667eea;
+      border-radius: 6px;
+      padding: 20px;
+      text-align: center;
+      margin: 30px 0;
+    }
+
+    .verification-code {
+      font-family: 'Courier New', monospace;
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+      letter-spacing: 4px;
+      word-break: break-all;
+    }
+
+    .verification-link-box {
+      text-align: center;
+      margin: 30px 0;
+    }
+
+    .verification-button {
+      display: inline-block;
+      background-color: #667eea;
+      color: #ffffff;
+      padding: 14px 32px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+
+    .verification-button:hover {
+      background-color: #764ba2;
+    }
+
+    .email-footer {
+      background-color: #f8f9fa;
+      padding: 30px;
+      text-align: center;
+      font-size: 12px;
+      color: #777;
+      border-top: 1px solid #eee;
+    }
+
+    .email-footer p {
+      margin: 8px 0;
+    }
+
+    .warning-box {
+      background-color: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+      color: #856404;
+    }
+
+    .warning-box p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .divider {
+      border: 0;
+      border-top: 1px solid #eee;
+      margin: 30px 0;
+    }
+
+    .support-text {
+      font-size: 13px;
+      color: #999;
+      text-align: center;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <!-- Header -->
+    <div class="email-header">
+      <h1>¡Bienvenido a BarberPro!</h1>
+    </div>
+
+    <!-- Body -->
+    <div class="email-body">
+      <h2>Verifica tu dirección de email</h2>
+
+      <p>Hola {{userName}},</p>
+
+      <p>
+        Gracias por registrarte en <strong>BarberPro</strong>. Para completar tu registro y comenzar a reservar tus
+        servicios favoritos, necesitamos que verifiques tu dirección de email.
+      </p>
+
+      <div class="verification-link-box">
+        <p>Haz clic en el siguiente botón para verificar tu email:</p>
+        <a href="{{verificationLink}}" class="verification-button">Verificar Email</a>
+      </div>
+
+      <div class="divider"></div>
+
+      <p style="font-size: 14px; color: #999;">O usa este código de verificación:</p>
+
+      <div class="verification-code-box">
+        <div class="verification-code">{{verificationToken}}</div>
+      </div>
+
+      <div class="warning-box">
+        <p>
+          <strong>⏰ Nota importante:</strong> Este enlace de verificación expira en <strong>24 horas</strong>. Si no lo
+          usas antes de ese tiempo, deberás solicitar un nuevo email de verificación.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <p>Si no creaste una cuenta en BarberPro, puedes ignorar este email de forma segura.</p>
+
+      <p>
+        Si tienes problemas para verificar tu email,
+        <a href="{{resendLink}}" style="color: #667eea; text-decoration: none;">haz clic aquí para resolicitar el email</a
+        >.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="email-footer">
+      <p><strong>BarberPro</strong> - Reserva tu corte favorito en Argentina</p>
+      <p>© {{currentYear}} BarberPro. Todos los derechos reservados.</p>
+
+      <div class="support-text">
+        <p>¿Preguntas? Contáctanos en <a href="mailto:soporte@barberpro.com.ar" style="color: #667eea; text-decoration: none;">soporte@barberpro.com.ar</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

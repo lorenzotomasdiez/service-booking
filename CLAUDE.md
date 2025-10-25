@@ -302,6 +302,8 @@ This architecture supports rapid development while maintaining enterprise-grade 
 ## Active Technologies
 - TypeScript 5.9.2, Node.js 24.6.0 + Docker Compose 2.0+, Fastify 5.6.0, SvelteKit (Vite-based), Prisma 6.15.0, tsx 4.20.5 (hot reload) (001-docker-dev-hotreload)
 - PostgreSQL 15 (docker postgres:15-alpine), Redis 7 (docker redis:7-alpine) (001-docker-dev-hotreload)
+- TypeScript 5.9.2 with Node.js 24.6.0 (backend), TypeScript with SvelteKit/Vite (frontend) (002-registration-completion)
+- PostgreSQL 15 (primary database - existing), Redis 7 (session/token caching - existing, Docker environment) (002-registration-completion)
 
 ## Recent Changes
 - 001-docker-dev-hotreload: Added TypeScript 5.9.2, Node.js 24.6.0 + Docker Compose 2.0+, Fastify 5.6.0, SvelteKit (Vite-based), Prisma 6.15.0, tsx 4.20.5 (hot reload)

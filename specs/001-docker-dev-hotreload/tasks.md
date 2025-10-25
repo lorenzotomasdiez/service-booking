@@ -23,9 +23,9 @@
 
 **Purpose**: Basic Docker development infrastructure setup
 
-- [ ] T001 Fix pgAdmin email validation error in .env (change `PGADMIN_DEFAULT_EMAIL=admin@barberpro.local` to `admin@barberpro.com`)
-- [ ] T002 [P] Create backend/.dockerignore excluding node_modules, dist, .git, .env*, *.log, coverage/, .DS_Store
-- [ ] T003 [P] Create frontend/.dockerignore excluding node_modules, build, .svelte-kit, .git, .env*, *.log, coverage/, .DS_Store
+- [x] T001 Fix pgAdmin email validation error in .env (change `PGADMIN_DEFAULT_EMAIL=admin@barberpro.local` to `admin@barberpro.com`)
+- [x] T002 [P] Create backend/.dockerignore excluding node_modules, dist, .git, .env*, *.log, coverage/, .DS_Store
+- [x] T003 [P] Create frontend/.dockerignore excluding node_modules, build, .svelte-kit, .git, .env*, *.log, coverage/, .DS_Store
 
 ---
 
@@ -35,15 +35,15 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Create backend/Dockerfile.dev with Node 20 alpine base stage
-- [ ] T005 Add backend/Dockerfile.dev development stage with tsx watch mode for hot reload
-- [ ] T006 [P] Create frontend/Dockerfile.dev with Node 20 alpine base stage
-- [ ] T007 [P] Add frontend/Dockerfile.dev development stage with Vite dev server
-- [ ] T008 Create backend/docker-entrypoint.sh script for Prisma migration on startup
-- [ ] T009 Make backend/docker-entrypoint.sh executable and configure Dockerfile.dev to use it
-- [ ] T010 Verify backend health endpoint exists at src/app.ts or create /api/health route
-- [ ] T011 Update frontend/vite.config.ts to set server.host to '0.0.0.0' for Docker access
-- [ ] T012 Update frontend/vite.config.ts to enable HMR with clientPort 5173
+- [x] T004 Create backend/Dockerfile.dev with Node 20 alpine base stage
+- [x] T005 Add backend/Dockerfile.dev development stage with tsx watch mode for hot reload
+- [x] T006 [P] Create frontend/Dockerfile.dev with Node 20 alpine base stage
+- [x] T007 [P] Add frontend/Dockerfile.dev development stage with Vite dev server
+- [x] T008 Create backend/docker-entrypoint.sh script for Prisma migration on startup
+- [x] T009 Make backend/docker-entrypoint.sh executable and configure Dockerfile.dev to use it
+- [x] T010 Verify backend health endpoint exists at src/app.ts or create /api/health route
+- [x] T011 Update frontend/vite.config.ts to set server.host to '0.0.0.0' for Docker access
+- [x] T012 Update frontend/vite.config.ts to enable HMR with clientPort 5173
 
 **Checkpoint**: Foundation ready - Docker images can now be built and services configured
 
@@ -62,20 +62,20 @@
 
 ### Implementation for User Story 1 & 4
 
-- [ ] T013 [US1] Update docker/docker-compose.dev.yml to add backend service with build context, Dockerfile.dev, environment overrides (DATABASE_URL, REDIS_URL)
-- [ ] T014 [US1] Configure backend service in docker-compose.dev.yml with bind mount (../backend:/app), anonymous volumes (/app/node_modules, /app/dist)
-- [ ] T015 [US1] Add backend service depends_on postgres and redis with condition: service_healthy
-- [ ] T016 [US1] Configure backend service healthcheck with wget to http://localhost:3000/api/health, 30s interval, 60s start_period
-- [ ] T017 [US1] [P] Add frontend service to docker-compose.dev.yml with build context, Dockerfile.dev
-- [ ] T018 [US1] [P] Configure frontend service with bind mount (../frontend:/app), anonymous volumes (/app/node_modules, /app/.svelte-kit, /app/build)
-- [ ] T019 [US1] [P] Add frontend service depends_on backend with condition: service_healthy
-- [ ] T020 [US1] [P] Configure frontend service healthcheck with wget to http://localhost:5173, 30s interval, 30s start_period
-- [ ] T021 [US1] Update Makefile to enhance existing dev-infra-only command with clear startup messages and service URLs
+- [x] T013 [US1] Update docker/docker-compose.dev.yml to add backend service with build context, Dockerfile.dev, environment overrides (DATABASE_URL, REDIS_URL)
+- [x] T014 [US1] Configure backend service in docker-compose.dev.yml with bind mount (../backend:/app), anonymous volumes (/app/node_modules, /app/dist)
+- [x] T015 [US1] Add backend service depends_on postgres and redis with condition: service_healthy
+- [x] T016 [US1] Configure backend service healthcheck with wget to http://localhost:3000/api/health, 30s interval, 60s start_period
+- [x] T017 [US1] [P] Add frontend service to docker-compose.dev.yml with build context, Dockerfile.dev
+- [x] T018 [US1] [P] Configure frontend service with bind mount (../frontend:/app), anonymous volumes (/app/node_modules, /app/.svelte-kit, /app/build)
+- [x] T019 [US1] [P] Add frontend service depends_on backend with condition: service_healthy
+- [x] T020 [US1] [P] Configure frontend service healthcheck with wget to http://localhost:5173, 30s interval, 30s start_period
+- [x] T021 [US1] Update Makefile to enhance existing dev-infra-only command with clear startup messages and service URLs
 - [ ] T022 [US1] Test backend hot reload: modify backend/src/server.ts, verify restart within 3 seconds
 - [ ] T023 [US1] Test frontend hot reload: modify frontend/src/routes/+page.svelte, verify browser refresh within 2 seconds
 - [ ] T024 [US1] Test data persistence: create database record, restart containers with `make down && make dev-infra-only`, verify data exists
-- [ ] T025 [US4] Create scripts/dev-setup.sh automation script for first-time environment setup
-- [ ] T026 [US4] Add error handling to scripts/dev-setup.sh with clear guidance for common issues (Docker not running, ports in use)
+- [x] T025 [US4] Create scripts/dev-setup.sh automation script for first-time environment setup
+- [x] T026 [US4] Add error handling to scripts/dev-setup.sh with clear guidance for common issues (Docker not running, ports in use)
 - [ ] T027 [US4] Test first-time setup: run setup script on clean environment, measure time to running app (target <15 minutes)
 
 **Checkpoint**: At this point, User Stories 1 and 4 should be fully functional - developers can start environment and new developers can onboard easily
@@ -94,10 +94,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T028 [US2] Verify existing Makefile `logs` command streams docker-compose logs with --follow, --tail=100, --timestamps
-- [ ] T029 [US2] Test existing pgAdmin service is accessible at http://localhost:8080 after fixing email in .env
-- [ ] T030 [US2] Test existing Redis Commander service is accessible at http://localhost:8081
-- [ ] T031 [US2] Verify backend Swagger/OpenAPI documentation exists at http://localhost:3000/docs or add @fastify/swagger configuration
+- [x] T028 [US2] Verify existing Makefile `logs` command streams docker-compose logs with --follow, --tail=100, --timestamps
+- [x] T029 [US2] Test existing pgAdmin service is accessible at http://localhost:8080 after fixing email in .env
+- [x] T030 [US2] Test existing Redis Commander service is accessible at http://localhost:8081
+- [x] T031 [US2] Verify backend Swagger/OpenAPI documentation exists at http://localhost:3000/docs or add @fastify/swagger configuration
 - [ ] T032 [US2] Test log viewing: run `make logs`, verify color-coded output from all containers
 - [ ] T033 [US2] Test database inspection: access pgAdmin, connect to postgres, run queries on barberpro_dev database
 - [ ] T034 [US2] Test API documentation: access Swagger UI, test sample endpoints interactively
@@ -119,9 +119,9 @@
 
 ### Implementation for User Story 3
 
-- [ ] T036 [US3] Create or verify existing Makefile `db-reset` command calls Prisma migrate reset in backend
-- [ ] T037 [US3] Ensure Makefile `db-reset` command checks if backend container is running, provides error if not
-- [ ] T038 [US3] Add optional preservation flag to db-reset command to skip uploaded files deletion (document in Makefile help text)
+- [x] T036 [US3] Create or verify existing Makefile `db-reset` command calls Prisma migrate reset in backend
+- [x] T037 [US3] Ensure Makefile `db-reset` command checks if backend container is running, provides error if not
+- [x] T038 [US3] Add optional preservation flag to db-reset command to skip uploaded files deletion (document in Makefile help text)
 - [ ] T039 [US3] Test database reset: create test data, run `make db-reset`, verify clean state with seed data
 - [ ] T040 [US3] Test reset performance: measure time for database drop + migrations + seed, verify <30 seconds
 - [ ] T041 [US3] Test containers continue running: verify backend and frontend don't require restart after reset

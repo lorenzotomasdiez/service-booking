@@ -59,6 +59,22 @@ const oauthRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
     const correlationId = crypto.randomUUID();
 
     try {
+      // Validate Google OAuth credentials are configured
+      if (!googleOAuthConfig.clientId || !googleOAuthConfig.clientSecret) {
+        fastify.log.error('Google OAuth credentials not configured', {
+          clientIdPresent: !!googleOAuthConfig.clientId,
+          clientSecretPresent: !!googleOAuthConfig.clientSecret,
+          correlationId
+        });
+
+        return reply.code(503).send({
+          error: 'Service Unavailable',
+          message: 'Autenticación con Google no está configurada. Por favor, contacta al administrador.',
+          statusCode: 503,
+          correlationId
+        });
+      }
+
       const { role, isRegistration, returnTo } = request.body;
 
       // Generate state token
@@ -158,6 +174,20 @@ const oauthRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
     const { code, state, error, error_description } = request.query;
 
     try {
+      // Validate Google OAuth credentials are configured
+      if (!googleOAuthConfig.clientId || !googleOAuthConfig.clientSecret) {
+        fastify.log.error('Google OAuth credentials not configured in callback handler', {
+          correlationId
+        });
+
+        return reply.code(503).send({
+          error: 'Service Unavailable',
+          message: 'Autenticación con Google no está configurada. Por favor, contacta al administrador.',
+          statusCode: 503,
+          correlationId
+        });
+      }
+
       // Check if user cancelled OAuth
       if (error) {
         oauthService.logOAuthEvent({

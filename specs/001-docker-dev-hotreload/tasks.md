@@ -134,10 +134,10 @@
 
 **Purpose**: Documentation, validation, and final refinements
 
-- [ ] T042 [P] Update docker/README.md with development environment documentation and common workflows
-- [ ] T043 [P] Update root README.md with quick start pointing to docker/README.md and Makefile commands
-- [ ] T044 [P] Add troubleshooting section to docker/README.md covering 6 common issues from quickstart.md
-- [ ] T045 [P] Validate quickstart.md instructions match actual implementation
+- [x] T042 [P] Update docker/README.md with development environment documentation and common workflows
+- [x] T043 [P] Update root README.md with quick start pointing to docker/README.md and Makefile commands
+- [x] T044 [P] Add troubleshooting section to docker/README.md covering 6 common issues from quickstart.md
+- [x] T045 [P] Validate quickstart.md instructions match actual implementation
 - [ ] T046 Test cross-platform compatibility: verify environment works on macOS (already tested), document Linux/Windows considerations
 - [ ] T047 Performance validation: measure environment startup time (<5 min target), memory usage (<4GB target), hot reload times (<3s backend, <2s frontend)
 - [ ] T048 Run complete acceptance test: fresh clone → make dev-infra-only → backend hot reload test → frontend hot reload test → data persistence test → reset test

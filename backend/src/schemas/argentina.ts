@@ -3,8 +3,8 @@ import { Type } from '@sinclair/typebox';
 // Argentina DNI validation pattern (8 digits with optional dots)
 export const DNI_PATTERN = /^\d{1,2}\.?\d{3}\.?\d{3}$/;
 
-// Argentina phone number pattern (+54-xxx-xxx-xxxx or 11-xxxx-xxxx)
-export const PHONE_PATTERN = /^(\+54[-\s]?)?(11|[2-9]\d{1})[-\s]?\d{4}[-\s]?\d{4}$/;
+// Argentina phone number pattern (+54 9 11 xxxx-xxxx for mobile, +54-xxx-xxx-xxxx or 11-xxxx-xxxx)
+export const PHONE_PATTERN = /^(\+54[-\s]?9?[-\s]?)?(11|[2-9]\d{1})[-\s]?\d{4}[-\s]?\d{4}$/;
 
 // Argentina CUIT/CUIL pattern (XX-XXXXXXXX-X)
 export const CUIT_PATTERN = /^\d{2}-?\d{8}-?\d{1}$/;

@@ -306,8 +306,25 @@ The codebase is architected for easy vertical replication:
    make doctor         # Check system requirements
    make status         # Check service health
    npm run db:reset    # Reset database if needed
+   npm run fix:docker  # Fix Docker dependency issues (esbuild errors, etc.)
    make clean          # Nuclear option: remove everything and start fresh
    ```
+
+   **Common Issue: "Cannot start service: Host version does not match binary version" (esbuild error)**
+
+   This error occurs when host and container node_modules get mixed up. Quick fix:
+   ```bash
+   npm run fix:docker
+   ```
+
+   This script:
+   - Stops all containers
+   - Removes old node_modules volumes
+   - Rebuilds containers with fresh, isolated dependencies
+   - Restarts all services
+
+   **Prevention**: Never run `npm install` in the host backend/frontend directories when using Docker.
+   Dependencies are managed inside containers using named volumes.
 
 This architecture supports rapid development while maintaining enterprise-grade quality and Argentina market optimization.
 

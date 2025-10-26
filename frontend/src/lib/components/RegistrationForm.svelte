@@ -57,6 +57,72 @@
 		errors = errors; // Trigger reactivity
 	}
 
+	function formatPhoneInput(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const value = input.value;
+
+		// Remove all non-digit characters
+		const digits = value.replace(/\D/g, '');
+
+		// Format: +54 9 11 1234-5678
+		// Expected: 11 digits total (54 + 9 + 11 + 12345678)
+		let formatted = '';
+
+		if (digits.length > 0) {
+			// Always start with +54
+			if (digits.startsWith('54')) {
+				formatted = '+54';
+				const remaining = digits.substring(2);
+
+				if (remaining.length > 0) {
+					// Add the 9 (mobile prefix)
+					formatted += ' 9';
+
+					if (remaining.length > 1) {
+						// Add area code (2-4 digits, typically 11 for Buenos Aires)
+						const areaCode = remaining.substring(1, Math.min(3, remaining.length));
+						formatted += ' ' + areaCode;
+
+						if (remaining.length > 3) {
+							// Add first 4 digits of phone number
+							const firstPart = remaining.substring(3, Math.min(7, remaining.length));
+							formatted += ' ' + firstPart;
+
+							if (remaining.length > 7) {
+								// Add last 4 digits with dash
+								const lastPart = remaining.substring(7, 11);
+								formatted += '-' + lastPart;
+							}
+						}
+					}
+				}
+			} else {
+				// If doesn't start with 54, assume user is typing local number
+				formatted = '+54 9';
+
+				if (digits.length > 0) {
+					// Add area code
+					const areaCode = digits.substring(0, Math.min(2, digits.length));
+					formatted += ' ' + areaCode;
+
+					if (digits.length > 2) {
+						// Add first 4 digits
+						const firstPart = digits.substring(2, Math.min(6, digits.length));
+						formatted += ' ' + firstPart;
+
+						if (digits.length > 6) {
+							// Add last 4 digits with dash
+							const lastPart = digits.substring(6, 10);
+							formatted += '-' + lastPart;
+						}
+					}
+				}
+			}
+		}
+
+		formData.phone = formatted;
+	}
+
 	function handlePhoneBlur() {
 		const error = validateField('phone', formData.phone);
 		if (error) {
@@ -126,7 +192,7 @@
 				firstName: validatedData.firstName,
 				lastName: validatedData.lastName,
 				phone: validatedData.phone,
-				role: validatedData.role
+				role: userType.toUpperCase() as 'CLIENT' | 'PROVIDER'
 			});
 
 			if (result && !result.success) {
@@ -377,14 +443,18 @@
 				id="phone"
 				type="tel"
 				bind:value={formData.phone}
+				on:input={formatPhoneInput}
 				on:blur={handlePhoneBlur}
 				class="form-input phone-input"
 				class:form-input-error={errors.phone}
 				placeholder="+54 9 11 1234-5678"
 				autocomplete="tel"
+				maxlength="20"
 			/>
 			{#if errors.phone}
 				<p class="mt-1 text-sm text-error-600">{errors.phone}</p>
+			{:else}
+				<p class="mt-1 text-sm text-neutral-500">Solo ingresa los números (ej: 1123977641)</p>
 			{/if}
 		</div>
 

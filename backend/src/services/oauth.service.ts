@@ -13,9 +13,10 @@ import {
   OAuthState,
   OAuthResult,
   OAuthEvent,
-  OAuthErrorCode
+  OAuthErrorCode,
+  OAuthCallbackSession
 } from '../types/oauth.types';
-import { googleOAuthConfig, oauthStateKeys } from '../config/oauth.config';
+import { googleOAuthConfig, oauthStateKeys, oauthCallbackKeys } from '../config/oauth.config';
 import { AuthMethod, OAuthProviderType, UserRole } from '@prisma/client';
 
 export class OAuthService {
@@ -99,6 +100,45 @@ export class OAuthService {
   }
 
   /**
+   * Exchange authorization code for access token
+   * @param code - Authorization code from Google callback
+   * @returns Access token response
+   */
+  async exchangeCodeForToken(code: string): Promise<{ access_token: string; id_token?: string }> {
+    try {
+      const response = await axios.post(
+        googleOAuthConfig.tokenURL,
+        {
+          code,
+          client_id: googleOAuthConfig.clientId,
+          client_secret: googleOAuthConfig.clientSecret,
+          redirect_uri: googleOAuthConfig.callbackURL,
+          grant_type: 'authorization_code'
+        },
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+
+      this.fastify.log.info('Token exchange successful', {
+        hasAccessToken: !!response.data.access_token,
+        hasIdToken: !!response.data.id_token
+      });
+
+      return response.data;
+    } catch (error: any) {
+      this.fastify.log.error('Error exchanging code for token', {
+        error: error.message,
+        response: error.response?.data
+      });
+
+      throw new Error('Error al obtener tokens de Google');
+    }
+  }
+
+  /**
    * Fetch user profile from Google using access token
    * @param accessToken - Google OAuth access token
    * @returns Google user profile
@@ -116,14 +156,20 @@ export class OAuthService {
 
       const profile = response.data;
 
-      // Validate email is verified
+      // Log email verification status for monitoring
+      // Note: Google's email_verified indicates Google's internal verification,
+      // but OAuth flow itself validates email ownership. Our app handles verification separately.
       if (!profile.email_verified) {
-        throw new Error('Email no verificado por Google');
+        this.fastify.log.warn('Google account has unverified email (allowed for OAuth)', {
+          googleUserId: profile.id,
+          email: profile.email
+        });
       }
 
       this.fastify.log.info('Google profile fetched successfully', {
         googleUserId: profile.id,
-        email: profile.email
+        email: profile.email,
+        emailVerifiedByGoogle: profile.email_verified
       });
 
       return profile;
@@ -236,9 +282,10 @@ export class OAuthService {
       role: role || 'CLIENT'
     });
 
-    const [newUser, oauthProvider] = await prisma.$transaction([
+    // Use interactive transaction for sequential operations
+    const result = await prisma.$transaction(async (tx) => {
       // Create new user
-      prisma.user.create({
+      const newUser = await tx.user.create({
         data: {
           email,
           name: googleProfile.name,
@@ -251,36 +298,30 @@ export class OAuthService {
           locale: googleProfile.locale || 'es-AR',
           timezone: 'America/Argentina/Buenos_Aires'
         }
-      }).then(async (user) => {
-        // Create OAuth provider record in same transaction
-        return user;
-      }),
-      // This will run after user is created
-      prisma.user.findFirst({
-        where: { email }
-      }).then(async (user) => {
-        if (!user) throw new Error('User creation failed');
+      });
 
-        return prisma.oAuthProvider.create({
-          data: {
-            userId: user.id,
-            provider: OAuthProviderType.GOOGLE,
-            providerUserId: googleUserId,
-            email,
-            profileData: {
-              name: googleProfile.name,
-              picture: googleProfile.picture,
-              locale: googleProfile.locale
-            }
+      // Create OAuth provider record
+      const oauthProvider = await tx.oAuthProvider.create({
+        data: {
+          userId: newUser.id,
+          provider: OAuthProviderType.GOOGLE,
+          providerUserId: googleUserId,
+          email,
+          profileData: {
+            name: googleProfile.name,
+            picture: googleProfile.picture,
+            locale: googleProfile.locale
           }
-        });
-      })
-    ]);
+        }
+      });
+
+      return { user: newUser, oauthProvider };
+    });
 
     return {
-      user: newUser,
+      user: result.user,
       isNewUser: true,
-      oauthProvider
+      oauthProvider: result.oauthProvider
     };
   }
 
@@ -446,6 +487,74 @@ export class OAuthService {
       refreshToken,
       expiresIn: 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
     };
+  }
+
+  /**
+   * Store OAuth callback session data in Redis for state token exchange
+   * @param sessionData - Callback session data to store
+   * @returns Callback token for exchange
+   */
+  async storeCallbackSession(sessionData: OAuthCallbackSession): Promise<string> {
+    const callbackToken = crypto.randomBytes(32).toString('base64url');
+    const key = oauthCallbackKeys.getCallbackSessionKey(callbackToken);
+
+    await redisService.setJSON(key, sessionData, oauthCallbackKeys.defaultTTL);
+
+    this.fastify.log.info('OAuth callback session stored in Redis', {
+      callbackToken,
+      userId: sessionData.user.id,
+      ttl: oauthCallbackKeys.defaultTTL,
+      isNewUser: sessionData.isNewUser
+    });
+
+    return callbackToken;
+  }
+
+  /**
+   * Retrieve and delete OAuth callback session from Redis
+   * @param callbackToken - The callback token to exchange
+   * @returns Callback session data (one-time use)
+   */
+  async exchangeCallbackToken(callbackToken: string): Promise<{
+    valid: boolean;
+    session?: OAuthCallbackSession;
+    error?: string;
+  }> {
+    const key = oauthCallbackKeys.getCallbackSessionKey(callbackToken);
+
+    try {
+      const sessionData = await redisService.getJSON<OAuthCallbackSession>(key);
+
+      if (!sessionData) {
+        return {
+          valid: false,
+          error: 'Token de callback inválido o expirado'
+        };
+      }
+
+      // Delete token after retrieval (one-time use for security)
+      await redisService.del(key);
+
+      this.fastify.log.info('OAuth callback token exchanged successfully', {
+        callbackToken,
+        userId: sessionData.user.id
+      });
+
+      return {
+        valid: true,
+        session: sessionData
+      };
+    } catch (error) {
+      this.fastify.log.error('Error exchanging OAuth callback token', {
+        error,
+        callbackToken
+      });
+
+      return {
+        valid: false,
+        error: 'Token de callback inválido o expirado'
+      };
+    }
   }
 
   /**

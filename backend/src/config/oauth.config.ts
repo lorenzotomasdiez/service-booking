@@ -11,8 +11,8 @@ export const googleOAuthConfig = {
   // Callback URL - must match Google Cloud Console configuration
   callbackURL:
     process.env.BACKEND_URL || 'http://localhost:3000'
-      ? `${process.env.BACKEND_URL}/auth/oauth/google/callback`
-      : 'http://localhost:3000/auth/oauth/google/callback',
+      ? `${process.env.BACKEND_URL}/api/auth/oauth/google/callback`
+      : 'http://localhost:3000/api/auth/oauth/google/callback',
 
   // OAuth scopes
   scope: (process.env.GOOGLE_OAUTH_SCOPES || 'openid profile email').split(' '),
@@ -38,6 +38,16 @@ export const oauthStateKeys = {
   getStateKey: (stateToken: string) => `oauth:state:${stateToken}`,
   getStatePrefix: () => 'oauth:state:',
   defaultTTL: 10 * 60, // 10 minutes in seconds
+};
+
+/**
+ * OAuth callback session storage keys (for Redis)
+ * Used for secure state token exchange pattern
+ */
+export const oauthCallbackKeys = {
+  getCallbackSessionKey: (callbackToken: string) => `oauth:callback:${callbackToken}`,
+  getCallbackPrefix: () => 'oauth:callback:',
+  defaultTTL: 5 * 60, // 5 minutes in seconds - short-lived for security
 };
 
 /**

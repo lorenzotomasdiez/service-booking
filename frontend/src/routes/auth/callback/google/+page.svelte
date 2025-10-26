@@ -1,9 +1,15 @@
 <script lang="ts">
 /**
- * T045: Google OAuth Callback Page
+ * T045: Google OAuth Callback Page (Secure State Token Exchange Pattern)
  * T059: Show welcome modal for new OAuth users
  * T063: Implement role-based redirect logic
- * Handles OAuth callback from Google, exchanges tokens, and redirects user
+ *
+ * Security Flow:
+ * 1. Backend receives OAuth callback from Google with authorization code
+ * 2. Backend exchanges code for tokens, stores in Redis with callback token
+ * 3. Backend redirects browser to this page with callback token in URL
+ * 4. This page exchanges callback token for JWT tokens via API call
+ * 5. JWT tokens never appear in URL (secure state exchange pattern)
  */
 
 import { onMount } from 'svelte';
@@ -29,8 +35,7 @@ async function handleOAuthCallback() {
 	try {
 		// Get query parameters from URL
 		const params = new URLSearchParams(window.location.search);
-		const code = params.get('code');
-		const state = params.get('state');
+		const callbackToken = params.get('token');
 		const errorParam = params.get('error');
 		const errorDescription = params.get('error_description');
 
@@ -50,9 +55,9 @@ async function handleOAuthCallback() {
 			return;
 		}
 
-		// Validate required parameters
-		if (!code || !state) {
-			error = 'Parámetros de autenticación inválidos';
+		// Validate callback token
+		if (!callbackToken) {
+			error = 'Token de callback no encontrado. Por favor, intenta nuevamente.';
 			loading = false;
 
 			setTimeout(() => {
@@ -61,9 +66,9 @@ async function handleOAuthCallback() {
 			return;
 		}
 
-		// Exchange authorization code for tokens
-		const response = await apiClient.get('/auth/oauth/google/callback', {
-			params: { code, state }
+		// Exchange callback token for JWT tokens
+		const response = await apiClient.post('/auth/oauth/google/exchange-token', {
+			token: callbackToken
 		});
 
 		if (!response.success || !response.data) {

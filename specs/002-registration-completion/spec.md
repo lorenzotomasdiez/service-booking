@@ -82,14 +82,19 @@ After successfully registering (via email or Google), a user is guided through t
 ### Edge Cases
 
 - What happens when a user tries to register with an email that belongs to a Google OAuth account (or vice versa)?
+  **Resolution**: System automatically links accounts by email match. If email exists (registered via email/password), OAuth flow upgrades account to `authMethod: BOTH` and marks email as verified.
 - How does the system handle network failures during the Google OAuth redirect?
 - What happens if a user's email verification token expires?
 - How does the system handle users who register but never verify their email?
 - What happens when Google OAuth returns incomplete profile data?
+- What happens when Google OAuth returns a profile with `email_verified: false`?
+  **Resolution**: System allows registration. Google's `email_verified` flag indicates Google's internal verification status, independent of our app's verification system. OAuth flow validates email ownership through Google's authentication, so users are auto-verified regardless of Google's flag.
 - How does the system handle concurrent registration attempts with the same email?
 - What happens when a user manually crafts a verification URL with an invalid token?
 - How does the system handle Argentina-specific email domains and formatting (e.g., .com.ar)?
 - What happens if Google OAuth is temporarily unavailable?
+- What happens when an OAuth-only user (no password) tries to login via email/password?
+  **Resolution**: Login fails. OAuth-only users must authenticate via Google or set a password in-app settings first.
 
 ## Requirements *(mandatory)*
 

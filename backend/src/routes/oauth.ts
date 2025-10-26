@@ -10,7 +10,7 @@ import crypto from 'crypto';
 import { OAuthService } from '../services/oauth.service';
 import { validateSchema } from '../middleware/validation';
 import { googleOAuthConfig } from '../config/oauth.config';
-import { OAuthState, OAuthErrorCode, GoogleProfile } from '../types/oauth.types';
+import { OAuthState, OAuthErrorCode, GoogleProfile, OAuthCallbackSession } from '../types/oauth.types';
 import { UserRole } from '@prisma/client';
 import { prisma } from '../services/database';
 
@@ -23,6 +23,10 @@ const initiateOAuthSchema = z.object({
 
 const linkOAuthSchema = z.object({
   accessToken: z.string().min(1, 'Token de acceso de Google requerido')
+});
+
+const exchangeCallbackTokenSchema = z.object({
+  token: z.string().min(1, 'Token de callback requerido')
 });
 
 const oauthRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
@@ -244,11 +248,10 @@ const oauthRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
 
       const stateData = stateValidation.state!;
 
-      // Exchange code for access token using fastify-oauth2
-      let token: any;
+      // Exchange code for access token
+      let tokenResponse: { access_token: string; id_token?: string };
       try {
-        // Use fastify-oauth2 to exchange code for token
-        token = await (fastify as any).googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(request);
+        tokenResponse = await oauthService.exchangeCodeForToken(code);
       } catch (tokenError: any) {
         oauthService.logOAuthEvent({
           type: 'ERROR',
@@ -271,7 +274,7 @@ const oauthRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
       // Fetch Google profile
       let googleProfile: GoogleProfile;
       try {
-        googleProfile = await oauthService.fetchGoogleProfile(token.access_token);
+        googleProfile = await oauthService.fetchGoogleProfile(tokenResponse.access_token);
       } catch (profileError: any) {
         oauthService.logOAuthEvent({
           type: 'ERROR',
@@ -346,8 +349,8 @@ const oauthRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
         }
       });
 
-      // Return success with tokens
-      return reply.send({
+      // Store callback session data in Redis with callback token
+      const callbackSession: OAuthCallbackSession = {
         user: {
           id: userResult.user.id,
           email: userResult.user.email,
@@ -361,8 +364,26 @@ const oauthRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
         refreshToken: tokens.refreshToken,
         expiresIn: tokens.expiresIn,
         isNewUser: userResult.isNewUser,
-        returnTo: stateData.returnTo
+        returnTo: stateData.returnTo,
+        createdAt: Date.now()
+      };
+
+      const callbackToken = await oauthService.storeCallbackSession(callbackSession);
+
+      // Redirect to frontend with callback token (NOT tokens themselves)
+      const frontendCallbackUrl = new URL(
+        '/auth/callback/google',
+        process.env.FRONTEND_URL || 'http://localhost:5173'
+      );
+      frontendCallbackUrl.searchParams.set('token', callbackToken);
+
+      fastify.log.info('Redirecting to frontend callback page', {
+        frontendUrl: frontendCallbackUrl.toString(),
+        userId: userResult.user.id,
+        correlationId
       });
+
+      return reply.code(302).redirect(frontendCallbackUrl.toString());
 
     } catch (error: any) {
       fastify.log.error('Unexpected error in OAuth callback', {
@@ -385,6 +406,105 @@ const oauthRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
       return reply.code(500).send({
         error: 'Internal Server Error',
         message: 'Error interno durante autenticación con Google',
+        statusCode: 500
+      });
+    }
+  });
+
+  /**
+   * POST /auth/oauth/google/exchange-token
+   * Exchange callback token for JWT tokens (state token exchange pattern)
+   * This is called by the frontend after receiving the callback token
+   */
+  fastify.post('/google/exchange-token', {
+    preHandler: [validateSchema(exchangeCallbackTokenSchema, 'body')],
+    schema: {
+      tags: ['OAuth'],
+      summary: 'Exchange callback token for JWT tokens',
+      description: 'Securely exchange one-time callback token for JWT access and refresh tokens',
+      body: Type.Object({
+        token: Type.String()
+      }),
+      response: {
+        200: Type.Object({
+          success: Type.Boolean(),
+          data: Type.Object({
+            user: Type.Object({
+              id: Type.String(),
+              email: Type.String(),
+              name: Type.String(),
+              avatar: Type.Optional(Type.String()),
+              role: Type.String(),
+              isVerified: Type.Boolean(),
+              authMethod: Type.String()
+            }),
+            accessToken: Type.String(),
+            refreshToken: Type.String(),
+            expiresIn: Type.Number(),
+            isNewUser: Type.Boolean(),
+            returnTo: Type.Optional(Type.String())
+          }),
+          timestamp: Type.String()
+        }),
+        400: Type.Object({
+          error: Type.String(),
+          message: Type.String(),
+          statusCode: Type.Number()
+        })
+      }
+    }
+  }, async (request: FastifyRequest<{ Body: { token: string } }>, reply: FastifyReply) => {
+    const correlationId = crypto.randomUUID();
+    const { token } = request.body;
+
+    try {
+      // Exchange callback token for session data
+      const exchange = await oauthService.exchangeCallbackToken(token);
+
+      if (!exchange.valid || !exchange.session) {
+        fastify.log.warn('Invalid or expired callback token', {
+          correlationId,
+          error: exchange.error
+        });
+
+        return reply.code(400).send({
+          error: 'Invalid Token',
+          message: exchange.error || 'Token de callback inválido o expirado',
+          statusCode: 400
+        });
+      }
+
+      const session = exchange.session;
+
+      fastify.log.info('Callback token exchanged successfully', {
+        correlationId,
+        userId: session.user.id,
+        isNewUser: session.isNewUser
+      });
+
+      // Return session data to frontend
+      return reply.send({
+        success: true,
+        data: {
+          user: session.user,
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          expiresIn: session.expiresIn,
+          isNewUser: session.isNewUser,
+          returnTo: session.returnTo
+        },
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error: any) {
+      fastify.log.error('Error exchanging callback token', {
+        error: error.message,
+        correlationId
+      });
+
+      return reply.code(500).send({
+        error: 'Exchange Failed',
+        message: 'Error al intercambiar token de callback',
         statusCode: 500
       });
     }

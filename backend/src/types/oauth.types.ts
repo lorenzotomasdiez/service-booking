@@ -141,6 +141,35 @@ export enum OAuthErrorCode {
 }
 
 /**
+ * OAuth callback session data stored in Redis
+ * Used for secure state token exchange pattern
+ */
+export interface OAuthCallbackSession {
+  // User data
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    avatar?: string;
+    role: string;
+    isVerified: boolean;
+    authMethod: string;
+  };
+
+  // JWT tokens
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+
+  // Additional metadata
+  isNewUser: boolean;
+  returnTo?: string;
+
+  // Timestamp when session was created
+  createdAt: number;
+}
+
+/**
  * OAuth event for logging
  */
 export interface OAuthEvent {

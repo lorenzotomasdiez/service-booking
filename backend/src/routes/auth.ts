@@ -19,11 +19,16 @@ import {
 
 // T056: Enhanced Zod validation schemas with detailed field-level error messages
 const registerValidationSchema = z.object({
-  name: z.string()
+  firstName: z.string()
     .min(1, 'Nombre requerido')
     .min(2, 'Nombre muy corto (mín. 2 caracteres)')
-    .max(100, 'Nombre muy largo (máx. 100 caracteres)')
+    .max(50, 'Nombre muy largo (máx. 50 caracteres)')
     .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, 'El nombre solo puede contener letras y espacios'),
+  lastName: z.string()
+    .min(1, 'Apellido requerido')
+    .min(2, 'Apellido muy corto (mín. 2 caracteres)')
+    .max(50, 'Apellido muy largo (máx. 50 caracteres)')
+    .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, 'El apellido solo puede contener letras y espacios'),
   email: z.string()
     .min(1, 'Email requerido')
     .email('Email inválido')
@@ -73,7 +78,11 @@ const authRoutes: FastifyPluginAsync = async (fastify): Promise<void> => {
     }
   }, async (request: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
     try {
-      const result = await authService.register(request.body);
+      // Combine firstName and lastName into name for database storage
+      const { firstName, lastName, ...rest } = request.body;
+      const name = `${firstName} ${lastName}`.trim();
+
+      const result = await authService.register({ name, ...rest });
 
       // T025-T026: Send verification email after user creation
       try {

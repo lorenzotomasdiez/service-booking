@@ -13,6 +13,12 @@ export interface AuthState {
 	isAuthenticated: boolean;
 	isLoading: boolean;
 	error: string | null;
+	firstLogin: boolean; // T060: Track if user just registered (for welcome modal)
+	verificationStatus: {
+		isVerified: boolean;
+		email: string;
+		verifiedAt?: Date;
+	} | null;
 }
 
 const initialState: AuthState = {
@@ -20,7 +26,9 @@ const initialState: AuthState = {
 	token: null,
 	isAuthenticated: false,
 	isLoading: false,
-	error: null
+	error: null,
+	firstLogin: false, // T060: Initialize firstLogin flag
+	verificationStatus: null // T060: Initialize verification status
 };
 
 // Create the auth store
@@ -59,7 +67,12 @@ function createAuthStore() {
 							token,
 							isAuthenticated: true,
 							isLoading: false,
-							error: null
+							error: null,
+							verificationStatus: {
+								isVerified: response.data.isVerified,
+								email: response.data.email,
+								verifiedAt: response.data.verifiedAt ? new Date(response.data.verifiedAt) : undefined
+							}
 						}));
 
 						// Initialize socket connection with existing token (with delay)
@@ -112,7 +125,13 @@ function createAuthStore() {
 					token: accessToken,
 					isAuthenticated: true,
 					isLoading: false,
-					error: null
+					error: null,
+					firstLogin: false, // T060: Existing user login, not first time
+					verificationStatus: {
+						isVerified: user.isVerified,
+						email: user.email,
+						verifiedAt: user.verifiedAt ? new Date(user.verifiedAt) : undefined
+					}
 				}));
 
 				// Initialize socket connection after successful login (with delay)
@@ -175,7 +194,13 @@ function createAuthStore() {
 					token,
 					isAuthenticated: true,
 					isLoading: false,
-					error: null
+					error: null,
+					firstLogin: true, // T060: New registration via email
+					verificationStatus: {
+						isVerified: user.isVerified,
+						email: user.email,
+						verifiedAt: user.verifiedAt ? new Date(user.verifiedAt) : undefined
+					}
 				}));
 
 				// Redirect to dashboard
@@ -223,7 +248,9 @@ function createAuthStore() {
 			token: null,
 			isAuthenticated: false,
 			isLoading: false,
-			error: null
+			error: null,
+			firstLogin: false, // T060: Reset firstLogin flag
+			verificationStatus: null // T060: Clear verification status
 		}));
 	};
 
@@ -244,10 +271,10 @@ function createAuthStore() {
 	const refreshToken = async () => {
 		try {
 			const response = await authApi.refreshToken();
-			
+
 			if (response.success && response.data) {
 				const { user, token } = response.data;
-				
+
 				Cookies.set('auth_token', token, { secure: true, sameSite: 'lax' });
 				localStorage.setItem('auth_token', token);
 
@@ -255,7 +282,12 @@ function createAuthStore() {
 					...state,
 					user,
 					token,
-					isAuthenticated: true
+					isAuthenticated: true,
+					verificationStatus: {
+						isVerified: user.isVerified,
+						email: user.email,
+						verifiedAt: user.verifiedAt ? new Date(user.verifiedAt) : undefined
+					}
 				}));
 
 				return true;
@@ -267,6 +299,67 @@ function createAuthStore() {
 		}
 	};
 
+	// T060: Set OAuth user (for OAuth callback)
+	const setOAuthUser = (userData: {
+		user: User;
+		accessToken: string;
+		refreshToken: string;
+		expiresIn: number;
+		isNewUser: boolean;
+	}) => {
+		const { user, accessToken, refreshToken: refToken, expiresIn, isNewUser } = userData;
+
+		// Store tokens
+		Cookies.set('auth_token', accessToken, { secure: true, sameSite: 'lax' });
+		localStorage.setItem('auth_token', accessToken);
+
+		update(state => ({
+			...state,
+			user,
+			token: accessToken,
+			isAuthenticated: true,
+			isLoading: false,
+			error: null,
+			firstLogin: isNewUser, // T060: Set firstLogin flag for new OAuth users
+			verificationStatus: {
+				isVerified: user.isVerified,
+				email: user.email,
+				verifiedAt: user.verifiedAt ? new Date(user.verifiedAt) : undefined
+			}
+		}));
+
+		// Initialize socket connection (with delay)
+		if (browser) {
+			setTimeout(() => {
+				socketService.connect();
+			}, 500);
+		}
+	};
+
+	// T060: Clear firstLogin flag (after showing welcome modal)
+	const clearFirstLogin = () => {
+		update(state => ({
+			...state,
+			firstLogin: false
+		}));
+	};
+
+	// T060: Update verification status
+	const updateVerificationStatus = (isVerified: boolean) => {
+		update(state => ({
+			...state,
+			verificationStatus: state.verificationStatus ? {
+				...state.verificationStatus,
+				isVerified,
+				verifiedAt: isVerified ? new Date() : undefined
+			} : null,
+			user: state.user ? {
+				...state.user,
+				isVerified
+			} : null
+		}));
+	};
+
 	return {
 		subscribe,
 		initializeAuth,
@@ -276,7 +369,10 @@ function createAuthStore() {
 		updateUser,
 		clearError,
 		refreshToken,
-		clearAuth
+		clearAuth,
+		setOAuthUser, // T060: Add setOAuthUser method
+		clearFirstLogin, // T060: Add clearFirstLogin method
+		updateVerificationStatus // T060: Add updateVerificationStatus method
 	};
 }
 
@@ -289,3 +385,5 @@ export const isLoading = derived(authStore, $auth => $auth.isLoading);
 export const authError = derived(authStore, $auth => $auth.error);
 export const isProvider = derived(authStore, $auth => $auth.user?.role === 'PROVIDER');
 export const isClient = derived(authStore, $auth => $auth.user?.role === 'CLIENT');
+export const firstLogin = derived(authStore, $auth => $auth.firstLogin); // T060: Export firstLogin flag
+export const verificationStatus = derived(authStore, $auth => $auth.verificationStatus); // T060: Export verification status

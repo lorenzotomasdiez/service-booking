@@ -1,0 +1,349 @@
+openapi: 3.0.3
+info:
+  title: BarberPro Email Verification API
+  description: Email verification endpoints for user registration security
+  version: 1.0.0
+  contact:
+    name: BarberPro API Team
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development
+  - url: https://api.barberpro.com.ar
+    description: Production
+
+tags:
+  - name: Verification
+    description: Email verification endpoints
+
+paths:
+  /auth/verify-email:
+    get:
+      tags:
+        - Verification
+      summary: Verify email address with token
+      description: |
+        Validates the email verification token sent to the user's inbox.
+        Marks the user's email as verified and deletes the token (single-use).
+        Tokens expire after 24 hours.
+      operationId: verifyEmail
+      parameters:
+        - name: token
+          in: query
+          description: Email verification token (64 hex characters)
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{64}$'
+            example: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - userId
+                properties:
+                  message:
+                    type: string
+                    example: Email verificado exitosamente
+                  userId:
+                    type: string
+                    example: clx1y2z3a4b5c6d7e8f9g0h1
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidToken:
+                  value:
+                    error: Invalid Token
+                    message: Token de verificación inválido o expirado
+                    statusCode: 400
+                alreadyVerified:
+                  value:
+                    error: Already Verified
+                    message: Este email ya fue verificado
+                    statusCode: 400
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/send-verification:
+    post:
+      tags:
+        - Verification
+      summary: Send verification email to user
+      description: |
+        Sends a verification email to the specified email address.
+        Can be used to send initial verification or resend if user didn't receive it.
+        Rate limited to 3 emails per hour per email address.
+      operationId: sendVerificationEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Email address to send verification to
+                  example: juan@example.com.ar
+      responses:
+        '200':
+          description: Verification email sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    example: Email de verificación enviado. Revisa tu bandeja de entrada.
+                  expiresIn:
+                    type: integer
+                    description: Token validity period in seconds
+                    example: 86400
+        '400':
+          description: Bad request (invalid email, already verified)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidEmail:
+                  value:
+                    error: Invalid Email
+                    message: Email inválido
+                    statusCode: 400
+                alreadyVerified:
+                  value:
+                    error: Already Verified
+                    message: Este email ya está verificado
+                    statusCode: 400
+        '404':
+          description: User with this email not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: User Not Found
+                message: No existe un usuario con este email
+                statusCode: 404
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Too Many Requests
+                message: Demasiados intentos. Intenta de nuevo en 5 minutos.
+                statusCode: 429
+                details:
+                  retryAfter: 300
+        '500':
+          description: Server error (email service unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/resend-verification:
+    post:
+      tags:
+        - Verification
+      summary: Resend verification email (authenticated)
+      description: |
+        Resends verification email to the authenticated user's email address.
+        Requires valid JWT token. User must not already be verified.
+        Rate limited to 3 emails per hour.
+      operationId: resendVerificationEmail
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Verification email resent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    example: Email de verificación reenviado
+        '400':
+          description: User already verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Already Verified
+                message: Tu email ya está verificado
+                statusCode: 400
+        '401':
+          description: Unauthorized (no valid JWT token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Too Many Requests
+                message: Espera 5 minutos antes de solicitar otro email
+                statusCode: 429
+                details:
+                  retryAfter: 300
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/verification-status:
+    get:
+      tags:
+        - Verification
+      summary: Check email verification status
+      description: |
+        Returns the email verification status for the authenticated user.
+        Useful for frontend to determine if verification reminder should be shown.
+      operationId: getVerificationStatus
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Verification status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - isVerified
+                  - email
+                properties:
+                  isVerified:
+                    type: boolean
+                    example: false
+                  email:
+                    type: string
+                    format: email
+                    example: juan@example.com.ar
+                  emailVerifiedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    example: null
+                  canResend:
+                    type: boolean
+                    description: Whether user can request another verification email (rate limit check)
+                    example: true
+                  nextResendAvailable:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: When user can request next verification email (if rate limited)
+                    example: null
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from registration or login
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: clx1y2z3a4b5c6d7e8f9g0h1
+        email:
+          type: string
+          format: email
+          example: juan@example.com.ar
+        name:
+          type: string
+          example: Juan Pérez
+        role:
+          type: string
+          enum: [CLIENT, PROVIDER, ADMIN]
+          example: CLIENT
+        isVerified:
+          type: boolean
+          example: true
+        emailVerifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: 2025-10-25T22:15:00.000Z
+        authMethod:
+          type: string
+          enum: [EMAIL, OAUTH, BOTH]
+          example: EMAIL
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error code (English, for programmatic handling)
+          example: Invalid Token
+        message:
+          type: string
+          description: Human-readable error message (Spanish, for user display)
+          example: Token de verificación inválido o expirado
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        details:
+          type: object
+          description: Additional error details (optional)
+          additionalProperties: true
+          example:
+            retryAfter: 300
+
+security: []
+
+externalDocs:
+  description: Email Verification Best Practices (OWASP)
+  url: https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html

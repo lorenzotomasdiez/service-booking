@@ -171,7 +171,7 @@ export class AuthService {
       locale: 'es-AR'
     };
 
-    // Create user
+    // Create user (isVerified defaults to false per schema)
     const user = await prisma.user.create({
       data: userData,
       select: {
@@ -182,6 +182,8 @@ export class AuthService {
         role: true,
         isActive: true,
         isVerified: true,
+        authMethod: true,
+        emailVerifiedAt: true,
         dni: true,
         cuit: true,
         timezone: true,

@@ -1,12 +1,15 @@
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
+import cookie from '@fastify/cookie';
+import oauth2 from '@fastify/oauth2';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { createServer } from 'http';
 import metricsPlugin from './plugins/metrics';
+import { fastifyOAuth2GoogleConfig } from './config/oauth.config';
 
 // Database connection
 import { database, prisma } from './services/database';
@@ -27,6 +30,7 @@ import { setupValidationMiddleware } from './middleware/validation';
 // Essential route imports for login functionality
 import healthRoutes from './routes/health';
 import authRoutes from './routes/auth';
+import oauthRoutes from './routes/oauth';
 import usersRoutes from './routes/users';
 import frontendAnalyticsRoutes from './routes/frontend-analytics';
 
@@ -79,6 +83,31 @@ export function buildServer(): FastifyInstance {
 
   server.register(jwt, {
     secret: process.env.JWT_SECRET || 'supersecret-change-in-production'
+  });
+
+  // T037: Register @fastify/cookie (required before @fastify/oauth2)
+  server.register(cookie as any, {
+    secret: process.env.COOKIE_SECRET || 'cookie-secret-change-in-production',
+    parseOptions: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
+    }
+  });
+
+  // T038: Register @fastify/oauth2 for Google OAuth
+  server.register(oauth2 as any, {
+    name: fastifyOAuth2GoogleConfig.name,
+    scope: fastifyOAuth2GoogleConfig.scope,
+    credentials: {
+      client: {
+        id: fastifyOAuth2GoogleConfig.clientId,
+        secret: fastifyOAuth2GoogleConfig.clientSecret
+      },
+      auth: (oauth2 as any).GOOGLE_CONFIGURATION
+    },
+    startRedirectPath: '/auth/oauth/google/start',
+    callbackUri: fastifyOAuth2GoogleConfig.callbackUri
   });
 
   server.register(multipart, {
@@ -143,6 +172,7 @@ export function buildServer(): FastifyInstance {
   // Register essential routes only
   server.register(healthRoutes, { prefix: '/api' });
   server.register(authRoutes, { prefix: '/api/auth' });
+  server.register(oauthRoutes, { prefix: '/api/auth/oauth' });
   server.register(usersRoutes, { prefix: '/api/users' });
   server.register(frontendAnalyticsRoutes, { prefix: '/api/analytics' });
 
@@ -205,5 +235,8 @@ export async function startServer(): Promise<void> {
     process.exit(1);
   }
 }
+
+// Export buildApp as an alias for tests
+export const buildApp = buildServer;
 
 export default buildServer;

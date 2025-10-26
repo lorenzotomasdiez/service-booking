@@ -112,8 +112,8 @@ services:
     volumes:
       # Hot reload - mount source code for live updates
       - ../backend:/app
-      # Exclude node_modules and build artifacts from host
-      - /app/node_modules
+      # Use named volume for node_modules (prevents host/container conflicts)
+      - backend-node-modules:/app/node_modules
       - /app/dist
     depends_on:
       postgres:
@@ -159,8 +159,8 @@ services:
     volumes:
       # Hot reload - mount source code for live updates
       - ../frontend:/app
-      # Exclude node_modules and build artifacts from host
-      - /app/node_modules
+      # Use named volume for node_modules (prevents host/container conflicts)
+      - frontend-node-modules:/app/node_modules
       - /app/build
       - /app/.svelte-kit
     depends_on:
@@ -193,6 +193,10 @@ volumes:
     name: barberpro-pgadmin-data-dev
   nginx_logs:
     name: barberpro-nginx-logs-dev
+  backend-node-modules:
+    name: barberpro-backend-node-modules-dev
+  frontend-node-modules:
+    name: barberpro-frontend-node-modules-dev
 
 # Development network
 networks:

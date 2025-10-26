@@ -114,3 +114,6 @@ class RedisService {
 const redisService = new RedisService();
 
 export default redisService;
+
+// Export the Redis client for direct access (e.g., in tests)
+export const redisClient = redisService.getClient();

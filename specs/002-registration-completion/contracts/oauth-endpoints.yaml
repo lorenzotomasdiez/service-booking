@@ -1,0 +1,357 @@
+openapi: 3.0.3
+info:
+  title: BarberPro OAuth Authentication API
+  description: Google OAuth 2.0 endpoints for user registration and login
+  version: 1.0.0
+  contact:
+    name: BarberPro API Team
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development
+  - url: https://api.barberpro.com.ar
+    description: Production
+
+tags:
+  - name: OAuth
+    description: Google OAuth 2.0 authentication endpoints
+
+paths:
+  /auth/oauth/google/initiate:
+    get:
+      tags:
+        - OAuth
+      summary: Initiate Google OAuth flow
+      description: |
+        Redirects user to Google's authentication page with proper OAuth 2.0 parameters.
+        Generates a secure state token stored in Redis for CSRF protection.
+      operationId: initiateGoogleOAuth
+      parameters:
+        - name: redirect
+          in: query
+          description: URL to redirect to after successful authentication (default: /dashboard)
+          required: false
+          schema:
+            type: string
+            example: /dashboard/provider
+        - name: role
+          in: query
+          description: Pre-select user role (CLIENT or PROVIDER)
+          required: false
+          schema:
+            type: string
+            enum: [CLIENT, PROVIDER]
+            example: PROVIDER
+      responses:
+        '302':
+          description: Redirect to Google OAuth consent screen
+          headers:
+            Location:
+              description: Google OAuth authorization URL with state parameter
+              schema:
+                type: string
+                example: https://accounts.google.com/o/oauth2/v2/auth?client_id=...&state=...
+        '500':
+          description: Server error (Redis unavailable, config error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: OAuth Temporarily Unavailable
+                message: No se pudo iniciar el flujo de autenticación
+                statusCode: 500
+
+  /auth/oauth/google/callback:
+    get:
+      tags:
+        - OAuth
+      summary: Google OAuth callback handler
+      description: |
+        Handles the redirect from Google after user grants/denies permissions.
+        Validates state token, exchanges authorization code for access token,
+        fetches user profile, and creates/logs in the user.
+      operationId: handleGoogleOAuthCallback
+      parameters:
+        - name: code
+          in: query
+          description: Authorization code from Google
+          required: true
+          schema:
+            type: string
+            example: 4/0AY0e-g7...
+        - name: state
+          in: query
+          description: CSRF protection state token (generated during initiation)
+          required: true
+          schema:
+            type: string
+            example: a8b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7
+        - name: error
+          in: query
+          description: Error code if user denied access
+          required: false
+          schema:
+            type: string
+            enum: [access_denied]
+      responses:
+        '302':
+          description: Redirect to frontend with authentication tokens
+          headers:
+            Location:
+              description: Frontend URL with access and refresh tokens
+              schema:
+                type: string
+                example: http://localhost:5173/auth/callback?token=eyJhbGc...&refresh=eyJhbGc...
+        '400':
+          description: Bad request (invalid/expired state, missing code)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidState:
+                  value:
+                    error: Invalid State
+                    message: Token de estado inválido o expirado
+                    statusCode: 400
+                accessDenied:
+                  value:
+                    error: Access Denied
+                    message: Acceso denegado por el usuario
+                    statusCode: 400
+        '500':
+          description: Server error during OAuth flow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: OAuth Failed
+                message: Error al autenticar con Google
+                statusCode: 500
+
+  /auth/oauth/google/link:
+    post:
+      tags:
+        - OAuth
+      summary: Link Google account to existing user
+      description: |
+        Allows an authenticated user to link their Google account to their
+        existing email/password account. Changes authMethod to BOTH.
+      operationId: linkGoogleOAuth
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+                - state
+              properties:
+                code:
+                  type: string
+                  description: Authorization code from Google OAuth callback
+                  example: 4/0AY0e-g7...
+                state:
+                  type: string
+                  description: State token for CSRF protection
+                  example: a8b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7
+      responses:
+        '200':
+          description: Google account successfully linked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Cuenta de Google vinculada exitosamente
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid request or Google account already linked to another user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                alreadyLinked:
+                  value:
+                    error: Already Linked
+                    message: Esta cuenta de Google ya está vinculada a otro usuario
+                    statusCode: 400
+                invalidState:
+                  value:
+                    error: Invalid State
+                    message: Token de estado inválido
+                    statusCode: 400
+        '401':
+          description: Unauthorized (no valid JWT token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/oauth/google/unlink:
+    delete:
+      tags:
+        - OAuth
+      summary: Unlink Google account from user
+      description: |
+        Removes the Google OAuth provider link from the user's account.
+        Requires that the user has a password set (cannot unlink if OAuth is the only auth method).
+      operationId: unlinkGoogleOAuth
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Google account successfully unlinked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Cuenta de Google desvinculada exitosamente
+        '400':
+          description: Cannot unlink (user has no password, OAuth is only auth method)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Cannot Unlink
+                message: No puedes desvincular tu única forma de inicio de sesión. Establece una contraseña primero.
+                statusCode: 400
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No Google account linked to this user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Not Found
+                message: No hay cuenta de Google vinculada
+                statusCode: 404
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login or registration
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: clx1y2z3a4b5c6d7e8f9g0h1
+        email:
+          type: string
+          format: email
+          example: juan@gmail.com
+        name:
+          type: string
+          example: Juan Pérez
+        role:
+          type: string
+          enum: [CLIENT, PROVIDER, ADMIN]
+          example: CLIENT
+        isVerified:
+          type: boolean
+          example: true
+        authMethod:
+          type: string
+          enum: [EMAIL, OAUTH, BOTH]
+          example: OAUTH
+        avatar:
+          type: string
+          nullable: true
+          example: https://lh3.googleusercontent.com/a/...
+        timezone:
+          type: string
+          example: America/Argentina/Buenos_Aires
+        locale:
+          type: string
+          example: es-AR
+        createdAt:
+          type: string
+          format: date-time
+          example: 2025-10-25T21:30:00.000Z
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error code (English, for programmatic handling)
+          example: Invalid State
+        message:
+          type: string
+          description: Human-readable error message (Spanish, for user display)
+          example: Token de estado inválido o expirado
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        details:
+          type: object
+          description: Additional error details (optional)
+          additionalProperties: true
+
+    OAuthState:
+      type: object
+      description: OAuth state data stored in Redis
+      properties:
+        state:
+          type: string
+          description: Random state token (CSRF protection)
+          example: a8b3c4d5e6f7g8h9i0j1k2l3m4n5o6p7
+        redirectUri:
+          type: string
+          description: Where to redirect after OAuth
+          example: /dashboard/provider
+        role:
+          type: string
+          enum: [CLIENT, PROVIDER]
+          nullable: true
+          description: Pre-selected role (optional)
+        userId:
+          type: string
+          nullable: true
+          description: User ID if linking OAuth to existing account
+        createdAt:
+          type: integer
+          description: Unix timestamp of state creation
+          example: 1698262800000
+
+security: []
+
+externalDocs:
+  description: Google OAuth 2.0 Documentation
+  url: https://developers.google.com/identity/protocols/oauth2

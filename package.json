@@ -11,6 +11,7 @@
     "restart": "make restart",
     "logs": "make logs",
     "status": "make status",
+    "fix:docker": "bash scripts/fix-docker-deps.sh",
 
     "_comment_setup": "=== Setup & Installation ===",
     "setup": "npm run install:all && make up && make db-migrate",

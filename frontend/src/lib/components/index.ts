@@ -9,6 +9,8 @@ export { default as Loading } from './Loading.svelte';
 export { default as ImageUpload } from './ImageUpload.svelte';
 export { default as ProgressIndicator } from './ProgressIndicator.svelte';
 export { default as OnboardingFlow } from './OnboardingFlow.svelte';
+export { default as WelcomeModal } from './WelcomeModal.svelte'; // T058: Welcome modal for new users
+export { default as OAuthButton } from './OAuthButton.svelte'; // OAuth authentication button
 
 // Component Types
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'success' | 'danger';

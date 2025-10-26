@@ -9,8 +9,8 @@ export const argentinaValidation = {
   // CUIT/CUIL: 11 digits with dashes
   cuit: z.string().regex(/^[0-9]{2}-[0-9]{8}-[0-9]{1}$/, 'CUIT/CUIL debe tener formato válido (ej: 20-12345678-9)'),
   
-  // Argentina phone: +54 followed by area code and number
-  phone: z.string().regex(/^\+54-[0-9]{2,4}-[0-9]{6,8}$/, 'Teléfono debe tener formato válido (+54-11-1234-5678)'),
+  // Argentina phone: +54 9 followed by area code and number (with spaces)
+  phone: z.string().regex(/^\+54\s9\s\d{2,4}\s\d{4}-\d{4}$/, 'Teléfono debe tener formato válido (+54 9 11 1234-5678)'),
   
   // Argentine postal codes
   postalCode: z.string().regex(/^[A-Z]?[0-9]{4}[A-Z]{0,3}$/, 'Código postal argentino inválido'),

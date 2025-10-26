@@ -1,0 +1,351 @@
+openapi: 3.0.3
+info:
+  title: BarberPro Registration API Extensions
+  description: Extensions to existing registration endpoints for email verification and OAuth support
+  version: 1.0.0
+  contact:
+    name: BarberPro API Team
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development
+  - url: https://api.barberpro.com.ar
+    description: Production
+
+tags:
+  - name: Registration
+    description: User registration endpoints (extended for verification & OAuth)
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Registration
+      summary: Register new user with email/password
+      description: |
+        **[EXISTING ENDPOINT - EXTENDED]**
+
+        Creates a new user account with email and password.
+        Now includes:
+        - Sends verification email after successful registration
+        - Sets authMethod to 'EMAIL'
+        - Sets isVerified to false (requires email verification)
+        - Rate limiting: 5 registrations per IP per hour
+
+        User receives JWT tokens immediately but email verification is required
+        for certain actions (configurable per feature).
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - name
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User's email address (must be unique)
+                  example: juan@example.com.ar
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  description: Password (min 8 chars, 1 uppercase, 1 lowercase, 1 number)
+                  example: SecurePass123
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 100
+                  description: User's full name
+                  example: Juan Pérez
+                phone:
+                  type: string
+                  pattern: '^\+54\s9\s\d{2,4}\s\d{4}-\d{4}$'
+                  description: Argentina phone number (optional)
+                  example: +54 9 11 1234-5678
+                role:
+                  type: string
+                  enum: [CLIENT, PROVIDER]
+                  description: User role
+                  example: CLIENT
+                dni:
+                  type: string
+                  pattern: '^\d{2}\.\d{3}\.\d{3}$'
+                  description: DNI (optional, Argentina format)
+                  example: 12.345.678
+                cuit:
+                  type: string
+                  pattern: '^\d{2}-\d{8}-\d$'
+                  description: CUIT (optional, for providers)
+                  example: 20-12345678-9
+                birthDate:
+                  type: string
+                  format: date-time
+                  description: Birth date (optional)
+                  example: 1990-05-15T00:00:00.000Z
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - user
+                  - accessToken
+                  - refreshToken
+                  - expiresIn
+                  - message
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  accessToken:
+                    type: string
+                    description: JWT access token
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  refreshToken:
+                    type: string
+                    description: JWT refresh token
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  expiresIn:
+                    type: integer
+                    description: Token expiration time in milliseconds
+                    example: 604800000
+                  message:
+                    type: string
+                    description: Success message with verification reminder
+                    example: Cuenta creada. Por favor, verifica tu email.
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidEmail:
+                  value:
+                    error: Validation Error
+                    message: Email inválido
+                    statusCode: 400
+                weakPassword:
+                  value:
+                    error: Validation Error
+                    message: La contraseña debe tener al menos 8 caracteres, 1 mayúscula, 1 minúscula y 1 número
+                    statusCode: 400
+        '409':
+          description: Conflict (email already registered)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Email Already Registered
+                message: Ya existe una cuenta con este email
+                statusCode: 409
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Too Many Requests
+                message: Demasiados intentos de registro. Intenta de nuevo más tarde.
+                statusCode: 429
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+paths-frontend:
+  # These are not API endpoints, but frontend routes
+  # Documented here for reference
+
+  /register:
+    description: |
+      **[EXISTING FRONTEND ROUTE]**
+      Main registration page with dual-role selection (Client vs Provider).
+      Users can choose their role before filling out the form.
+
+      URL: http://localhost:5173/register
+      Component: /routes/register/+page.svelte
+
+      Features:
+      - Dual-role selection UI
+      - Email/password registration form
+      - "Continue with Google" OAuth button
+      - Link to /login page
+      - Terms and privacy policy acceptance
+
+  /register/client:
+    description: |
+      **[NEW FRONTEND ROUTE]**
+      Client-specific registration page with role pre-selected to CLIENT.
+      Role selection UI is hidden.
+
+      URL: http://localhost:5173/register/client
+      Component: /routes/register/client/+page.svelte
+
+      SEO:
+      - Title: "Registro de Cliente - BarberPro"
+      - Description: "Reserva turnos en las mejores barberías de Argentina"
+
+      Marketing:
+      - Use this URL for client acquisition campaigns
+      - Direct link for Instagram/Facebook ads targeting customers
+
+  /register/provider:
+    description: |
+      **[NEW FRONTEND ROUTE]**
+      Provider-specific registration page with role pre-selected to PROVIDER.
+      Role selection UI is hidden.
+
+      URL: http://localhost:5173/register/provider
+      Component: /routes/register/provider/+page.svelte
+
+      SEO:
+      - Title: "Registro de Profesional - BarberPro"
+      - Description: "Ofrece tus servicios de barbería y gestiona tu negocio"
+
+      Marketing:
+      - Use this URL for provider recruitment campaigns
+      - Direct link for barber/salon owner outreach
+
+  /verify-email:
+    description: |
+      **[NEW FRONTEND ROUTE]**
+      Email verification confirmation page.
+      Displays success/error message after token validation.
+
+      URL: http://localhost:5173/verify-email?token=xxx
+      Component: /routes/verify-email/+page.svelte
+
+      Flow:
+      1. User clicks verification link in email
+      2. Page extracts token from query parameter
+      3. Calls GET /api/auth/verify-email with token
+      4. Shows success message and redirects to dashboard
+      5. Or shows error message and offers to resend verification email
+
+  /auth/callback/google:
+    description: |
+      **[NEW FRONTEND ROUTE]**
+      Google OAuth callback handler page.
+      Receives tokens from backend OAuth redirect and stores them.
+
+      URL: http://localhost:5173/auth/callback/google?token=xxx&refresh=yyy
+      Component: /routes/auth/callback/google/+page.svelte
+
+      Flow:
+      1. Backend redirects here after successful OAuth
+      2. Page extracts access and refresh tokens from URL
+      3. Stores tokens in auth store (cookies + localStorage)
+      4. Redirects to appropriate dashboard based on user role
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: clx1y2z3a4b5c6d7e8f9g0h1
+        email:
+          type: string
+          format: email
+          example: juan@example.com.ar
+        name:
+          type: string
+          example: Juan Pérez
+        phone:
+          type: string
+          nullable: true
+          example: +54 9 11 1234-5678
+        role:
+          type: string
+          enum: [CLIENT, PROVIDER, ADMIN]
+          example: CLIENT
+        isActive:
+          type: boolean
+          example: true
+        isVerified:
+          type: boolean
+          example: false
+        authMethod:
+          type: string
+          enum: [EMAIL, OAUTH, BOTH]
+          example: EMAIL
+        emailVerifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+        dni:
+          type: string
+          nullable: true
+          example: 12.345.678
+        cuit:
+          type: string
+          nullable: true
+          example: 20-12345678-9
+        timezone:
+          type: string
+          example: America/Argentina/Buenos_Aires
+        locale:
+          type: string
+          example: es-AR
+        avatar:
+          type: string
+          nullable: true
+          example: null
+        birthDate:
+          type: string
+          format: date-time
+          nullable: true
+          example: 1990-05-15T00:00:00.000Z
+        createdAt:
+          type: string
+          format: date-time
+          example: 2025-10-25T21:30:00.000Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2025-10-25T21:30:00.000Z
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+        - statusCode
+      properties:
+        error:
+          type: string
+          description: Error code (English, for programmatic handling)
+          example: Validation Error
+        message:
+          type: string
+          description: Human-readable error message (Spanish, for user display)
+          example: Email inválido
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        details:
+          type: object
+          description: Additional error details (optional)
+          additionalProperties: true
+
+security: []
+
+externalDocs:
+  description: BarberPro Registration Flow Documentation
+  url: https://docs.barberpro.com.ar/authentication/registration

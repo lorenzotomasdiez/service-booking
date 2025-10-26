@@ -15,21 +15,25 @@ model User {
   email     String   @unique
   name      String
   phone     String?  @unique // Argentina phone format +54-xxx-xxx-xxxx
-  password  String
+  password  String?  // Nullable for OAuth-only users
   role      UserRole @default(CLIENT)
   isActive  Boolean  @default(true)
   isVerified Boolean @default(false)
-  
+
+  // Authentication method tracking
+  authMethod AuthMethod @default(EMAIL)
+  emailVerifiedAt DateTime?
+
   // Argentina specific fields
   dni       String?  @unique // Documento Nacional de Identidad
   cuit      String?  @unique // CUIT for tax purposes
   timezone  String   @default("America/Argentina/Buenos_Aires")
   locale    String   @default("es-AR")
-  
+
   // Profile fields
   avatar    String?
   birthDate DateTime?
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -43,12 +47,15 @@ model User {
   promotionUsages  PromotionUsage[]
   loyaltyPoints    LoyaltyPoints[]
   clientNotes      ClientNote[] @relation("ClientNotes")
+  emailVerificationTokens EmailVerificationToken[]
+  oauthProviders   OAuthProvider[]
 
   @@index([email])              // Login queries
   @@index([phone])              // Phone lookup
   @@index([dni])                // Argentina DNI lookup
   @@index([role, isActive])     // Role-based queries
   @@index([isVerified])         // Verification status
+  @@index([authMethod])         // Auth method lookups
   @@map("users")
 }
 
@@ -353,6 +360,17 @@ enum NotificationStatus {
   UNREAD
   READ
   ARCHIVED
+}
+
+enum AuthMethod {
+  EMAIL
+  OAUTH
+  BOTH
+}
+
+enum OAuthProviderType {
+  GOOGLE
+  FACEBOOK
 }
 
 // Referral System Models
@@ -712,11 +730,51 @@ model AfipTransaction {
   timestamp    DateTime @default(now())
   reported     Boolean  @default(false)
   reportedAt   DateTime?
-  
+
   @@index([transactionId])
   @@index([timestamp])
   @@index([reported])
   @@map("afip_transactions")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  email     String   // Store the email being verified
+  expiresAt DateTime // Token expires after 24 hours
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
+model OAuthProvider {
+  id              String   @id @default(cuid())
+  userId          String
+  provider        OAuthProviderType
+  providerUserId  String   // Google user ID
+  email           String   // Email from OAuth provider
+  profileData     Json?    // Store additional profile info (name, picture, etc.)
+  accessToken     String?  // OAuth access token
+  refreshToken    String?  // OAuth refresh token (if available)
+  tokenExpiresAt  DateTime? // When access token expires
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@index([provider])
+  @@index([providerUserId])
+  @@map("oauth_providers")
 }
 
 model PromotionalCampaign {
